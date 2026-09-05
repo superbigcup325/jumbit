@@ -1,1 +1,11 @@
+import {
+  "moonbitlang/async/fs" @afs,
+  "moonbitlang/async/io",
+  "moonbitlang/core/debug",
+  "moonbitlang/core/random",
+  "superbigcup325/jumbit/core",
+}
 
+import {
+  "moonbitlang/async",
+} for "wbtest"
