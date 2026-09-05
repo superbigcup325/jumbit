@@ -20,9 +20,9 @@ pub const MONTH : Int64 = 30L * DAY
 /// 单条目录记录：三字段模型（对齐上游 src/db/dir.rs）
 pub(all) struct Dir {
   path : String
-  rank : Double
-  last_accessed : Int64
-}
+  mut rank : Double
+  mut last_accessed : Int64
+} derive(Debug)
 
 ///|
 /// frecency 得分 = rank × 时间衰减系数（Epoch 单位：秒）
