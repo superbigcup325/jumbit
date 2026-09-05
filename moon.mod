@@ -27,4 +27,5 @@ description = "a MoonBit rewrite of zoxide: jump to directories in a few keystro
 
 import {
   "moonbitlang/async@0.21.2",
+  "moonbitlang/x@0.5.1",
 }

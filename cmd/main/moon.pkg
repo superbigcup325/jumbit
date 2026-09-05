@@ -1,1 +1,14 @@
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/fs" @afs,
+  "moonbitlang/async/stdio",
+  "moonbitlang/core/debug",
+  "moonbitlang/core/env",
+  "moonbitlang/x/sys",
+  "superbigcup325/jumbit/cli",
+  "superbigcup325/jumbit/config",
+  "superbigcup325/jumbit/core",
+  "superbigcup325/jumbit/platform",
+}
+
 pkgtype(kind: "executable")

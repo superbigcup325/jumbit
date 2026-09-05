@@ -3,7 +3,7 @@
 pub(all) struct Database {
   dirs : Array[Dir]
   mut dirty : Bool
-}
+} derive(Debug)
 
 ///|
 pub fn Database::new() -> Database {

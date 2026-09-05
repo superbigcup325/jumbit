@@ -2,6 +2,7 @@
 package "superbigcup325/jumbit/cmd/main"
 
 // Values
+pub async fn run(Array[String], (String) -> String?, Array[String]) -> Int
 
 // Errors
 

@@ -2,6 +2,7 @@
 package "superbigcup325/jumbit/config"
 
 // Values
+pub fn data_dir((String) -> String?) -> Result[String, String]
 
 // Errors
 

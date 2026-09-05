@@ -1,11 +1,24 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "superbigcup325/jumbit/cli"
 
+import {
+  "moonbitlang/core/debug",
+}
+
 // Values
+pub fn parse(Array[String]) -> Command
+
+pub fn usage() -> String
 
 // Errors
 
 // Types and methods
+pub(all) enum Command {
+  Add(Array[String])
+  Query(Array[String])
+  Help
+  Unknown(String)
+} derive(Eq, @debug.Debug)
 
 // Type aliases
 

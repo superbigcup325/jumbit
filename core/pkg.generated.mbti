@@ -1,11 +1,60 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "superbigcup325/jumbit/core"
 
+import {
+  "moonbitlang/core/debug",
+}
+
 // Values
+pub const DAY : Int64 = 86400
+
+pub const HOUR : Int64 = 3600
+
+pub const MAX_SIZE : Int = 33554432
+
+pub const MINUTE : Int64 = 60
+
+pub const MONTH : Int64 = 2592000
+
+pub const SECOND : Int64 = 1
+
+pub const WEEK : Int64 = 604800
+
+pub fn decode(Bytes) -> Result[Array[Dir], CodecError]
+
+pub fn encode(Array[Dir]) -> Bytes
+
+pub fn resolve_path(String, String) -> String
 
 // Errors
 
 // Types and methods
+pub enum CodecError {
+  CorruptedData
+  UnsupportedVersion(Int)
+  TooLarge
+} derive(@debug.Debug)
+
+pub(all) struct Database {
+  dirs : Array[Dir]
+  mut dirty : Bool
+} derive(@debug.Debug)
+pub fn Database::add(Self, String, Double, Int64) -> Unit
+pub fn Database::add_update(Self, String, Double, Int64) -> Unit
+pub fn Database::all(Self) -> Array[Dir]
+pub fn Database::find_idx(Self, String) -> Int?
+pub fn Database::is_dirty(Self) -> Bool
+pub fn Database::mark_clean(Self) -> Unit
+pub fn Database::new() -> Self
+pub fn Database::sort_by_score(Self, Int64) -> Unit
+
+pub(all) struct Dir {
+  path : String
+  mut rank : Double
+  mut last_accessed : Int64
+} derive(@debug.Debug)
+pub fn Dir::format_score(Self, Int64) -> String
+pub fn Dir::score(Self, Int64) -> Double
 
 // Type aliases
 
