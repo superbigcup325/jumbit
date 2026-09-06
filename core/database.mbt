@@ -127,3 +127,64 @@ pub fn Database::remove(self : Database, path : String) -> Bool {
     None => false
   }
 }
+
+///|
+/// 新建条目且不查重（会产生重复，调用方需保证先查或随后 dedup；对齐上游 add_unchecked）
+pub fn Database::add_unchecked(
+  self : Database,
+  path : String,
+  rank : Double,
+  now : Int64,
+) -> Unit {
+  self.dirs.push({ path, rank, last_accessed: now, })
+  self.dirty = true
+}
+
+///|
+/// 按路径字典序原地排序
+pub fn Database::sort_by_path(self : Database) -> Unit {
+  self.dirs.sort_by(fn(a, b) { a.path.compare(b.path) })
+  self.dirty = true
+}
+
+///|
+/// 老化（对齐上游 Database::age）：总分**严格大于** max_age 才触发
+/// （total=0 与 total==max_age 均不动，天然防除零）；全体 rank 乘
+/// factor = 0.9 × max_age / total，乘后 rank < 1 的条目删除。
+pub fn Database::age(self : Database, max_age : Double) -> Unit {
+  let mut total = 0.0
+  for d in self.dirs {
+    total = total + d.rank
+  }
+  if total > max_age {
+    let factor = 0.9 * max_age / total
+    for i in self.dirs.length()>..0 {
+      let d = self.dirs[i]
+      d.rank = d.rank * factor
+      if d.rank < 1.0 {
+        self.swap_remove(i)
+      }
+    }
+    self.dirty = true
+  }
+}
+
+///|
+/// 合并重复路径：先按路径排序，相邻同路径条目 rank 相加、last_accessed 取最大
+/// （对齐上游 Database::dedup）
+pub fn Database::dedup(self : Database) -> Unit {
+  self.sort_by_path()
+  for i in self.dirs.length()>..1 {
+    let curr = self.dirs[i]
+    let prev = self.dirs[i - 1]
+    if curr.path == prev.path {
+      prev.last_accessed = if prev.last_accessed > curr.last_accessed {
+        prev.last_accessed
+      } else {
+        curr.last_accessed
+      }
+      prev.rank = prev.rank + curr.rank
+      self.swap_remove(i)
+    }
+  }
+}
