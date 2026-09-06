@@ -42,7 +42,7 @@ j backend        # 跳转（自动补全）
 ji               # fzf 交互式跳转
 ```
 
-参数：`--cmd C` 自定义命令名（如 `--cmd=cd`）、`--hook pwd|prompt|none` 选择记录触发方式、`--no-cmd` 只生成内部函数。
+参数：`--cmd C` 自定义命令名（默认 `j`，如 `--cmd=cd`）、`--hook pwd|prompt|none` 选择记录触发方式（默认 `pwd`）、`--no-cmd` 只生成内部函数。
 
 ## 环境变量
 
@@ -60,7 +60,7 @@ ji               # fzf 交互式跳转
 - 持久化格式为自定义二进制（版本号 + 长度前缀条目），与上游 `db.zo` **不互通**
 - 环境变量前缀 `_ZO_*` → `_JB_*`，两者可共存
 - 关键词大小写归一仅限 ASCII（上游为 Unicode 全量）
-- glob 排除不支持 `{a,b}` 括号展开；`*`/`?`/`[...]` 语义对齐
+- glob 排除不支持 `{a,b}` 括号展开；`**` 按两个 `*` 处理、不跨分隔符（上游 glob crate 的 `**` 为递归通配）；`*`/`?`/`[...]` 语义对齐
 - 仅支持 Linux；fzf 预览窗口的平台定制未实现
 - 未移植：`import`（外部工具历史导入）、`edit` 子命令、elvish/nushell/posix/powershell/tcsh/xonsh 模板
 
