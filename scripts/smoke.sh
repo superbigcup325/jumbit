@@ -38,7 +38,6 @@ if [ "$out" != "$t2" ]; then
   echo "✗ query foo 输出 [$out] ≠ [$t2]" >&2
   exit 1
 fi
-out2=$(_JB_DATA_DIR="$data" "$bin" query target 2>/dev/null || true)
 if _JB_DATA_DIR="$data" "$bin" query nosuchkeyword 2>/dev/null; then
   echo "✗ 无匹配关键词应退出码 1" >&2
   exit 1

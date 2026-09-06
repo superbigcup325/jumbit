@@ -1,6 +1,14 @@
 // 端到端测试：经 run() 全链路（真实 FS，_JB_DATA_DIR 注入临时目录，stderr 消息可断言）
 
 ///|
+/// 递归清理测试目录（rmdir 失败静默：断言失败场景下残留可接受）
+async fn cleanup_test_dir(dir : String) -> Unit {
+  @afs.rmdir(dir, recursive=true) catch {
+    err => ignore(err)
+  }
+}
+
+///|
 async fn make_test_dir(prefix : String) -> String {
   // rand_name 不可见（platform 私有），用毫秒 + exists 重试保证并发测试不撞名
   for _attempt = 0 {
@@ -12,23 +20,6 @@ async fn make_test_dir(prefix : String) -> String {
       continue _attempt + 1
     }
   }
-}
-
-///|
-fn env_with(data_dir : String) -> (String) -> String? {
-  fn(key : String) -> String? {
-    if key == "_JB_DATA_DIR" {
-      Some(data_dir)
-    } else {
-      None
-    }
-  }
-}
-
-///|
-test "env_with：命中与未命中" {
-  @debug.assert_eq(env_with("/d")("_JB_DATA_DIR"), Some("/d"))
-  @debug.assert_eq(env_with("/d")("HOME"), None)
 }
 
 ///|
@@ -44,6 +35,17 @@ fn env_map(pairs : Array[(String, String)]) -> (String) -> String? {
 }
 
 ///|
+fn env_with(data_dir : String) -> (String) -> String? {
+  env_map([("_JB_DATA_DIR", data_dir)])
+}
+
+///|
+test "env_with：命中与未命中" {
+  @debug.assert_eq(env_with("/d")("_JB_DATA_DIR"), Some("/d"))
+  @debug.assert_eq(env_with("/d")("HOME"), None)
+}
+
+///|
 test "echo_enabled：仅 _JB_ECHO=1 生效" {
   @debug.assert_eq(echo_enabled(env_map([("_JB_ECHO", "1")])), true)
   @debug.assert_eq(echo_enabled(env_map([("_JB_ECHO", "0")])), false)
@@ -56,9 +58,11 @@ async test "add → query 全链路" {
   let target = make_test_dir("target")
   let errs : Array[String] = []
   @debug.assert_eq(run(["add", target], env_with(data), errs), 0)
-  @debug.assert_eq(errs.length(), 0)
   @debug.assert_eq(@afs.exists(data + "/db.zo"), true)
+  @debug.assert_eq(errs.length(), 0)
   @debug.assert_eq(run(["query"], env_with(data), errs), 0)
+  cleanup_test_dir(data)
+  cleanup_test_dir(target)
 }
 
 ///|
@@ -67,6 +71,7 @@ async test "空库 query → 退出码 1 + 提示语，不 panic" {
   let errs : Array[String] = []
   @debug.assert_eq(run(["query"], env_with(data), errs), 1)
   @debug.assert_eq(errs.length(), 1)
+  cleanup_test_dir(data)
 }
 
 ///|
@@ -75,6 +80,7 @@ async test "add 非目录 → 退出码 1 且报错文案" {
   let errs : Array[String] = []
   @debug.assert_eq(run(["add", "/nonexistent-path"], env_with(data), errs), 1)
   @debug.assert_eq(errs.length(), 1)
+  cleanup_test_dir(data)
 }
 
 ///|
@@ -84,6 +90,7 @@ async test "add 含换行路径 → 跳过且不建库文件" {
   @debug.assert_eq(run(["add", "/a\nb"], env_with(data), errs), 1)
   @debug.assert_eq(errs.length(), 1)
   @debug.assert_eq(@afs.exists(data + "/db.zo"), false)
+  cleanup_test_dir(data)
 }
 
 ///|
@@ -93,6 +100,7 @@ async test "未知命令与缺参数 → 退出码 2" {
   @debug.assert_eq(run(["frobnicate"], env_with(data), errs), 2)
   @debug.assert_eq(run(["add"], env_with(data), errs), 2)
   @debug.assert_eq(errs.length(), 3)
+  cleanup_test_dir(data)
 }
 
 ///|
@@ -101,6 +109,7 @@ async test "help → 退出码 0" {
   let errs : Array[String] = []
   @debug.assert_eq(run(["help"], env_with(data), errs), 0)
   @debug.assert_eq(errs.length(), 0)
+  cleanup_test_dir(data)
 }
 
 ///|
@@ -116,6 +125,8 @@ async test "两次 add 同目录 → 数据库仍单条目" {
   }
   @debug.assert_eq(store.database().all().length(), 1)
   @debug.assert_eq(store.database().all()[0].rank, 2.0)
+  cleanup_test_dir(data)
+  cleanup_test_dir(target)
 }
 
 ///|
@@ -133,6 +144,9 @@ async test "query 关键词：命中末组件的目录" {
   @debug.assert_eq(errs2.length(), 1)
   // 关键词落在首组件（tmp）不满足末组件锚定 → 无匹配
   @debug.assert_eq(run(["query", "tmp"], env_with(data), errs2), 1)
+  cleanup_test_dir(data)
+  cleanup_test_dir(foo_dir)
+  cleanup_test_dir(bar_dir)
 }
 
 ///|
@@ -155,4 +169,6 @@ async test "add：_JB_ECHO=1 时回显且退出码不受影响" {
     Err(e) => fail("\{Repr(e)}")
   }
   @debug.assert_eq(store.database().all().length(), 1)
+  cleanup_test_dir(data)
+  cleanup_test_dir(target)
 }

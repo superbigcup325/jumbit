@@ -108,7 +108,7 @@ async fn run_add(
 }
 
 ///|
-/// query：按得分降序输出（当前版本无关键词过滤，关键词参数暂被忽略）
+/// query：按得分降序找首个命中关键词的目录（过滤语义见 core/keyword）
 async fn run_query(
   keywords : Array[String],
   getenv : (String) -> String?,
