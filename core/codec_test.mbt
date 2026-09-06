@@ -126,3 +126,27 @@ test "非法 UTF-8 路径 → CorruptedData" {
     other => fail("unexpected: \{Repr(other)}")
   }
 }
+
+///|
+test "路径含 NUL 字节 → CorruptedData" {
+  // 版本 1 + plen=3 + "a\x00b"（NUL 在路径中间）
+  let buf : Array[Byte] = [1, 0, 0, 0, 3, 0, 0, 0, 97, 0, 98].map(fn(i) {
+    i.to_byte()
+  })
+  match @core.decode(Bytes::from_array(buf)) {
+    Err(@core.CorruptedData) => ()
+    other => fail("unexpected: \{Repr(other)}")
+  }
+}
+
+///|
+test "路径含换行字节 → CorruptedData" {
+  // 版本 1 + plen=2 + 0x0A 0x0D
+  let buf : Array[Byte] = [1, 0, 0, 0, 2, 0, 0, 0, 10, 13].map(fn(i) {
+    i.to_byte()
+  })
+  match @core.decode(Bytes::from_array(buf)) {
+    Err(@core.CorruptedData) => ()
+    other => fail("unexpected: \{Repr(other)}")
+  }
+}

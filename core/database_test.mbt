@@ -61,3 +61,20 @@ test "find_idx：命中与未命中" {
   @debug.assert_eq(db.find_idx("/foo"), Some(0))
   @debug.assert_eq(db.find_idx("/bar"), None)
 }
+
+///|
+test "all() 返回副本：外部增删不影响库内部" {
+  let db = @core.Database::new()
+  db.add("/foo", 1.0, 0L)
+  let snapshot = db.all()
+  snapshot.push(@core.Dir::{ path: "/injected", rank: 9.0, last_accessed: 0L, })
+  @debug.assert_eq(db.all().length(), 1)
+}
+
+///|
+test "from_dirs：解码入口构建，初始未标脏" {
+  let dirs = [@core.Dir::{ path: "/a", rank: 1.0, last_accessed: 0L, }]
+  let db = @core.Database::from_dirs(dirs)
+  @debug.assert_eq(db.is_dirty(), false)
+  @debug.assert_eq(db.all().length(), 1)
+}

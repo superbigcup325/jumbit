@@ -27,7 +27,7 @@ pub async fn load(data_dir : String) -> Result[Store, StoreError] {
       err => return Err(Io("\{Repr(err)}"))
     }
     match @core.decode(data.binary()) {
-      Ok(dirs) => Ok({ db: { dirs, dirty: false, }, data_dir, })
+      Ok(dirs) => Ok({ db: @core.Database::from_dirs(dirs), data_dir, })
       Err(e) => Err(Codec(e))
     }
   } else {

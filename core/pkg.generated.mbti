@@ -37,7 +37,7 @@ pub enum CodecError {
   TooLarge
 } derive(@debug.Debug)
 
-pub(all) struct Database {
+pub struct Database {
   dirs : Array[Dir]
   mut dirty : Bool
 } derive(@debug.Debug)
@@ -45,6 +45,7 @@ pub fn Database::add(Self, String, Double, Int64) -> Unit
 pub fn Database::add_update(Self, String, Double, Int64) -> Unit
 pub fn Database::all(Self) -> Array[Dir]
 pub fn Database::find_idx(Self, String) -> Int?
+pub fn Database::from_dirs(Array[Dir]) -> Self
 pub fn Database::is_dirty(Self) -> Bool
 pub fn Database::mark_clean(Self) -> Unit
 pub fn Database::new() -> Self

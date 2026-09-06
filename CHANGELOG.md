@@ -19,4 +19,12 @@
 - 端到端冒烟脚本 `scripts/smoke.sh`：真实二进制验证 add→query 回显与错误退出码
 - 开发者回归脚本 `scripts/regression.sh`：`moon check --deny-warn`、`moon test`、`moon fmt --check`、`moon info` 接口面冻结四道闸，任一失败即非零退出
 
+### Fixed
+
+- 持久化解码拒绝路径字节含 NUL/换行的库文件（此前仅 add 入口拦截，手工构造的库文件可绕过）
+
+### Internal
+
+- Database 封装收敛：字段改为外部不可构造/原地修改，`all()` 返回数组副本，保证 dirty 标志一致性
+
 [Unreleased]: https://github.com/superbigcup325/jumbit

@@ -1,6 +1,7 @@
 ///|
 /// 数据库：条目数组 + dirty 标志（对齐上游 src/db/mod.rs；MoonBit 无借用约束，直接持数组）
-pub(all) struct Database {
+/// pub struct：外部可读字段但不可构造/原地修改，变更一律走方法（保 dirty 一致性）
+pub struct Database {
   dirs : Array[Dir]
   mut dirty : Bool
 } derive(Debug)
@@ -8,6 +9,12 @@ pub(all) struct Database {
 ///|
 pub fn Database::new() -> Database {
   { dirs: [], dirty: false, }
+}
+
+///|
+/// 从解码结果构建（platform/load 专用；dirty=false）
+pub fn Database::from_dirs(dirs : Array[Dir]) -> Database {
+  { dirs, dirty: false, }
 }
 
 ///|
@@ -78,9 +85,9 @@ pub fn Database::find_idx(self : Database, path : String) -> Int? {
 }
 
 ///|
-/// 只读访问条目数组
+/// 只读访问条目数组（返回副本：外部增删/排序不影响库内部结构）
 pub fn Database::all(self : Database) -> Array[Dir] {
-  self.dirs
+  Array::from_iter(self.dirs.iter())
 }
 
 ///|
