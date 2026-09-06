@@ -157,7 +157,13 @@ fn parse_init(args : Array[String]) -> Command {
       "init: 不支持的 shell: \{shell}（当前支持 bash/zsh/fish）",
     )
   }
-  let opts : InitOptions = { shell, cmd: None, hook: HookNone, no_cmd: false, }
+  // 默认对齐上游 cmd.rs：--cmd 默认定义命令（jumbit → "j"），--hook 默认 pwd
+  let opts : InitOptions = {
+    shell,
+    cmd: Some("j"),
+    hook: HookPwd,
+    no_cmd: false,
+  }
   let mut bad : String? = None
   let n = args.length()
   let mut i = 1
@@ -220,7 +226,7 @@ pub fn usage() -> String {
   "    --all                                 跳过存在性检查\n" +
   "    --exclude <path>                      排除指定目录（精确路径）\n" +
   "    --interactive                         fzf 交互式选择\n" +
-  "  jumbit init <shell>                     生成 shell 集成脚本\n" +
+  "  jumbit init <shell>                     生成 shell 集成脚本（默认定义 j/ji，hook=pwd）\n" +
   "    [--cmd C] [--hook pwd|prompt|none] [--no-cmd]\n" +
   "  jumbit help                             显示本帮助\n\n" +
   "环境变量：\n" +
