@@ -23,6 +23,17 @@ if [ "$out" != "$target" ]; then
   exit 1
 fi
 
+echo "== --list --score 输出格式（6.1f 得分前缀 + 空格 + 路径）=="
+out=$(_JB_DATA_DIR="$data" "$bin" query --list --score)
+if [ "$(echo "$out" | wc -l)" -lt 1 ]; then
+  echo "✗ --list 无输出" >&2
+  exit 1
+fi
+if ! echo "$out" | grep -qE '^ *[0-9]+\.[0-9] .*tmp'; then
+  echo "✗ --score 前缀格式不符: $out" >&2
+  exit 1
+fi
+
 echo "== 未知命令应退出码 2 =="
 if _JB_DATA_DIR="$data" "$bin" frobnicate 2>/dev/null; then
   echo "✗ 未知命令退出码应为 2" >&2

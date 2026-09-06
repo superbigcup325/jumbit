@@ -30,7 +30,7 @@ pub async fn run(
       2
     }
     @cli.Add(paths) => run_add(paths, getenv, errs)
-    @cli.Query(keywords) => run_query(keywords, getenv, errs)
+    @cli.Query(qopts) => run_query(qopts, getenv, errs)
   }
 }
 
@@ -108,9 +108,10 @@ async fn run_add(
 }
 
 ///|
-/// query：按得分降序找首个命中关键词的目录（过滤语义见 core/keyword）
+/// query：完整过滤链（core/stream）+ --exclude 精确路径过滤 + 三种输出模式。
+/// 排序与懒删除会标脏，结束统一 save 落盘（对齐上游 query 后 save）。
 async fn run_query(
-  keywords : Array[String],
+  qopts : @cli.QueryOptions,
   getenv : (String) -> String?,
   errs : Array[String],
 ) -> Int {
@@ -128,22 +129,89 @@ async fn run_query(
       return 1
     }
   }
-  let db = store.database()
-  let now = current_second()
-  db.sort_by_score(now)
-  let dirs = db.all()
-  // sort_by_score 为升序，倒序即从最高分向低分找首个命中
-  for i in dirs.length()>..0 {
-    if @core.filter_by_keywords(keywords, dirs[i].path) {
-      println(dirs[i].path)
-      return 0
+  let globs = match @config.exclude_dirs(getenv, getenv("HOME")) {
+    Ok(g) => g
+    Err(msg) => {
+      err_line(errs, msg)
+      return 2
     }
   }
-  if keywords.is_empty() {
-    err_line(errs, "数据库为空，没有可跳转的目录")
-  } else {
-    let kw = keywords.join(" ")
-    err_line(errs, "无匹配: \{kw}")
+  let resolve_symlinks = @config.resolve_symlinks(getenv)
+  let now = current_second()
+  let stream_opts : @core.StreamOptions = {
+    now,
+    keywords: qopts.keywords,
+    exclude: globs,
+    base_dir: None,
+    exists: !qopts.all,
+    resolve_symlinks,
+    ttl: now - 3L * @core.MONTH,
   }
-  1
+  // exists 回调：kind 检查；resolve_symlinks=true 时不跟随符号链接（上游反向逻辑）
+  let hits = store
+    .database()
+    .query_all(stream_opts, async fn(path) {
+      let kind = @afs.kind(path, follow_symlink=!resolve_symlinks) catch {
+        err => {
+          ignore(err)
+          @afs.Unknown
+        }
+      }
+      kind == @afs.Directory
+    })
+  // --exclude 为精确路径过滤（对齐上游 query_first/list 的跳过循环）
+  let remaining = match qopts.exclude {
+    Some(exclude_path) => {
+      let out : Array[@core.Dir] = []
+      for d in hits {
+        if d.path != exclude_path {
+          out.push(d)
+        }
+      }
+      out
+    }
+    None => hits
+  }
+  let code = if remaining.is_empty() {
+    if hits.length() > 0 {
+      // 有命中但全被 --exclude 排除
+      err_line(errs, "you are already in the only match")
+    } else if qopts.keywords.is_empty() {
+      err_line(errs, "数据库为空，没有可跳转的目录")
+    } else {
+      let kw = qopts.keywords.join(" ")
+      err_line(errs, "无匹配: \{kw}")
+    }
+    1
+  } else if qopts.list {
+    for d in remaining {
+      println(render(d, now, qopts.score, " "))
+    }
+    0
+  } else {
+    println(render(remaining[0], now, qopts.score, " "))
+    0
+  }
+  match store.save() {
+    Ok(_) => code
+    Err(err) => {
+      err_line(errs, "保存数据库失败: \{Repr(err)}")
+      1
+    }
+  }
+}
+
+///|
+/// 输出行：--score 时前缀 6.1f 得分 + 分隔符（fzf 场景后续换 \t）
+fn render(
+  dir : @core.Dir,
+  now : Int64,
+  with_score : Bool,
+  separator : String,
+) -> String {
+  if with_score {
+    dir.format_score(now) + separator + dir.path
+  } else {
+    dir.path
+  }
 }

@@ -1,12 +1,53 @@
 // 子命令解析测试
 
 ///|
-test "parse：add/query 收集剩余参数" {
+fn query_opts(
+  keywords? : Array[String] = [],
+  all? : Bool = false,
+  list? : Bool = false,
+  score? : Bool = false,
+  exclude? : String? = None,
+) -> @cli.QueryOptions {
+  { keywords, all, list, score, exclude, }
+}
+
+///|
+test "parse：add/query 收集参数" {
   @debug.assert_eq(@cli.parse(["add", "/a", "/b"]), @cli.Add(["/a", "/b"]))
-  @debug.assert_eq(@cli.parse(["query"]), @cli.Query([]))
+  @debug.assert_eq(@cli.parse(["query"]), @cli.Query(query_opts()))
   @debug.assert_eq(
     @cli.parse(["query", "foo", "bar"]),
-    @cli.Query(["foo", "bar"]),
+    @cli.Query(query_opts(keywords=["foo", "bar"])),
+  )
+}
+
+///|
+test "parse：query 四个 flag" {
+  @debug.assert_eq(
+    @cli.parse(["query", "--list"]),
+    @cli.Query(query_opts(list=true)),
+  )
+  @debug.assert_eq(
+    @cli.parse(["query", "--score", "--all"]),
+    @cli.Query(query_opts(score=true, all=true)),
+  )
+  @debug.assert_eq(
+    @cli.parse(["query", "--exclude", "/tmp/x", "kw"]),
+    @cli.Query(query_opts(keywords=["kw"], exclude=Some("/tmp/x"))),
+  )
+  // flag 与关键词混排
+  @debug.assert_eq(
+    @cli.parse(["query", "kw", "--list"]),
+    @cli.Query(query_opts(keywords=["kw"], list=true)),
+  )
+}
+
+///|
+test "parse：未知 flag 与缺值归 Unknown" {
+  @debug.assert_eq(@cli.parse(["query", "--bogus"]), @cli.Unknown("--bogus"))
+  @debug.assert_eq(
+    @cli.parse(["query", "--exclude"]),
+    @cli.Unknown("--exclude 缺少路径参数"),
   )
 }
 

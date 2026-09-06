@@ -172,3 +172,77 @@ async test "add：_JB_ECHO=1 时回显且退出码不受影响" {
   cleanup_test_dir(data)
   cleanup_test_dir(target)
 }
+
+///|
+async test "query --list 与 --score 退出码" {
+  let data = make_test_dir("list-data")
+  let t1 = make_test_dir("alpha-list")
+  let t2 = make_test_dir("beta-list")
+  let errs : Array[String] = []
+  @debug.assert_eq(run(["add", t1, t2], env_with(data), errs), 0)
+  @debug.assert_eq(run(["query", "--list"], env_with(data), errs), 0)
+  @debug.assert_eq(run(["query", "--list", "--score"], env_with(data), errs), 0)
+  @debug.assert_eq(run(["query", "--score", "alpha"], env_with(data), errs), 0)
+  cleanup_test_dir(data)
+  cleanup_test_dir(t1)
+  cleanup_test_dir(t2)
+}
+
+///|
+async test "query --exclude 精确路径：唯一命中被排除报 only match" {
+  let data = make_test_dir("excl-data")
+  let only = make_test_dir("only-dir")
+  let errs : Array[String] = []
+  @debug.assert_eq(run(["add", only], env_with(data), errs), 0)
+  @debug.assert_eq(run(["query", "--exclude", only], env_with(data), errs), 1)
+  @debug.assert_eq(errs.length(), 1)
+  cleanup_test_dir(data)
+  cleanup_test_dir(only)
+}
+
+///|
+async test "query --all 跳过存在性检查" {
+  let data = make_test_dir("all-data")
+  let gone = make_test_dir("gone-dir")
+  let errs : Array[String] = []
+  @debug.assert_eq(run(["add", gone], env_with(data), errs), 0)
+  // 目录被删：默认 exists 检查 → 无匹配；--all → 仍返回
+  @afs.rmdir(gone)
+  @debug.assert_eq(run(["query"], env_with(data), errs), 1)
+  @debug.assert_eq(run(["query", "--all"], env_with(data), errs), 0)
+  cleanup_test_dir(data)
+}
+
+///|
+async test "_JB_EXCLUDE_DIRS glob 命中懒删除（重载后条目消失）" {
+  let data = make_test_dir("glob-data")
+  let victim = make_test_dir("victim-dir")
+  let keeper = make_test_dir("keeper-dir")
+  let errs : Array[String] = []
+  @debug.assert_eq(run(["add", victim, keeper], env_with(data), errs), 0)
+  let env = env_map([
+    ("_JB_DATA_DIR", data),
+    ("_JB_EXCLUDE_DIRS", "/tmp/*victim*"),
+  ])
+  @debug.assert_eq(run(["query", "--list"], env, errs), 0)
+  // 懒删除已落盘：重载后只剩 keeper
+  let store = match @platform.load(data) {
+    Ok(s) => s
+    Err(e) => fail("\{Repr(e)}")
+  }
+  @debug.assert_eq(store.database().all().length(), 1)
+  @debug.assert_eq(store.database().all()[0].path, keeper)
+  cleanup_test_dir(data)
+  cleanup_test_dir(victim)
+  cleanup_test_dir(keeper)
+}
+
+///|
+async test "_JB_EXCLUDE_DIRS 非法 glob → 退出码 2" {
+  let data = make_test_dir("badglob")
+  let errs : Array[String] = []
+  let env = env_map([("_JB_DATA_DIR", data), ("_JB_EXCLUDE_DIRS", "[unclosed")])
+  @debug.assert_eq(run(["query"], env, errs), 2)
+  @debug.assert_eq(errs.length(), 1)
+  cleanup_test_dir(data)
+}

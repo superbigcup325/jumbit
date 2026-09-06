@@ -26,7 +26,15 @@ pub fn encode(Array[Dir]) -> Bytes
 
 pub fn filter_by_keywords(Array[String], String) -> Bool
 
+pub fn glob_match(String, String) -> Bool
+
+pub fn glob_matches(String, String) -> Result[Bool, GlobError]
+
 pub fn resolve_path(String, String) -> String
+
+pub fn starts_with(String, String) -> Bool
+
+pub fn validate_glob(String) -> GlobError?
 
 // Errors
 
@@ -49,7 +57,10 @@ pub fn Database::from_dirs(Array[Dir]) -> Self
 pub fn Database::is_dirty(Self) -> Bool
 pub fn Database::mark_clean(Self) -> Unit
 pub fn Database::new() -> Self
+pub async fn Database::query_all(Self, StreamOptions, async (String) -> Bool) -> Array[Dir]
+pub fn Database::remove(Self, String) -> Bool
 pub fn Database::sort_by_score(Self, Int64) -> Unit
+pub fn Database::swap_remove(Self, Int) -> Unit
 
 pub(all) struct Dir {
   path : String
@@ -58,6 +69,24 @@ pub(all) struct Dir {
 } derive(@debug.Debug)
 pub fn Dir::format_score(Self, Int64) -> String
 pub fn Dir::score(Self, Int64) -> Double
+
+pub(all) enum GlobError {
+  UnclosedBracket
+  EmptyClass
+  InvalidRange
+  TrailingEscape
+} derive(Eq, @debug.Debug)
+
+pub(all) struct StreamOptions {
+  now : Int64
+  keywords : Array[String]
+  exclude : Array[String]
+  base_dir : String?
+  exists : Bool
+  resolve_symlinks : Bool
+  ttl : Int64
+}
+pub fn StreamOptions::new(Int64) -> Self
 
 // Type aliases
 

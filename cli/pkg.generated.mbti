@@ -15,9 +15,17 @@ pub fn usage() -> String
 // Types and methods
 pub(all) enum Command {
   Add(Array[String])
-  Query(Array[String])
+  Query(QueryOptions)
   Help
   Unknown(String)
+} derive(Eq, @debug.Debug)
+
+pub(all) struct QueryOptions {
+  keywords : Array[String]
+  mut all : Bool
+  mut list : Bool
+  mut score : Bool
+  mut exclude : String?
 } derive(Eq, @debug.Debug)
 
 // Type aliases

@@ -33,10 +33,10 @@ pub fn StreamOptions::new(now : Int64) -> StreamOptions {
 /// score 排序 → keywords → base_dir → exclude(glob, 命中懒删) → exists(最后，最慢)
 /// → 不存在且超 TTL 懒删。返回按得分从高到低的全部命中。
 /// exists 回调由调用方注入（platform 传文件系统检查，单测传闭包）。
-pub fn Database::query_all(
+pub async fn Database::query_all(
   self : Database,
   opts : StreamOptions,
-  exists : (String) -> Bool,
+  exists : async (String) -> Bool,
 ) -> Array[Dir] {
   self.sort_by_score(opts.now)
   let out : Array[Dir] = []
