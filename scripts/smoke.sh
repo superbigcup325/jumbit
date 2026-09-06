@@ -43,7 +43,7 @@ fi
 echo "== 关键词查询（末组件锚定）=="
 t2=$(mktemp -d "${TMPDIR:-/tmp}/foo-demo-XXXX")
 trap 'rm -rf "$data" "$target" "$t2"' EXIT
-_JB_DATA_DIR="$data" "$bin" add "$t2"
+_JB_DATA_DIR="$data" "$bin" add -- "$t2"
 out=$(_JB_DATA_DIR="$data" "$bin" query foo)
 if [ "$out" != "$t2" ]; then
   echo "✗ query foo 输出 [$out] ≠ [$t2]" >&2

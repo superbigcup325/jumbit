@@ -66,9 +66,28 @@ test "parse：未知命令回显原名" {
 }
 
 ///|
-test "parse：-- 之后的参数原样保留（负号开头路径）" {
+test "parse：add 的 -- 被剥离，其后路径原样保留" {
   @debug.assert_eq(
     @cli.parse(["add", "--", "-weird-dir"]),
-    @cli.Add(["--", "-weird-dir"]),
+    @cli.Add(["-weird-dir"]),
+  )
+  // 多个 -- 只有首个是分隔符
+  @debug.assert_eq(
+    @cli.parse(["add", "--", "--also-literal"]),
+    @cli.Add(["--also-literal"]),
+  )
+  @debug.assert_eq(@cli.parse(["add", "x", "--", "--"]), @cli.Add(["x", "--"]))
+}
+
+///|
+test "parse：query 的 -- 结束 flag 解析" {
+  // -- 之后的 --list 是关键词不是 flag
+  @debug.assert_eq(
+    @cli.parse(["query", "--", "--list"]),
+    @cli.Query(query_opts(keywords=["--list"])),
+  )
+  @debug.assert_eq(
+    @cli.parse(["query", "kw", "--", "-dash"]),
+    @cli.Query(query_opts(keywords=["kw", "-dash"])),
   )
 }

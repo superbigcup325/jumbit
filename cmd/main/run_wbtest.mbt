@@ -75,6 +75,22 @@ async test "空库 query → 退出码 1 + 提示语，不 panic" {
 }
 
 ///|
+async test "add 的 -- 分隔符：负号开头路径可正常记录" {
+  let data = make_test_dir("dash-data")
+  let target = make_test_dir("-dash-target")
+  let errs : Array[String] = []
+  @debug.assert_eq(run(["add", "--", target], env_with(data), errs), 0)
+  @debug.assert_eq(errs.length(), 0)
+  let store = match @platform.load(data) {
+    Ok(s) => s
+    Err(e) => fail("\{Repr(e)}")
+  }
+  @debug.assert_eq(store.database().all().length(), 1)
+  cleanup_test_dir(data)
+  cleanup_test_dir(target)
+}
+
+///|
 async test "add 非目录 → 退出码 1 且报错文案" {
   let data = make_test_dir("nondir")
   let errs : Array[String] = []

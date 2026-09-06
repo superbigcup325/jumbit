@@ -28,7 +28,7 @@ pub fn parse(args : Array[String]) -> Command {
     rest.push(args[i])
   }
   match args[0] {
-    "add" => Add(rest)
+    "add" => Add(strip_double_dash(rest))
     "query" => parse_query(rest)
     "help" | "--help" | "-h" => Help
     other => Unknown(other)
@@ -46,26 +46,34 @@ fn parse_query(args : Array[String]) -> Command {
     exclude: None,
   }
   let mut bad : String? = None
+  let mut escaped = false
   let n = args.length()
   let mut i = 0
   while i < n {
-    match args[i] {
-      "--all" => opts.all = true
-      "--list" => opts.list = true
-      "--score" => opts.score = true
-      "--exclude" =>
-        if i + 1 < n {
-          opts.exclude = Some(args[i + 1])
-          i += 1
-        } else {
-          bad = Some("--exclude 缺少路径参数")
-        }
-      s =>
-        if s.has_prefix("-") && s != "-" {
-          bad = Some(s)
-        } else {
-          opts.keywords.push(s)
-        }
+    let a = args[i]
+    if !escaped && a == "--" {
+      escaped = true
+    } else if !escaped {
+      match a {
+        "--all" => opts.all = true
+        "--list" => opts.list = true
+        "--score" => opts.score = true
+        "--exclude" =>
+          if i + 1 < n {
+            opts.exclude = Some(args[i + 1])
+            i += 1
+          } else {
+            bad = Some("--exclude 缺少路径参数")
+          }
+        s =>
+          if s.has_prefix("-") && s != "-" {
+            bad = Some(s)
+          } else {
+            opts.keywords.push(s)
+          }
+      }
+    } else {
+      opts.keywords.push(a)
     }
     i += 1
   }
@@ -73,6 +81,21 @@ fn parse_query(args : Array[String]) -> Command {
     Some(flag) => Unknown(flag)
     None => Query(opts)
   }
+}
+
+///|
+/// add 的 `--` 分隔符：仅剥离首个裸 `--`，其后参数原样保留（含再次出现的 `--`）
+fn strip_double_dash(args : Array[String]) -> Array[String] {
+  let out : Array[String] = []
+  let mut dropped = false
+  for a in args {
+    if !dropped && a == "--" {
+      dropped = true
+    } else {
+      out.push(a)
+    }
+  }
+  out
 }
 
 ///|
