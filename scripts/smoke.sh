@@ -23,6 +23,30 @@ if [ "$out" != "$target" ]; then
   exit 1
 fi
 
+echo "== init 模板语法校验（参数矩阵抽样）=="
+for shell in bash zsh fish; do
+  if ! command -v "$shell" >/dev/null; then
+    echo "  跳过 $shell（未安装）"
+    continue
+  fi
+  for args in "" "--no-cmd" "--cmd cd" "--hook prompt" "--hook pwd --cmd j"; do
+    if [ "$shell" = "bash" ]; then
+      _JB_ECHO=1 _JB_RESOLVE_SYMLINKS=1 "$bin" init bash $args | bash -n || { echo "✗ bash -n 失败: $args" >&2; exit 1; }
+    elif [ "$shell" = "zsh" ]; then
+      _JB_ECHO=1 "$bin" init zsh $args | zsh -n || { echo "✗ zsh -n 失败: $args" >&2; exit 1; }
+    else
+      _JB_RESOLVE_SYMLINKS=1 "$bin" init fish $args | fish -n || { echo "✗ fish -n 失败: $args" >&2; exit 1; }
+    fi
+  done
+done
+
+echo "== init bash source 实测 =="
+eval "$("$bin" init bash --cmd j)" 
+type __jumbit_z >/dev/null && type __jumbit_zi >/dev/null && type j >/dev/null || {
+  echo "✗ source 后函数未定义" >&2
+  exit 1
+}
+
 echo "== remove 后 query 无结果 =="
 _JB_DATA_DIR="$data" "$bin" remove -- "$target"
 if _JB_DATA_DIR="$data" "$bin" query 2>/dev/null; then

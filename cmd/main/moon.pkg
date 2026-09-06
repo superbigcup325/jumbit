@@ -9,6 +9,7 @@ import {
   "superbigcup325/jumbit/config",
   "superbigcup325/jumbit/core",
   "superbigcup325/jumbit/platform",
+  "superbigcup325/jumbit/templates" @tpl,
 }
 
 pkgtype(kind: "executable")

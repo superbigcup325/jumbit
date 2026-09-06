@@ -1,0 +1,26 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "superbigcup325/jumbit/templates"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn render_bash(String?, Hook, Bool, Bool) -> String
+
+pub fn render_fish(String?, Hook, Bool, Bool) -> String
+
+pub fn render_zsh(String?, Hook, Bool, Bool) -> String
+
+// Errors
+
+// Types and methods
+pub(all) enum Hook {
+  HookNone
+  HookPrompt
+  HookPwd
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits

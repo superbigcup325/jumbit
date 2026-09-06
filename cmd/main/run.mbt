@@ -32,6 +32,7 @@ pub async fn run(
     @cli.Add(aopts) => run_add(aopts, getenv, errs)
     @cli.Query(qopts) => run_query(qopts, getenv, errs)
     @cli.Remove(paths) => run_remove(paths, getenv, errs)
+    @cli.Init(iopts) => run_init(iopts, getenv, errs)
   }
 }
 
@@ -271,6 +272,26 @@ async fn run_query(
       err_line(errs, "无匹配: \{kw}")
     }
     1
+  } else if qopts.interactive {
+    match @platform.fzf_select(remaining, now, @config.fzf_opts(getenv)) {
+      Ok(selection) => {
+        // --score 输出整行（得分\t路径）；否则剥掉 7 字符得分前缀（对齐上游）
+        if qopts.score {
+          println(selection)
+        } else if selection.length() > 7 {
+          println(selection[7:].to_owned())
+        } else {
+          println("")
+        }
+        0
+      }
+      Err(@platform.NotFound) => {
+        err_line(errs, "could not find fzf, is it installed?")
+        1
+      }
+      Err(@platform.NoMatch) => 1
+      Err(@platform.Exit(c)) => c
+    }
   } else if qopts.list {
     for d in remaining {
       println(render(d, now, qopts.score, " "))
@@ -302,4 +323,27 @@ fn render(
   } else {
     dir.path
   }
+}
+
+///|
+/// init：按 shell 渲染集成脚本（echo/resolve_symlinks 取自运行时配置，对齐上游 init.rs）
+fn run_init(
+  iopts : @cli.InitOptions,
+  getenv : (String) -> String?,
+  errs : Array[String],
+) -> Int {
+  let echo = echo_enabled(getenv)
+  let resolve_symlinks = @config.resolve_symlinks(getenv)
+  let cmd : String? = if iopts.no_cmd { None } else { iopts.cmd }
+  let source = match iopts.shell {
+    "bash" => @tpl.render_bash(cmd, iopts.hook, echo, resolve_symlinks)
+    "zsh" => @tpl.render_zsh(cmd, iopts.hook, echo, resolve_symlinks)
+    "fish" => @tpl.render_fish(cmd, iopts.hook, echo, resolve_symlinks)
+    other => {
+      err_line(errs, "init: 不支持的 shell: \{other}")
+      return 2
+    }
+  }
+  println(source)
+  0
 }

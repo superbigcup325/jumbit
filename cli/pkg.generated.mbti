@@ -3,6 +3,7 @@ package "superbigcup325/jumbit/cli"
 
 import {
   "moonbitlang/core/debug",
+  "superbigcup325/jumbit/templates",
 }
 
 // Values
@@ -22,8 +23,16 @@ pub(all) enum Command {
   Add(AddOptions)
   Query(QueryOptions)
   Remove(Array[String])
+  Init(InitOptions)
   Help
   Unknown(String)
+} derive(Eq, @debug.Debug)
+
+pub(all) struct InitOptions {
+  shell : String
+  mut cmd : String?
+  mut hook : @templates.Hook
+  mut no_cmd : Bool
 } derive(Eq, @debug.Debug)
 
 pub(all) struct QueryOptions {
@@ -31,6 +40,7 @@ pub(all) struct QueryOptions {
   mut all : Bool
   mut list : Bool
   mut score : Bool
+  mut interactive : Bool
   mut exclude : String?
 } derive(Eq, @debug.Debug)
 

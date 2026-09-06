@@ -5,6 +5,7 @@ pub(all) struct QueryOptions {
   mut all : Bool
   mut list : Bool
   mut score : Bool
+  mut interactive : Bool
   mut exclude : String?
 } derive(Debug, Eq)
 
@@ -16,10 +17,19 @@ pub(all) struct AddOptions {
 } derive(Debug, Eq)
 
 ///|
+pub(all) struct InitOptions {
+  shell : String
+  mut cmd : String?
+  mut hook : @tpl.Hook
+  mut no_cmd : Bool
+} derive(Debug, Eq)
+
+///|
 pub(all) enum Command {
   Add(AddOptions)
   Query(QueryOptions)
   Remove(Array[String])
+  Init(InitOptions)
   Help
   Unknown(String)
 } derive(Debug, Eq)
@@ -38,6 +48,7 @@ pub fn parse(args : Array[String]) -> Command {
     "add" => parse_add(rest)
     "query" => parse_query(rest)
     "remove" => Remove(strip_double_dash(rest))
+    "init" => parse_init(rest)
     "help" | "--help" | "-h" => Help
     other => Unknown(other)
   }
@@ -92,6 +103,7 @@ fn parse_query(args : Array[String]) -> Command {
     all: false,
     list: false,
     score: false,
+    interactive: false,
     exclude: None,
   }
   let mut bad : String? = None
@@ -107,6 +119,7 @@ fn parse_query(args : Array[String]) -> Command {
         "--all" => opts.all = true
         "--list" => opts.list = true
         "--score" => opts.score = true
+        "--interactive" => opts.interactive = true
         "--exclude" =>
           if i + 1 < n {
             opts.exclude = Some(args[i + 1])
@@ -129,6 +142,54 @@ fn parse_query(args : Array[String]) -> Command {
   match bad {
     Some(flag) => Unknown(flag)
     None => Query(opts)
+  }
+}
+
+///|
+/// init 参数解析：shell ∈ {bash, zsh, fish}；--cmd C / --hook pwd|prompt|none / --no-cmd
+fn parse_init(args : Array[String]) -> Command {
+  if args.is_empty() {
+    return Unknown("init: 缺少 shell 参数（bash/zsh/fish）")
+  }
+  let shell = args[0]
+  if shell != "bash" && shell != "zsh" && shell != "fish" {
+    return Unknown(
+      "init: 不支持的 shell: \{shell}（当前支持 bash/zsh/fish）",
+    )
+  }
+  let opts : InitOptions = { shell, cmd: None, hook: HookNone, no_cmd: false, }
+  let mut bad : String? = None
+  let n = args.length()
+  let mut i = 1
+  while i < n {
+    match args[i] {
+      "--no-cmd" => opts.no_cmd = true
+      "--cmd" =>
+        if i + 1 < n {
+          opts.cmd = Some(args[i + 1])
+          i += 1
+        } else {
+          bad = Some("--cmd 缺少命令名参数")
+        }
+      "--hook" =>
+        if i + 1 < n {
+          match args[i + 1] {
+            "pwd" => opts.hook = @tpl.HookPwd
+            "prompt" => opts.hook = @tpl.HookPrompt
+            "none" => opts.hook = @tpl.HookNone
+            v => bad = Some("--hook 仅支持 pwd/prompt/none: \{v}")
+          }
+          i += 1
+        } else {
+          bad = Some("--hook 缺少参数")
+        }
+      s => bad = Some(s)
+    }
+    i += 1
+  }
+  match bad {
+    Some(msg) => Unknown(msg)
+    None => Init(opts)
   }
 }
 
@@ -158,6 +219,9 @@ pub fn usage() -> String {
   "    --score                               前缀显示得分\n" +
   "    --all                                 跳过存在性检查\n" +
   "    --exclude <path>                      排除指定目录（精确路径）\n" +
+  "    --interactive                         fzf 交互式选择\n" +
+  "  jumbit init <shell>                     生成 shell 集成脚本\n" +
+  "    [--cmd C] [--hook pwd|prompt|none] [--no-cmd]\n" +
   "  jumbit help                             显示本帮助\n\n" +
   "环境变量：\n" +
   "  _JB_DATA_DIR                            数据目录（默认 $HOME/.local/share/jumbit，须绝对路径）\n" +

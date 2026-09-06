@@ -8,7 +8,7 @@ fn query_opts(
   score? : Bool = false,
   exclude? : String? = None,
 ) -> @cli.QueryOptions {
-  { keywords, all, list, score, exclude, }
+  { keywords, all, list, score, interactive: false, exclude, }
 }
 
 ///|
