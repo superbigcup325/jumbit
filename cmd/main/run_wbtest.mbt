@@ -264,11 +264,11 @@ async test "_JB_EXCLUDE_DIRS glob 命中懒删除（重载后条目消失）" {
 }
 
 ///|
-async test "_JB_EXCLUDE_DIRS 非法 glob → 退出码 2" {
+async test "_JB_EXCLUDE_DIRS 非法 glob → 退出码 1（对齐上游运行失败）" {
   let data = make_test_dir("badglob")
   let errs : Array[String] = []
   let env = env_map([("_JB_DATA_DIR", data), ("_JB_EXCLUDE_DIRS", "[unclosed")])
-  @debug.assert_eq(run(["query"], env, errs), 2)
+  @debug.assert_eq(run(["query"], env, errs), 1)
   @debug.assert_eq(errs.length(), 1)
   cleanup_test_dir(data)
 }
@@ -323,11 +323,11 @@ async test "_JB_MAXAGE=0：add 后总分清零全删（预期行为锁定）" {
 }
 
 ///|
-async test "_JB_MAXAGE 非数字 → 退出码 2" {
+async test "_JB_MAXAGE 非数字 → 退出码 1（对齐上游运行失败）" {
   let data = make_test_dir("age-bad")
   let errs : Array[String] = []
   let env = env_map([("_JB_DATA_DIR", data), ("_JB_MAXAGE", "abc")])
-  @debug.assert_eq(run(["add", data], env, errs), 2)
+  @debug.assert_eq(run(["add", data], env, errs), 1)
   @debug.assert_eq(errs.length(), 1)
   cleanup_test_dir(data)
 }

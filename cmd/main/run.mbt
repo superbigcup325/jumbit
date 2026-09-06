@@ -13,7 +13,8 @@ fn err_line(errs : Array[String], msg : String) -> Unit {
 
 ///|
 /// 全部子命令的执行入口。
-/// 返回进程退出码（0 成功 / 1 运行失败 / 2 用法错误）；stderr 消息写入 errs。
+/// 返回进程退出码：0 成功 / 1 运行失败（含配置错误，对齐上游 ExitCode::FAILURE）
+/// / 2 用法错误（对齐 clap 参数解析错误）。stderr 消息写入 errs。
 pub async fn run(
   args : Array[String],
   getenv : (String) -> String?,
@@ -63,21 +64,21 @@ async fn run_add(
     Ok(d) => d
     Err(msg) => {
       err_line(errs, msg)
-      return 2
+      return 1
     }
   }
   let globs = match @config.exclude_dirs(getenv, getenv("HOME")) {
     Ok(g) => g
     Err(msg) => {
       err_line(errs, msg)
-      return 2
+      return 1
     }
   }
   let maxage = match @config.maxage(getenv) {
     Ok(m) => m
     Err(msg) => {
       err_line(errs, msg)
-      return 2
+      return 1
     }
   }
   let resolve_symlinks = @config.resolve_symlinks(getenv)
@@ -162,7 +163,7 @@ async fn run_remove(
     Ok(d) => d
     Err(msg) => {
       err_line(errs, msg)
-      return 2
+      return 1
     }
   }
   let store = match @platform.load(data_dir) {
@@ -208,7 +209,7 @@ async fn run_query(
     Ok(d) => d
     Err(msg) => {
       err_line(errs, msg)
-      return 2
+      return 1
     }
   }
   let store = match @platform.load(data_dir) {
@@ -222,7 +223,7 @@ async fn run_query(
     Ok(g) => g
     Err(msg) => {
       err_line(errs, msg)
-      return 2
+      return 1
     }
   }
   let resolve_symlinks = @config.resolve_symlinks(getenv)
