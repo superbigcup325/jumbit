@@ -106,3 +106,24 @@ pub fn Database::sort_by_score(self : Database, now : Int64) -> Unit {
   self.dirs.sort_by(fn(a, b) { a.score(now).compare(b.score(now)) })
   self.dirty = true
 }
+
+///|
+/// O(1) 删除指定下标（不保序，对齐上游 swap_remove）；懒删除专用
+pub fn Database::swap_remove(self : Database, idx : Int) -> Unit {
+  let last = self.dirs.length() - 1
+  self.dirs[idx] = self.dirs[last]
+  ignore(self.dirs.pop())
+  self.dirty = true
+}
+
+///|
+/// 按路径删除条目，返回是否确实删除了
+pub fn Database::remove(self : Database, path : String) -> Bool {
+  match self.find_idx(path) {
+    Some(i) => {
+      self.swap_remove(i)
+      true
+    }
+    None => false
+  }
+}

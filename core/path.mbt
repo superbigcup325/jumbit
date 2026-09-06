@@ -26,3 +26,32 @@ pub fn resolve_path(path : String, base : String) -> String {
     "/" + stack.join("/")
   }
 }
+
+///|
+/// 组件级前缀判断（对齐 std::path::Path::starts_with）：
+/// "/foo/ba" 不是 "/foo/bar" 的前缀；空 base 是任意路径的前缀。
+pub fn starts_with(path : String, base : String) -> Bool {
+  let path_segs = non_empty_segments(path)
+  let base_segs = non_empty_segments(base)
+  if base_segs.length() > path_segs.length() {
+    return false
+  }
+  for i in 0..<base_segs.length() {
+    if path_segs[i] != base_segs[i] {
+      return false
+    }
+  }
+  true
+}
+
+///|
+/// 按分隔符切分并丢弃空段（"/" 与 "" 的段列表均为空）
+fn non_empty_segments(path : String) -> Array[String] {
+  let out : Array[String] = []
+  for seg in path.split("/") {
+    if seg != "" {
+      out.push(seg.to_owned())
+    }
+  }
+  out
+}
