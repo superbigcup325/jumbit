@@ -14,7 +14,8 @@
 - 项目脚手架：以 `moon new` 铺设，`preferred_target = "native"`，MIT 许可证，包结构按 `core`（纯函数内核）/ `platform`（IO 外壳）/ `config` / `cli` 分层
 - 依赖锁定 `moonbitlang/async@0.21.2`：其 `fs` 子包提供带同步落盘的文件读写与 `rename`（原子写的基础），`process` 子包提供子进程调用（交互式选择的基础）
 - 关键词查询：最后一个关键词锚定路径末组件、其余从右往左消耗不许重叠（对齐 zoxide 匹配语义，大小写归一仅 ASCII）
-- 命令行入口 `jumbit`：`add <path>...` 记录目录（路径规范化、换行/非目录校验）、`query` 输出最高得分目录、`help`
+- 命令行入口 `jumbit`：`add <path>...` 记录目录（路径规范化、换行/非目录校验）、`query [kw]...` 按关键词过滤后输出最高得分目录、`help`
+- 调试回显 `_JB_ECHO=1`：add 时回显记录的目录
 - 端到端冒烟脚本 `scripts/smoke.sh`：真实二进制验证 add→query 回显与错误退出码
 - 开发者回归脚本 `scripts/regression.sh`：`moon check --deny-warn`、`moon test`、`moon fmt --check`、`moon info` 接口面冻结四道闸，任一失败即非零退出
 

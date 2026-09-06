@@ -29,4 +29,19 @@ if _JB_DATA_DIR="$data" "$bin" frobnicate 2>/dev/null; then
   exit 1
 fi
 
+echo "== 关键词查询（末组件锚定）=="
+t2=$(mktemp -d "${TMPDIR:-/tmp}/foo-demo-XXXX")
+trap 'rm -rf "$data" "$target" "$t2"' EXIT
+_JB_DATA_DIR="$data" "$bin" add "$t2"
+out=$(_JB_DATA_DIR="$data" "$bin" query foo)
+if [ "$out" != "$t2" ]; then
+  echo "✗ query foo 输出 [$out] ≠ [$t2]" >&2
+  exit 1
+fi
+out2=$(_JB_DATA_DIR="$data" "$bin" query target 2>/dev/null || true)
+if _JB_DATA_DIR="$data" "$bin" query nosuchkeyword 2>/dev/null; then
+  echo "✗ 无匹配关键词应退出码 1" >&2
+  exit 1
+fi
+
 echo "✓ smoke 全绿"

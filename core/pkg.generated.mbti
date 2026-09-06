@@ -24,6 +24,8 @@ pub fn decode(Bytes) -> Result[Array[Dir], CodecError]
 
 pub fn encode(Array[Dir]) -> Bytes
 
+pub fn filter_by_keywords(Array[String], String) -> Bool
+
 pub fn resolve_path(String, String) -> String
 
 // Errors

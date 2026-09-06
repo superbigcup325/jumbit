@@ -35,6 +35,15 @@ pub async fn run(
 }
 
 ///|
+/// _JB_ECHO 调试回显开关：仅值 "1" 生效（对齐上游 config::echo）
+fn echo_enabled(getenv : (String) -> String?) -> Bool {
+  match getenv("_JB_ECHO") {
+    Some("1") => true
+    _ => false
+  }
+}
+
+///|
 /// add：路径规范化 → 换行/目录校验 → add_update → save（_JB_MAXAGE 老化在后续版本接入）
 async fn run_add(
   paths : Array[String],
@@ -64,6 +73,7 @@ async fn run_add(
     None => "/"
   }
   let now = current_second()
+  let echo = echo_enabled(getenv)
   let mut failed = false
   for path in paths {
     if path.find("\n") is Some(_) || path.find("\r") is Some(_) {
@@ -84,6 +94,9 @@ async fn run_add(
       continue
     }
     store.database().add_update(resolved, 1.0, now)
+    if echo {
+      println(resolved)
+    }
   }
   match store.save() {
     Ok(_) => if failed { 1 } else { 0 }
@@ -101,11 +114,6 @@ async fn run_query(
   getenv : (String) -> String?,
   errs : Array[String],
 ) -> Int {
-  if keywords.length() > 0 {
-    err_line(
-      errs, "提示: 关键词过滤尚未实现，当前输出最高得分目录",
-    )
-  }
   let data_dir = match @config.data_dir(getenv) {
     Ok(d) => d
     Err(msg) => {
@@ -124,10 +132,18 @@ async fn run_query(
   let now = current_second()
   db.sort_by_score(now)
   let dirs = db.all()
-  if dirs.is_empty() {
-    err_line(errs, "数据库为空，没有可跳转的目录")
-    return 1
+  // sort_by_score 为升序，倒序即从最高分向低分找首个命中
+  for i in dirs.length()>..0 {
+    if @core.filter_by_keywords(keywords, dirs[i].path) {
+      println(dirs[i].path)
+      return 0
+    }
   }
-  println(dirs[dirs.length() - 1].path)
-  0
+  if keywords.is_empty() {
+    err_line(errs, "数据库为空，没有可跳转的目录")
+  } else {
+    let kw = keywords.join(" ")
+    err_line(errs, "无匹配: \{kw}")
+  }
+  1
 }
