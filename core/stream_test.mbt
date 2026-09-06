@@ -79,6 +79,40 @@ async test "exists=false 但近期访问 → 保留不删" {
 }
 
 ///|
+async test "单遍多次懒删除：exclude 连删多条，幸存者完整且倒序输出" {
+  let db = @core.Database::new()
+  db.add("/a/x", 1.0, 0L)
+  db.add("/b/y", 1.0, 0L)
+  db.add("/c/z", 1.0, 0L)
+  db.add("/keep", 1.0, 0L)
+  db.mark_clean()
+  let o = opts(1000L, exclude=["/a/*", "/c/*"])
+  let hits = db.query_all(o, fixed_exists(true))
+  // 倒序遍历 + swap_remove 交错：/keep 与 /b/y 幸存，且命中序从高到低
+  @debug.assert_eq(hits.length(), 2)
+  @debug.assert_eq(hits[0].path, "/keep")
+  @debug.assert_eq(hits[1].path, "/b/y")
+  @debug.assert_eq(db.all().length(), 2)
+  @debug.assert_eq(db.find_idx("/a/x") is Some(_), false)
+  @debug.assert_eq(db.find_idx("/c/z") is Some(_), false)
+  @debug.assert_eq(db.find_idx("/b/y") is Some(_), true)
+}
+
+///|
+async test "exists=false 且多条超 TTL → 单遍全删，近期条目幸存" {
+  let db = @core.Database::new()
+  db.add("/s1", 1.0, 0L)
+  db.add("/s2", 1.0, 0L)
+  db.add("/fresh", 1.0, 3L * @core.MONTH + 1L)
+  let (exists_fn, _) = counting_exists(false)
+  let o = opts(4L * @core.MONTH, exists=true)
+  let hits = db.query_all(o, exists_fn)
+  @debug.assert_eq(hits.length(), 0)
+  @debug.assert_eq(db.all().length(), 1)
+  @debug.assert_eq(db.find_idx("/fresh") is Some(_), true)
+}
+
+///|
 async test "exists 回调在所有前置过滤之后才调用（exists 最慢放最后）" {
   let db = @core.Database::new()
   db.add("/miss", 1.0, 0L) // 关键词不命中

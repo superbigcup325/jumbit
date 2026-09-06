@@ -128,6 +128,58 @@ test "非法 UTF-8 路径 → CorruptedData" {
 }
 
 ///|
+test "恰好 32MiB：允许通过大小检查，继续走版本校验" {
+  let bytes = Bytes::make(@core.MAX_SIZE, 0)
+  match @core.decode(bytes) {
+    // 全零字节版本号为 0 ≠ 1，说明大小检查放行、版本检查生效
+    Err(@core.UnsupportedVersion(0)) => ()
+    other => fail("unexpected: \{Repr(other)}")
+  }
+}
+
+///|
+test "空路径条目（path_len=0）合法解码" {
+  let buf : Array[Byte] = [
+    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  ].map(fn(i) { i.to_byte() })
+  match @core.decode(Bytes::from_array(buf)) {
+    Ok(dirs) => {
+      @debug.assert_eq(dirs.length(), 1)
+      @debug.assert_eq(dirs[0].path, "")
+      @debug.assert_eq(dirs[0].rank, 0.0)
+      @debug.assert_eq(dirs[0].last_accessed, 0L)
+    }
+    Err(e) => fail("unexpected: \{Repr(e)}")
+  }
+}
+
+///|
+test "roundtrip：特殊浮点与边界时间戳按 bit 保真" {
+  let dirs = [
+    // NaN：rank 唯一的 f64 非 bit 自反风险点（NaN != NaN）
+    @core.Dir::{ path: "/nan", rank: 0.0 / 0.0, last_accessed: -5L, },
+    // ±inf 与 Int64 边界
+    @core.Dir::{ path: "/inf", rank: 1.0 / 0.0, last_accessed: -1L, },
+    @core.Dir::{
+      path: "/ninf",
+      rank: -1.0 / 0.0,
+      last_accessed: 9223372036854775807L,
+    },
+  ]
+  match @core.decode(@core.encode(dirs)) {
+    Ok(out) => {
+      @debug.assert_eq(out[0].rank != out[0].rank, true) // NaN
+      @debug.assert_eq(out[0].last_accessed, -5L)
+      @debug.assert_eq(out[1].rank, 1.0 / 0.0)
+      @debug.assert_eq(out[1].last_accessed, -1L)
+      @debug.assert_eq(out[2].rank, -1.0 / 0.0)
+      @debug.assert_eq(out[2].last_accessed, 9223372036854775807L)
+    }
+    Err(e) => fail("unexpected: \{Repr(e)}")
+  }
+}
+
+///|
 test "路径含 NUL 字节 → CorruptedData" {
   // 版本 1 + plen=3 + "a\x00b"（NUL 在路径中间）
   let buf : Array[Byte] = [1, 0, 0, 0, 3, 0, 0, 0, 97, 0, 98].map(fn(i) {

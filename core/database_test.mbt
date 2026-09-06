@@ -128,6 +128,22 @@ test "age：_JB_MAXAGE=0 语义锁定——任何正总分触发全删" {
 }
 
 ///|
+test "age：缩放后 rank 恰好 1.0 保留（严格 <，factor 精确为 0.5 构造）" {
+  // m = 0.9 × 10000；pad 使 total == 2m → factor = m/2m == 0.5（f64 精确）
+  let m = 0.9 * 10000.0
+  let db = @core.Database::new()
+  db.add_unchecked("/exact", 2.0, 0L)
+  db.add_unchecked("/pad", m + m - 2.0, 0L)
+  db.add_unchecked("/zero", 0.0, 0L)
+  db.age(10000.0)
+  // 2.0 × 0.5 = 1.0，不满足 < 1.0 → 保留
+  @debug.assert_eq(db.find_idx("/exact") is Some(_), true)
+  @debug.assert_eq(db.all()[0].rank, 1.0)
+  // rank 0 条目缩放后 < 1 → 删除
+  @debug.assert_eq(db.find_idx("/zero") is Some(_), false)
+}
+
+///|
 test "dedup：rank 相加、last_accessed 取最大" {
   let db = @core.Database::new()
   db.add_unchecked("/a", 1.0, 100L)

@@ -27,3 +27,12 @@ test "空路径与根" {
   @debug.assert_eq(@core.resolve_path("/", "/x/y"), "/")
   @debug.assert_eq(@core.resolve_path(".", "/x/y"), "/x/y")
 }
+
+///|
+test "base 恒为规范路径：其中的 .. 与 . 与空段被忽略" {
+  // 上游 base = current_dir()，经 Path::components 恒不含 .. / . 段，
+  // 故本实现对 base 中此类段静默丢弃（锁定为前置条件规格）
+  @debug.assert_eq(@core.resolve_path("a", "/x/../y/./z"), "/x/y/z/a")
+  @debug.assert_eq(@core.resolve_path("a", "/x//y"), "/x/y/a")
+  @debug.assert_eq(@core.resolve_path("a", "/x/y/"), "/x/y/a")
+}

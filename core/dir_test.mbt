@@ -14,6 +14,10 @@ test "score 衰减系数：四档 + 时钟回拨" {
   @debug.assert_eq(dir.score(base + 60L * @core.DAY), 2.5)
   // 恰好 1 小时 → 落下一档 ×2.0（严格 <）
   @debug.assert_eq(dir.score(base + @core.HOUR), 20.0)
+  // 恰好 1 天 → 落 <1w ×0.5（严格 <）
+  @debug.assert_eq(dir.score(base + @core.DAY), 5.0)
+  // 恰好 1 周 → 落其余 ×0.25（严格 <）
+  @debug.assert_eq(dir.score(base + @core.WEEK), 2.5)
   // now == last_accessed → ×4.0
   @debug.assert_eq(dir.score(base), 40.0)
   // now < last_accessed（时钟回拨）→ ×4.0
@@ -46,4 +50,10 @@ test "format_score：宽度 6、1 位小数、clamp 边界" {
   // 小数进位：rank 123.456 ×4 = 493.824 → 493.8
   let frac = @core.Dir::{ path: "/foo", rank: 123.456, last_accessed: now, }
   inspect(frac.format_score(now), content=" 493.8")
+  // 个位小数：rank 0.1 ×4 = 0.4 → 整数部分补齐 3 空格
+  let tiny = @core.Dir::{ path: "/foo", rank: 0.1, last_accessed: now, }
+  inspect(tiny.format_score(now), content="   0.4")
+  // round 进位不破坏 clamp：rank 2499.74 ×4 = 9998.96 → ×10 round = 99990 → 9999.0
+  let carry = @core.Dir::{ path: "/foo", rank: 2499.74, last_accessed: now, }
+  inspect(carry.format_score(now), content="9999.0")
 }

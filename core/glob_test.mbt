@@ -58,6 +58,13 @@ test "多组件路径与字面量" {
 }
 
 ///|
+test "星号零宽：尾分隔符与空段匹配（对齐上游 glob crate 逐字符语义）" {
+  @debug.assert_eq(@core.glob_match("foo/*", "foo/"), true)
+  @debug.assert_eq(@core.glob_match("foo/*", "foo"), false)
+  @debug.assert_eq(@core.glob_match("foo/*bar", "foo/xxbar"), true)
+}
+
+///|
 test "校验：非法 pattern 报错" {
   @debug.assert_eq(@core.validate_glob("[abc"), Some(@core.UnclosedBracket))
   @debug.assert_eq(@core.validate_glob("[]"), Some(@core.EmptyClass))
@@ -66,6 +73,17 @@ test "校验：非法 pattern 报错" {
   @debug.assert_eq(@core.validate_glob("abc\\"), Some(@core.TrailingEscape))
   @debug.assert_eq(@core.validate_glob("/foo/*"), None)
   @debug.assert_eq(@core.validate_glob("[!a-z]x"), None)
+}
+
+///|
+test "校验：区间未闭合与类尾 '-' 的边界" {
+  // 含区间的未闭合 '['
+  @debug.assert_eq(@core.validate_glob("[a-z"), Some(@core.UnclosedBracket))
+  // '-' 在类尾为字面量，合法
+  @debug.assert_eq(@core.validate_glob("[a-]"), None)
+  @debug.assert_eq(@core.validate_glob("[-a]"), None)
+  // 区间后紧跟 ']'：']' 终止类，区间合法
+  @debug.assert_eq(@core.validate_glob("[a-z]"), None)
 }
 
 ///|

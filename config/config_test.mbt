@@ -124,6 +124,32 @@ test "resolve_symlinks：仅值 1 生效" {
 }
 
 ///|
+test "maxage：前导正号与前导零（对齐上游 parse::<u32> 语义）" {
+  // Rust "+5".parse::<u32>() 接受前导 +
+  match maxage(fake_env([("_JB_MAXAGE", "+5")])) {
+    Ok(v) => @debug.assert_eq(v, 5.0)
+    Err(e) => fail(e)
+  }
+  match maxage(fake_env([("_JB_MAXAGE", "007")])) {
+    Ok(v) => @debug.assert_eq(v, 7.0)
+    Err(e) => fail(e)
+  }
+}
+
+///|
+test "maxage：空串 / 空白 / 溢出均拒绝" {
+  @debug.assert_eq(maxage(fake_env([("_JB_MAXAGE", "")])) is Err(_), true)
+  // Rust parse 不容忍空白
+  @debug.assert_eq(maxage(fake_env([("_JB_MAXAGE", " 5")])) is Err(_), true)
+  @debug.assert_eq(maxage(fake_env([("_JB_MAXAGE", "5 ")])) is Err(_), true)
+  // 超出整数范围
+  @debug.assert_eq(
+    maxage(fake_env([("_JB_MAXAGE", "99999999999999")])) is Err(_),
+    true,
+  )
+}
+
+///|
 test "escape_glob：特殊字符逐一前置反斜杠" {
   @debug.assert_eq(escape_glob("a*b"), "a\\*b")
   @debug.assert_eq(escape_glob("x?y[1]"), "x\\?y\\[1\\]")
