@@ -73,3 +73,28 @@ pub fn escape_glob(path : String) -> String {
   }
   sb.to_string()
 }
+
+///|
+/// _JB_MAXAGE：数据库总分老化阈值（默认 10000；上游解析为 u32，这里同限制）
+pub fn maxage(get : (String) -> String?) -> Result[Double, String] {
+  match get("_JB_MAXAGE") {
+    None => Ok(10000.0)
+    Some(value) => {
+      let parsed : Result[Int, String] = Ok(@strconv.from_str(value)) catch {
+        e => {
+          ignore(e)
+          Err("_JB_MAXAGE 必须是非负整数: \{value}")
+        }
+      }
+      match parsed {
+        Ok(n) =>
+          if n < 0 {
+            Err("_JB_MAXAGE 必须是非负整数: \{value}")
+          } else {
+            Ok(n.to_double())
+          }
+        Err(msg) => Err(msg)
+      }
+    }
+  }
+}

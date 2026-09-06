@@ -50,8 +50,11 @@ pub struct Database {
   mut dirty : Bool
 } derive(@debug.Debug)
 pub fn Database::add(Self, String, Double, Int64) -> Unit
+pub fn Database::add_unchecked(Self, String, Double, Int64) -> Unit
 pub fn Database::add_update(Self, String, Double, Int64) -> Unit
+pub fn Database::age(Self, Double) -> Unit
 pub fn Database::all(Self) -> Array[Dir]
+pub fn Database::dedup(Self) -> Unit
 pub fn Database::find_idx(Self, String) -> Int?
 pub fn Database::from_dirs(Array[Dir]) -> Self
 pub fn Database::is_dirty(Self) -> Bool
@@ -59,6 +62,7 @@ pub fn Database::mark_clean(Self) -> Unit
 pub fn Database::new() -> Self
 pub async fn Database::query_all(Self, StreamOptions, async (String) -> Bool) -> Array[Dir]
 pub fn Database::remove(Self, String) -> Bool
+pub fn Database::sort_by_path(Self) -> Unit
 pub fn Database::sort_by_score(Self, Int64) -> Unit
 pub fn Database::swap_remove(Self, Int) -> Unit
 

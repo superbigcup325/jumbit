@@ -1,4 +1,5 @@
 import {
   "moonbitlang/core/debug",
+  "moonbitlang/core/strconv",
   "superbigcup325/jumbit/core",
 }

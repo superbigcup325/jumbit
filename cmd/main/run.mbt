@@ -29,8 +29,9 @@ pub async fn run(
       err_line(errs, "运行 jumbit help 查看用法")
       2
     }
-    @cli.Add(paths) => run_add(paths, getenv, errs)
+    @cli.Add(aopts) => run_add(aopts, getenv, errs)
     @cli.Query(qopts) => run_query(qopts, getenv, errs)
+    @cli.Remove(paths) => run_remove(paths, getenv, errs)
   }
 }
 
@@ -44,14 +45,116 @@ fn echo_enabled(getenv : (String) -> String?) -> Bool {
 }
 
 ///|
-/// add：路径规范化 → 换行/目录校验 → add_update → save（_JB_MAXAGE 老化在后续版本接入）
+/// add（对齐上游 add.rs）：
+/// - 按 _JB_RESOLVE_SYMLINKS 选择 realpath（canonicalize）或 resolve_path
+/// - 换行路径 / _JB_EXCLUDE_DIRS glob 命中 → 静默跳过；非目录 → 立即报错中止
+/// - 全部 add_update(score) 后，若 dirty 则 age(_JB_MAXAGE) 再 save
 async fn run_add(
+  aopts : @cli.AddOptions,
+  getenv : (String) -> String?,
+  errs : Array[String],
+) -> Int {
+  if aopts.paths.is_empty() {
+    err_line(errs, "add: 缺少路径参数")
+    return 2
+  }
+  let data_dir = match @config.data_dir(getenv) {
+    Ok(d) => d
+    Err(msg) => {
+      err_line(errs, msg)
+      return 2
+    }
+  }
+  let globs = match @config.exclude_dirs(getenv, getenv("HOME")) {
+    Ok(g) => g
+    Err(msg) => {
+      err_line(errs, msg)
+      return 2
+    }
+  }
+  let maxage = match @config.maxage(getenv) {
+    Ok(m) => m
+    Err(msg) => {
+      err_line(errs, msg)
+      return 2
+    }
+  }
+  let resolve_symlinks = @config.resolve_symlinks(getenv)
+  let store = match @platform.load(data_dir) {
+    Ok(s) => s
+    Err(err) => {
+      err_line(errs, "打开数据库失败: \{Repr(err)}")
+      return 1
+    }
+  }
+  let cwd = match @env.current_dir() {
+    Some(d) => d
+    None => "/"
+  }
+  let now = current_second()
+  for path in aopts.paths {
+    let resolved = @core.resolve_path(path, cwd)
+    let resolved = if resolve_symlinks {
+      @afs.realpath(resolved) catch {
+        err => {
+          err_line(errs, "解析路径失败: \{resolved} (\{Repr(err)})")
+          return 1
+        }
+      }
+    } else {
+      resolved
+    }
+    // 换行/回车无法整洁地打印在单行，静默跳过（对齐上游 EXCLUDE_CHARS）
+    if resolved.find("\n") is Some(_) || resolved.find("\r") is Some(_) {
+      continue
+    }
+    // _JB_EXCLUDE_DIRS 命中 → 静默跳过
+    let mut excluded = false
+    for pattern in globs {
+      if @core.glob_match(pattern, resolved) {
+        excluded = true
+        break
+      }
+    }
+    if excluded {
+      continue
+    }
+    let kind = @afs.kind(resolved) catch {
+      err => {
+        ignore(err)
+        @afs.Unknown
+      }
+    }
+    if kind != @afs.Directory {
+      err_line(errs, "not a directory: \{resolved}")
+      return 1
+    }
+    store.database().add_update(resolved, aopts.score, now)
+    if echo_enabled(getenv) {
+      println(resolved)
+    }
+  }
+  if store.database().is_dirty() {
+    store.database().age(maxage)
+  }
+  match store.save() {
+    Ok(_) => 0
+    Err(err) => {
+      err_line(errs, "保存数据库失败: \{Repr(err)}")
+      1
+    }
+  }
+}
+
+///|
+/// remove（对齐上游 remove.rs）：先按原始串删，未中再按规范化路径删，仍未中报错
+async fn run_remove(
   paths : Array[String],
   getenv : (String) -> String?,
   errs : Array[String],
 ) -> Int {
   if paths.is_empty() {
-    err_line(errs, "add: 缺少路径参数")
+    err_line(errs, "remove: 缺少路径参数")
     return 2
   }
   let data_dir = match @config.data_dir(getenv) {
@@ -72,34 +175,19 @@ async fn run_add(
     Some(d) => d
     None => "/"
   }
-  let now = current_second()
-  let echo = echo_enabled(getenv)
-  let mut failed = false
   for path in paths {
-    if path.find("\n") is Some(_) || path.find("\r") is Some(_) {
-      err_line(errs, "路径包含换行，已跳过: \{path}")
-      failed = true
-      continue
+    let mut removed = store.database().remove(path)
+    if !removed {
+      let resolved = @core.resolve_path(path, cwd)
+      removed = store.database().remove(resolved)
     }
-    let resolved = @core.resolve_path(path, cwd)
-    let kind = @afs.kind(resolved) catch {
-      err => {
-        ignore(err)
-        @afs.Unknown
-      }
-    }
-    if kind != @afs.Directory {
-      err_line(errs, "不是目录: \{resolved}")
-      failed = true
-      continue
-    }
-    store.database().add_update(resolved, 1.0, now)
-    if echo {
-      println(resolved)
+    if !removed {
+      err_line(errs, "path not found in database: \{path}")
+      return 1
     }
   }
   match store.save() {
-    Ok(_) => if failed { 1 } else { 0 }
+    Ok(_) => 0
     Err(err) => {
       err_line(errs, "保存数据库失败: \{Repr(err)}")
       1

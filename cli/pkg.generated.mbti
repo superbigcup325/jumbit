@@ -13,9 +13,15 @@ pub fn usage() -> String
 // Errors
 
 // Types and methods
+pub(all) struct AddOptions {
+  paths : Array[String]
+  mut score : Double
+} derive(Eq, @debug.Debug)
+
 pub(all) enum Command {
-  Add(Array[String])
+  Add(AddOptions)
   Query(QueryOptions)
+  Remove(Array[String])
   Help
   Unknown(String)
 } derive(Eq, @debug.Debug)

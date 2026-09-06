@@ -23,6 +23,15 @@ if [ "$out" != "$target" ]; then
   exit 1
 fi
 
+echo "== remove 后 query 无结果 =="
+_JB_DATA_DIR="$data" "$bin" remove -- "$target"
+if _JB_DATA_DIR="$data" "$bin" query 2>/dev/null; then
+  echo "✗ remove 后 query 应无结果（退出码 1）" >&2
+  exit 1
+fi
+# 重新 add 供后续段落使用
+_JB_DATA_DIR="$data" "$bin" add -- "$target"
+
 echo "== --list --score 输出格式（6.1f 得分前缀 + 空格 + 路径）=="
 out=$(_JB_DATA_DIR="$data" "$bin" query --list --score)
 if [ "$(echo "$out" | wc -l)" -lt 1 ]; then

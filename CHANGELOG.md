@@ -18,7 +18,10 @@
 - 查询流过滤链：score 排序 → 关键词 → base_dir（组件级前缀）→ exclude glob（命中懒删除）→ exists 检查（最后执行）→ 不存在且超 3 个月 TTL 懒删除；exists 回调注入使过滤链可纯测试
 - 数据库删除：按路径 remove 与 O(1) swap_remove（懒删除落库）
 - 命令行入口 `jumbit`：`add <path>...` 记录目录（路径规范化、换行/非目录校验）、`query [kw]...` 按关键词过滤后输出最高得分目录、`query --list`（全部匹配，按得分降序）、`--score`（6.1f 得分前缀）、`--all`（跳过存在性检查）、`--exclude <path>`（精确路径排除，排除唯一命中时明确报错）
-- 环境变量 `_JB_EXCLUDE_DIRS`（冒号分隔 glob，命中懒删除，默认排除 home 目录本身）与 `_JB_RESOLVE_SYMLINKS=1`（add 解析符号链接、查询反向不跟随）
+- 环境变量 `_JB_EXCLUDE_DIRS`（冒号分隔 glob，命中懒删除，默认排除 home 目录本身）、`_JB_RESOLVE_SYMLINKS=1`（add 解析符号链接、查询反向不跟随）、`_JB_MAXAGE`（数据库总分老化阈值，默认 10000，非法值报错）
+- `remove <path>...`：按原始串与规范化路径双重尝试删除，未找到明确报错
+- `add --score N`：指定本次增量权重
+- add 链路对齐上游：换行路径与排除 glob 命中静默跳过，非目录立即中止，写库前按总分老化
 - 调试回显 `_JB_ECHO=1`：add 时回显记录的目录
 - 端到端冒烟脚本 `scripts/smoke.sh`：真实二进制验证 add→query 回显与错误退出码
 - 开发者回归脚本 `scripts/regression.sh`：`moon check --deny-warn`、`moon test`、`moon fmt --check`、`moon info` 接口面冻结四道闸，任一失败即非零退出

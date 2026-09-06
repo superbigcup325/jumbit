@@ -10,9 +10,16 @@ pub(all) struct QueryOptions {
 
 ///|
 /// 子命令（MVP 命令面：add / query / help）
+pub(all) struct AddOptions {
+  paths : Array[String]
+  mut score : Double
+} derive(Debug, Eq)
+
+///|
 pub(all) enum Command {
-  Add(Array[String])
+  Add(AddOptions)
   Query(QueryOptions)
+  Remove(Array[String])
   Help
   Unknown(String)
 } derive(Debug, Eq)
@@ -28,10 +35,52 @@ pub fn parse(args : Array[String]) -> Command {
     rest.push(args[i])
   }
   match args[0] {
-    "add" => Add(strip_double_dash(rest))
+    "add" => parse_add(rest)
     "query" => parse_query(rest)
+    "remove" => Remove(strip_double_dash(rest))
     "help" | "--help" | "-h" => Help
     other => Unknown(other)
+  }
+}
+
+///|
+/// add 参数解析：可选一次 `--score <n>`；裸 `--` 剥离后全部为路径
+fn parse_add(args : Array[String]) -> Command {
+  let opts : AddOptions = { paths: [], score: 1.0, }
+  let mut bad : String? = None
+  let mut escaped = false
+  let n = args.length()
+  let mut i = 0
+  while i < n {
+    let a = args[i]
+    if !escaped && a == "--" {
+      escaped = true
+    } else if !escaped && a == "--score" {
+      if i + 1 < n {
+        let parsed : Result[Double, String] = Ok(@strconv.from_str(args[i + 1])) catch {
+          e => {
+            ignore(e)
+            Err("--score 必须是数字: \{args[i + 1]}")
+          }
+        }
+        match parsed {
+          Ok(v) => opts.score = v
+          Err(msg) => bad = Some(msg)
+        }
+        i += 1
+      } else {
+        bad = Some("--score 缺少数值参数")
+      }
+    } else if !escaped && a.has_prefix("-") && a != "-" {
+      bad = Some(a)
+    } else {
+      opts.paths.push(a)
+    }
+    i += 1
+  }
+  match bad {
+    Some(msg) => Unknown(msg)
+    None => Add(opts)
   }
 }
 
@@ -102,7 +151,8 @@ fn strip_double_dash(args : Array[String]) -> Array[String] {
 pub fn usage() -> String {
   "jumbit \{@jumbit.VERSION} — a MoonBit rewrite of zoxide\n\n" +
   "用法：\n" +
-  "  jumbit add <path>...                    记录目录\n" +
+  "  jumbit add [--score N] <path>...        记录目录（--score 指定本次增量权重）\n" +
+  "  jumbit remove <path>...                 从数据库移除目录\n" +
   "  jumbit query [kw]...                    输出最高得分匹配目录\n" +
   "    --list                                输出全部匹配（按得分降序）\n" +
   "    --score                               前缀显示得分\n" +
@@ -113,5 +163,6 @@ pub fn usage() -> String {
   "  _JB_DATA_DIR                            数据目录（默认 $HOME/.local/share/jumbit，须绝对路径）\n" +
   "  _JB_ECHO=1                              add 时回显记录的目录\n" +
   "  _JB_EXCLUDE_DIRS                        冒号分隔的 glob 列表，命中即从库中移除\n" +
-  "  _JB_RESOLVE_SYMLINKS=1                  add 时解析符号链接（查询时反向不跟随）"
+  "  _JB_RESOLVE_SYMLINKS=1                  add 时解析符号链接（查询时反向不跟随）\n" +
+  "  _JB_MAXAGE=N                            数据库总分老化阈值（默认 10000）"
 }
