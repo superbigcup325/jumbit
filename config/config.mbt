@@ -98,3 +98,9 @@ pub fn maxage(get : (String) -> String?) -> Result[Double, String] {
     }
   }
 }
+
+///|
+/// _JB_FZF_OPTS：透传给 fzf 的自定义参数（经 FZF_DEFAULT_OPTS 环境变量）
+pub fn fzf_opts(get : (String) -> String?) -> String? {
+  get("_JB_FZF_OPTS")
+}

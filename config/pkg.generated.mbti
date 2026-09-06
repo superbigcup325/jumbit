@@ -8,6 +8,8 @@ pub fn escape_glob(String) -> String
 
 pub fn exclude_dirs((String) -> String?, String?) -> Result[Array[String], String]
 
+pub fn fzf_opts((String) -> String?) -> String?
+
 pub fn maxage((String) -> String?) -> Result[Double, String]
 
 pub fn resolve_symlinks((String) -> String?) -> Bool
