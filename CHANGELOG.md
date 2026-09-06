@@ -21,6 +21,7 @@
 - 环境变量 `_JB_EXCLUDE_DIRS`（冒号分隔 glob，命中懒删除，默认排除 home 目录本身）、`_JB_RESOLVE_SYMLINKS=1`（add 解析符号链接、查询反向不跟随）、`_JB_MAXAGE`（数据库总分老化阈值，默认 10000，非法值报错）
 - `remove <path>...`：按原始串与规范化路径双重尝试删除，未找到明确报错
 - fzf 交互选择：`query --interactive` 按得分送入 fzf（未安装明确报错），`_JB_FZF_OPTS` 经 FZF_DEFAULT_OPTS 透传自定义参数
+- 项目 README：构建方式、完整用法、shell 集成、环境变量表、与 zoxide 差异清单、许可证说明
 - shell 集成：`jumbit init bash|zsh|fish` 生成集成脚本（`--cmd C` 自定义命令名、`--hook pwd|prompt|none` 触发方式、`--no-cmd` 不定义别名），脚本内环境变量 `_JB_ECHO`/`_JB_RESOLVE_SYMLINKS` 运行时生效
 - `add --score N`：指定本次增量权重
 - add 链路对齐上游：换行路径与排除 glob 命中静默跳过，非目录立即中止，写库前按总分老化
