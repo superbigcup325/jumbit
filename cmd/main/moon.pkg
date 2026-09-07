@@ -3,6 +3,7 @@ import {
   "moonbitlang/async/fs" @afs,
   "moonbitlang/async/stdio",
   "moonbitlang/core/debug",
+  "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/env",
   "moonbitlang/x/sys",
   "superbigcup325/jumbit/cli",

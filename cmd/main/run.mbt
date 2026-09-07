@@ -433,35 +433,44 @@ async fn run_import(
     // z / zsh-z / fasd / z.lua 与 z 同格式，共用解析（对齐上游复用 z::Iter）
     _ => @core.parse_z_line
   }
+  // 折叠开关与解析器同源派生（仅 atuin 有连续折叠，六插件中唯一）
+  let collapse = iopts.plugin == "atuin"
+  // 解析 pass：记录流转为带定位条目（空行静默跳过，上游迭代器 continue；
+  // 行号占位保留，坏解码行折为 Err 后续按位上报）
+  let parsed : Array[@core.LocatedDir] = []
   for record in records {
     let location = match source {
       Some(path) => "\{path}:\{record.line_num}"
       None => "line \{record.line_num}"
     }
     match record.result {
-      Err(reason) => err_line(errs, "\{location}: \{reason}")
-      Ok(line) => {
-        // 空行静默跳过（上游迭代器 continue）
-        if line == "" {
-          continue
+      Err(reason) => parsed.push({ location, result: Err(reason), })
+      Ok(line) =>
+        if line != "" {
+          parsed.push({ location, result: parse(line), })
         }
-        match parse(line) {
-          Ok(dir) => {
-            // _JB_EXCLUDE_DIRS 命中 → 静默跳过（对齐上游 exclude_dirs 过滤）
-            let mut excluded = false
-            for pattern in globs {
-              if @core.glob_match(pattern, dir.path) {
-                excluded = true
-                break
-              }
-            }
-            if !excluded {
-              store
-              .database()
-              .add_unchecked(dir.path, dir.rank, dir.last_accessed)
-            }
+    }
+  }
+  let entries = if collapse {
+    @core.collapse_consecutive(parsed)
+  } else {
+    parsed
+  }
+  // 入库 pass：坏行按 <定位>: <原因> 上报不中止；exclude 命中静默跳过
+  for entry in entries {
+    match entry.result {
+      Err(reason) => err_line(errs, "\{entry.location}: \{reason}")
+      Ok(dir) => {
+        // _JB_EXCLUDE_DIRS 命中 → 静默跳过（对齐上游 exclude_dirs 过滤）
+        let mut excluded = false
+        for pattern in globs {
+          if @core.glob_match(pattern, dir.path) {
+            excluded = true
+            break
           }
-          Err(reason) => err_line(errs, "\{location}: \{reason}")
+        }
+        if !excluded {
+          store.database().add_unchecked(dir.path, dir.rank, dir.last_accessed)
         }
       }
     }

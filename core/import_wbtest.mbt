@@ -172,3 +172,78 @@ test "days_from_civil：与已知 epoch 交叉验证" {
   // 1969-12-31 → -1 天
   @debug.assert_eq(days_from_civil(1969, 12, 31), -1L)
 }
+
+///|
+/// 折叠测试辅助：路径 → 带定位条目（rank/时间对折叠不可见，取占位值）
+fn loc(path : String) -> LocatedDir {
+  { location: path, result: Ok({ path, rank: 1.0, last_accessed: 0L, }), }
+}
+
+///|
+/// 折叠测试辅助：坏行条目
+fn loc_err(reason : String) -> LocatedDir {
+  { location: "line 0", result: Err(reason), }
+}
+
+///|
+/// 折叠结果投影为路径/坏行标记序列，便于断言
+fn collapse_paths(items : Array[LocatedDir]) -> Array[String] {
+  let out : Array[String] = []
+  for it in items {
+    match it.result {
+      Ok(d) => out.push(d.path)
+      Err(_) => out.push("<err>")
+    }
+  }
+  out
+}
+
+///|
+test "collapse_consecutive：连续同路径只保留首次（上游 prev_cwd 语义）" {
+  let out = collapse_consecutive([
+    loc("/a"),
+    loc("/a"),
+    loc("/a"),
+    loc("/b"),
+    loc("/a"),
+  ])
+  @debug.assert_eq(collapse_paths(out), ["/a", "/b", "/a"])
+}
+
+///|
+test "collapse_consecutive：Err 原样透传且不打断折叠链" {
+  // /a → 坏行 → /a：坏行不改 prev，第二个 /a 仍被折叠（上游错误路径不改 prev_cwd）
+  let out = collapse_consecutive([
+    loc("/a"),
+    loc_err("bad"),
+    loc("/a"),
+    loc("/b"),
+  ])
+  @debug.assert_eq(collapse_paths(out), ["/a", "<err>", "/b"])
+}
+
+///|
+test "collapse_consecutive：空序列与单条目" {
+  @debug.assert_eq(collapse_consecutive([]).length(), 0)
+  @debug.assert_eq(collapse_paths(collapse_consecutive([loc("/only")])), [
+    "/only",
+  ])
+}
+
+///|
+test "collapse_consecutive：定位随条目保留" {
+  let items = [
+    {
+      location: "line 1",
+      result: Ok({ path: "/x", rank: 1.0, last_accessed: 0L, }),
+    },
+    {
+      location: "line 2",
+      result: Ok({ path: "/x", rank: 1.0, last_accessed: 5L, }),
+    },
+  ]
+  let out = collapse_consecutive(items)
+  @debug.assert_eq(out.length(), 1)
+  @debug.assert_eq(out[0].location, "line 1")
+  @debug.assert_eq(expect_dir(out[0].result).last_accessed, 0L)
+}

@@ -64,6 +64,41 @@ pub fn parse_atuin_line(line : String) -> Result[Dir, String] {
 }
 
 ///|
+/// 带定位的解析条目：location 供错误上报拼 `<来源>:<行号>`（atuin 无文件来源时
+/// 调用方传 `line <N>`），与条目绑定后可整体过折叠器（上游 ImportError 同构）
+pub(all) struct LocatedDir {
+  location : String
+  result : Result[Dir, String]
+} derive(Debug)
+
+///|
+/// atuin 导入的连续同路径折叠（对齐上游 src/import/atuin.rs Iter 的 prev_cwd）：
+/// shell 历史按命令序排列，连住一个目录的多条记录只算一次转换，连续重复仅保留
+/// 首次；Err 原样透传且不更新折叠链（上游错误路径不改 prev_cwd），空记录由调用方
+/// 在解析前跳过、同样不影响链
+pub fn collapse_consecutive(items : Array[LocatedDir]) -> Array[LocatedDir] {
+  let out : Array[LocatedDir] = []
+  let mut prev : String? = None
+  for item in items {
+    match item.result {
+      Err(_) => out.push(item)
+      Ok(dir) => {
+        let dup = match prev {
+          Some(p) => p == dir.path
+          None => false
+        }
+        if dup {
+          continue
+        }
+        prev = Some(dir.path)
+        out.push(item)
+      }
+    }
+  }
+  out
+}
+
+///|
 /// sigmoid：autojump rank 归一（对齐上游 import/autojump.rs sigmoid）
 fn sigmoid(x : Double) -> Double {
   1.0 / (1.0 + @math.exp(-x))

@@ -20,6 +20,8 @@ pub const SECOND : Int64 = 1
 
 pub const WEEK : Int64 = 604800
 
+pub fn collapse_consecutive(Array[LocatedDir]) -> Array[LocatedDir]
+
 pub fn decode(Bytes) -> Result[Array[Dir], CodecError]
 
 pub fn encode(Array[Dir]) -> Bytes
@@ -87,6 +89,11 @@ pub(all) enum GlobError {
   InvalidRange
   TrailingEscape
 } derive(Eq, @debug.Debug)
+
+pub(all) struct LocatedDir {
+  location : String
+  result : Result[Dir, String]
+} derive(@debug.Debug)
 
 pub(all) struct StreamOptions {
   now : Int64

@@ -596,3 +596,58 @@ async test "import z：超大 rank 触发 age 老化（0.9×maxage/total 因子�
   cleanup_test_dir(data)
   cleanup_test_dir(zdir)
 }
+
+///|
+async test "import atuin：连续同路径折叠 + 错误不打断链（PATH 注入伪 atuin 走真实子进程）" {
+  let data = make_test_dir("imp-atuin-data")
+  let bindir = make_test_dir("imp-atuin-bin")
+  // 记录序：/a /a 坏行 /a /b —— 期望 /a 只收首次（跨坏行仍折叠），/b 照常
+  let nul = "\u{0000}"
+  let records : String = "2024-01-01 00:00:00\t/a\{nul}2024-01-02 00:00:00\t/a\{nul}bad-record\{nul}2024-01-03 00:00:00\t/a\{nul}2024-01-04 00:00:00\t/b\{nul}"
+  @platform.write_atomic(bindir + "/records", @utf8.encode(records))
+  let fake = bindir + "/atuin"
+  let script : String = "#!/bin/sh\ncat \{bindir}/records\n"
+  @platform.write_atomic(fake, @utf8.encode(script))
+  @afs.chmod(fake, 0o755)
+  let orig_path = @env.get_env_var("PATH")
+  @env.set_env_var(
+    "PATH",
+    match orig_path {
+      Some(p) => "\{bindir}:\{p}"
+      None => bindir
+    },
+  )
+  let errs : Array[String] = []
+  @debug.assert_eq(
+    run(["import", "atuin"], env_map([("_JB_DATA_DIR", data)]), errs),
+    0,
+  )
+  // 还原 PATH（追加式注入对并行测试无害，礼貌还原）
+  match orig_path {
+    Some(p) => @env.set_env_var("PATH", p)
+    None => @env.unset_env_var("PATH")
+  }
+  @debug.assert_eq(errs.length(), 1)
+  @debug.assert_eq(errs[0], "line 3: invalid entry: bad-record")
+  let store = match @platform.load(data) {
+    Ok(s) => s
+    Err(e) => fail("\{Repr(e)}")
+  }
+  @debug.assert_eq(store.database().all().length(), 2)
+  for d in store.database().all() {
+    match d.path {
+      "/a" => {
+        // rank=1.0 且时间取转换首次（2024-01-01），非折叠前最后一条（01-03）
+        @debug.assert_eq(d.rank, 1.0)
+        @debug.assert_eq(d.last_accessed, 1704067200L)
+      }
+      "/b" => {
+        @debug.assert_eq(d.rank, 1.0)
+        @debug.assert_eq(d.last_accessed, 1704326400L)
+      }
+      other => fail("unexpected path: \{other}")
+    }
+  }
+  cleanup_test_dir(data)
+  cleanup_test_dir(bindir)
+}
