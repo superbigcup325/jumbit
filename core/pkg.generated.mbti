@@ -30,6 +30,12 @@ pub fn glob_match(String, String) -> Bool
 
 pub fn glob_matches(String, String) -> Result[Bool, GlobError]
 
+pub fn parse_atuin_line(String) -> Result[Dir, String]
+
+pub fn parse_autojump_line(String) -> Result[Dir, String]
+
+pub fn parse_z_line(String) -> Result[Dir, String]
+
 pub fn resolve_path(String, String) -> String
 
 pub fn starts_with(String, String) -> Bool
@@ -58,6 +64,7 @@ pub fn Database::dedup(Self) -> Unit
 pub fn Database::find_idx(Self, String) -> Int?
 pub fn Database::from_dirs(Array[Dir]) -> Self
 pub fn Database::is_dirty(Self) -> Bool
+pub fn Database::is_empty(Self) -> Bool
 pub fn Database::mark_clean(Self) -> Unit
 pub fn Database::new() -> Self
 pub async fn Database::query_all(Self, StreamOptions, async (String) -> Bool) -> Array[Dir]

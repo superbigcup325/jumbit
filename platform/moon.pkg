@@ -4,6 +4,7 @@ import {
   "moonbitlang/async/process",
   "moonbitlang/async/io",
   "moonbitlang/core/debug",
+  "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/random",
   "superbigcup325/jumbit/core",
 }

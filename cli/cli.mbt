@@ -25,11 +25,20 @@ pub(all) struct InitOptions {
 } derive(Debug, Eq)
 
 ///|
+/// import 的选项：plugin ∈ {atuin, autojump, fasd, z, z.lua, zsh-z}；
+/// --merge 对齐上游 global flag，可出现在插件名前后任意位置
+pub(all) struct ImportOptions {
+  plugin : String
+  mut merge : Bool
+} derive(Debug, Eq)
+
+///|
 pub(all) enum Command {
   Add(AddOptions)
   Query(QueryOptions)
   Remove(Array[String])
   Init(InitOptions)
+  Import(ImportOptions)
   Help
   Unknown(String)
 } derive(Debug, Eq)
@@ -49,6 +58,7 @@ pub fn parse(args : Array[String]) -> Command {
     "query" => parse_query(rest)
     "remove" => Remove(strip_double_dash(rest))
     "init" => parse_init(rest)
+    "import" => parse_import(rest)
     "help" | "--help" | "-h" => Help
     other => Unknown(other)
   }
@@ -200,6 +210,50 @@ fn parse_init(args : Array[String]) -> Command {
 }
 
 ///|
+/// import 支持的插件（对齐上游 ImportFrom 枚举；z.lua / zsh-z 带点与连字符）
+pub fn import_plugins() -> Array[String] {
+  ["atuin", "autojump", "fasd", "z", "z.lua", "zsh-z"]
+}
+
+///|
+/// import 参数解析：一个插件名位置参数 + 任意位置的 --merge；
+/// 未知 flag / 多余位置参数 / 非法插件名归 Unknown（对齐 clap 退出码 2）
+fn parse_import(args : Array[String]) -> Command {
+  let mut plugin : String? = None
+  let mut merge = false
+  let mut bad : String? = None
+  for a in args {
+    if a == "--merge" {
+      merge = true
+    } else if a.has_prefix("-") && a != "-" {
+      bad = Some(a)
+    } else if plugin is None {
+      plugin = Some(a)
+    } else {
+      bad = Some(a)
+    }
+  }
+  match bad {
+    Some(flag) => Unknown(flag)
+    None =>
+      match plugin {
+        Some(p) =>
+          if import_plugins().contains(p) {
+            Import({ plugin: p, merge, })
+          } else {
+            Unknown(
+              "import: 不支持的插件: \{p}（支持 \{import_plugins().join("/")}）",
+            )
+          }
+        None =>
+          Unknown(
+            "import: 缺少插件参数（\{import_plugins().join("/")}）",
+          )
+      }
+  }
+}
+
+///|
 /// add 的 `--` 分隔符：仅剥离首个裸 `--`，其后参数原样保留（含再次出现的 `--`）
 fn strip_double_dash(args : Array[String]) -> Array[String] {
   let out : Array[String] = []
@@ -228,11 +282,14 @@ pub fn usage() -> String {
   "    --interactive                         fzf 交互式选择\n" +
   "  jumbit init <shell>                     生成 shell 集成脚本（默认定义 j/ji，hook=pwd）\n" +
   "    [--cmd C] [--hook pwd|prompt|none] [--no-cmd]\n" +
+  "  jumbit import <plugin> [--merge]        从其他工具导入历史数据（空库直灌，--merge 合并进非空库）\n" +
+  "    plugin ∈ atuin/autojump/fasd/z/z.lua/zsh-z（坏行逐条上报不中止）\n" +
   "  jumbit help                             显示本帮助\n\n" +
   "环境变量：\n" +
   "  _JB_DATA_DIR                            数据目录（默认 $HOME/.local/share/jumbit，须绝对路径）\n" +
   "  _JB_ECHO=1                              add 时回显记录的目录\n" +
   "  _JB_EXCLUDE_DIRS                        冒号分隔的 glob 列表，命中即从库中移除\n" +
   "  _JB_RESOLVE_SYMLINKS=1                  add 时解析符号链接（查询时反向不跟随）\n" +
-  "  _JB_MAXAGE=N                            数据库总分老化阈值（默认 10000）"
+  "  _JB_MAXAGE=N                            数据库总分老化阈值（默认 10000）\n" +
+  "import 读取各插件标准数据文件，可经 _Z_DATA/_FASD_DATA/ZSHZ_DATA/_ZL_DATA/XDG_DATA_HOME 定位"
 }

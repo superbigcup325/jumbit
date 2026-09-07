@@ -6,6 +6,11 @@
 
 ### Added
 
+- `import <plugin>`：从其他工具导入历史数据，支持 `atuin`/`autojump`/`fasd`/`z`/`z.lua`/`zsh-z`（对齐上游 cmd/import.rs + import/ 六模块）
+  - 空库直灌、非空库须 `--merge`（可位于插件名前后，上游 global flag 语义）
+  - 数据文件按各插件标准约定自动探测（`_Z_DATA`/`_FASD_DATA`/`ZSHZ_DATA`/`_ZL_DATA`/`XDG_DATA_HOME`）；z.lua 主路径缺失回落 fish 变体路径；atuin 经 `atuin history list --print0` 子进程读取
+  - autojump rank 过 sigmoid 归一（last_accessed=0）；atuin UTC 时间戳解析为 epoch（rank=1.0，同目录连续记录折叠）
+  - 坏行按 `<文件>:<行号>: <原因>` 逐条上报不中止（atuin 为 `line N`）；结束后 dedup + age(maxage) 再落盘
 - glob 匹配器：`*`/`?`/`[...]`/`[!...]` 均不跨路径分隔符，`\` 转义，非法 pattern（未闭合/空类/倒序区间/尾转义）报错；`{a,b}` 不支持（与上游差异）
 - 数据层：`Dir` 三字段模型（path/rank/last_accessed）与 frecency score 衰减（<1h ×4.0 / <1d ×2.0 / <1w ×0.5 / 其余 ×0.25）
 - 数据库操作：权重累加（add/add_update，负增量 clamp 到 0）、按得分排序、dirty 标志
@@ -31,6 +36,7 @@
 
 ### Fixed
 
+- 得分显示在精确半界（如陈旧条目 1.0×0.25=0.25）改按 Rust `{:.1}` 的半界取偶舍入，`--score` 前缀与上游逐字节一致（此前 `.round()` 半界远离零，0.25 误显 0.3）
 - 持久化解码拒绝路径字节含 NUL/换行的库文件（此前仅 add 入口拦截，手工构造的库文件可绕过）
 
 ### Internal

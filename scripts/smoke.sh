@@ -87,4 +87,21 @@ if _JB_DATA_DIR="$data" "$bin" query nosuchkeyword 2>/dev/null; then
   exit 1
 fi
 
+echo "== import：非空库拒绝 + --merge 合并 + 坏行上报 =="
+zdata="$data/z-smoke.txt"
+printf '/smoke-imported|1|1704067200\nbad line\n' > "$zdata"
+if _JB_DATA_DIR="$data" _Z_DATA="$zdata" "$bin" import z 2>/dev/null; then
+  echo "✗ 非空库 import 无 --merge 应退出码 1" >&2
+  exit 1
+fi
+out=$(_JB_DATA_DIR="$data" _Z_DATA="$zdata" "$bin" import --merge z 2>&1)
+if [ "$out" != "$zdata:2: invalid entry: bad line" ]; then
+  echo "✗ import 坏行上报不符: [$out]" >&2
+  exit 1
+fi
+if ! _JB_DATA_DIR="$data" "$bin" query --all --list | grep -q '^/smoke-imported$'; then
+  echo "✗ import 后库中应有 /smoke-imported" >&2
+  exit 1
+fi
+
 echo "✓ smoke 全绿"

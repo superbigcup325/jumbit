@@ -89,3 +89,79 @@ async test "store：损坏的库文件报 Codec 错误" {
     other => fail("\{Repr(other)}")
   }
 }
+
+///|
+async test "read_import_lines：按行切分、剥 \\r、空行占位计行号" {
+  let dir = make_tmp_dir()
+  let path = dir + "/zdata"
+  write_atomic(path, b"/a|1|100\n\n/b|2|200\r\n/c|3|300")
+  let records = match read_import_lines(path) {
+    Ok(r) => r
+    Err(e) => fail("\{Repr(e)}")
+  }
+  // 空行（第 2 行）保留占位，行号连续（对齐上游逐行读取语义）
+  @debug.assert_eq(records.length(), 4)
+  @debug.assert_eq(records[0].line_num, 1)
+  @debug.assert_eq(records[0].result, Ok("/a|1|100"))
+  @debug.assert_eq(records[1].line_num, 2)
+  @debug.assert_eq(records[1].result, Ok(""))
+  @debug.assert_eq(records[2].line_num, 3)
+  @debug.assert_eq(records[2].result, Ok("/b|2|200"))
+  @debug.assert_eq(records[3].line_num, 4)
+  @debug.assert_eq(records[3].result, Ok("/c|3|300"))
+  @afs.rmdir(dir, recursive=true)
+}
+
+///|
+async test "read_import_lines：无尾随换行也能取末行，坏 UTF-8 只标记该行" {
+  let dir = make_tmp_dir()
+  let path = dir + "/zdata"
+  write_atomic(path, b"/a|1|100\n\xff\xfe")
+  let records = match read_import_lines(path) {
+    Ok(r) => r
+    Err(e) => fail("\{Repr(e)}")
+  }
+  @debug.assert_eq(records.length(), 2)
+  @debug.assert_eq(records[0].result, Ok("/a|1|100"))
+  @debug.assert_eq(records[1].line_num, 2)
+  @debug.assert_eq(records[1].result, Err("invalid utf-8"))
+  @afs.rmdir(dir, recursive=true)
+}
+
+///|
+async test "read_import_lines：文件缺失报 could not read" {
+  match read_import_lines("/nonexistent-import-file-xyz") {
+    Err(msg) => assert_true(msg.has_prefix("could not read "))
+    Ok(_) => fail("expected error")
+  }
+}
+
+///|
+async test "records_from_process：NUL 切分 + stderr 原文透传" {
+  // printf 的 \0 输出 NUL；stderr 经 echo >&2 产生
+  let result = records_from_process("sh", [
+    "-c", "printf 'A\\0BB\\0'; echo atuin-err >&2",
+  ])
+  match result {
+    Ok((records, err_text)) => {
+      @debug.assert_eq(records.length(), 2)
+      @debug.assert_eq(records[0].line_num, 1)
+      @debug.assert_eq(records[0].result, Ok("A"))
+      @debug.assert_eq(records[1].line_num, 2)
+      @debug.assert_eq(records[1].result, Ok("BB"))
+      assert_true(err_text.contains("atuin-err"))
+    }
+    Err(e) => fail("\{e}")
+  }
+}
+
+///|
+async test "records_from_process：命令不存在报可读错误" {
+  match records_from_process("definitely-not-a-real-cmd-xyz", []) {
+    Err(msg) =>
+      @debug.assert_eq(
+        msg, "failed to run `definitely-not-a-real-cmd-xyz`; is it installed and on PATH?",
+      )
+    Ok(_) => fail("expected error")
+  }
+}

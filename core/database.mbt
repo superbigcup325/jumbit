@@ -96,6 +96,12 @@ pub fn Database::is_dirty(self : Database) -> Bool {
 }
 
 ///|
+/// 库是否无条目（import 的空库检查用，对齐上游 db.dirs().is_empty()）
+pub fn Database::is_empty(self : Database) -> Bool {
+  self.dirs.length() == 0
+}
+
+///|
 pub fn Database::mark_clean(self : Database) -> Unit {
   self.dirty = false
 }

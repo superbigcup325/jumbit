@@ -34,6 +34,7 @@ pub async fn run(
     @cli.Query(qopts) => run_query(qopts, getenv, errs)
     @cli.Remove(paths) => run_remove(paths, getenv, errs)
     @cli.Init(iopts) => run_init(iopts, getenv, errs)
+    @cli.Import(iopts) => run_import(iopts, getenv, errs)
   }
 }
 
@@ -347,4 +348,155 @@ fn run_init(
   }
   println(source)
   0
+}
+
+///|
+/// import（对齐上游 cmd/import.rs + import/run）：
+/// 空库直灌 / --merge 合并进非空库；坏行按 `<来源>:<行号>: <原因>` 上报不中止；
+/// 结束后 dedup + age(maxage) 再落盘。atuin 走子进程，其余插件读数据文件。
+async fn run_import(
+  iopts : @cli.ImportOptions,
+  getenv : (String) -> String?,
+  errs : Array[String],
+) -> Int {
+  let data_dir = match @config.data_dir(getenv) {
+    Ok(d) => d
+    Err(msg) => {
+      err_line(errs, msg)
+      return 1
+    }
+  }
+  let store = match @platform.load(data_dir) {
+    Ok(s) => s
+    Err(err) => {
+      err_line(errs, "打开数据库失败: \{Repr(err)}")
+      return 1
+    }
+  }
+  if !iopts.merge && !store.database().is_empty() {
+    err_line(
+      errs, "current database is not empty, specify --merge to continue anyway",
+    )
+    return 1
+  }
+  let globs = match @config.exclude_dirs(getenv, getenv("HOME")) {
+    Ok(g) => g
+    Err(msg) => {
+      err_line(errs, msg)
+      return 1
+    }
+  }
+  // 读数据源：source 为 None 表示无文件来源（atuin），上报定位用 `line N`
+  let loaded : Result[(Array[@platform.ImportRecord], String?), String] = match
+    iopts.plugin {
+    "atuin" =>
+      match @platform.atuin_history_records() {
+        Ok((records, stderr_text)) => {
+          if stderr_text != "" {
+            err_line(errs, stderr_text)
+          }
+          Ok((records, None))
+        }
+        Err(msg) => Err(msg)
+      }
+    "z" => read_import_file(@config.z_data_path(getenv))
+    "fasd" => read_import_file(@config.fasd_data_path(getenv))
+    "zsh-z" => read_import_file(@config.zsh_z_data_path(getenv))
+    "autojump" => read_import_file(@config.autojump_data_path(getenv))
+    // z.lua：主路径缺失回落 fish 变体；双双缺失报主路径（对齐上游 z_lua.rs）
+    "z.lua" =>
+      match read_import_file(@config.zlua_data_path(getenv)) {
+        Ok(found) => Ok(found)
+        Err(_) =>
+          match @config.zlua_fish_path(getenv) {
+            Ok(fish_path) =>
+              if @afs.exists(fish_path) {
+                read_import_file(Ok(fish_path))
+              } else {
+                read_import_file(@config.zlua_data_path(getenv))
+              }
+            Err(msg) => Err(msg)
+          }
+      }
+    other => Err("import: 不支持的插件: \{other}")
+  }
+  let (records, source) = match loaded {
+    Ok((records, source)) => (records, source)
+    Err(msg) => {
+      err_line(errs, msg)
+      return 1
+    }
+  }
+  let parse : (String) -> Result[@core.Dir, String] = match iopts.plugin {
+    "autojump" => @core.parse_autojump_line
+    "atuin" => @core.parse_atuin_line
+    // z / zsh-z / fasd / z.lua 与 z 同格式，共用解析（对齐上游复用 z::Iter）
+    _ => @core.parse_z_line
+  }
+  for record in records {
+    let location = match source {
+      Some(path) => "\{path}:\{record.line_num}"
+      None => "line \{record.line_num}"
+    }
+    match record.result {
+      Err(reason) => err_line(errs, "\{location}: \{reason}")
+      Ok(line) => {
+        // 空行静默跳过（上游迭代器 continue）
+        if line == "" {
+          continue
+        }
+        match parse(line) {
+          Ok(dir) => {
+            // _JB_EXCLUDE_DIRS 命中 → 静默跳过（对齐上游 exclude_dirs 过滤）
+            let mut excluded = false
+            for pattern in globs {
+              if @core.glob_match(pattern, dir.path) {
+                excluded = true
+                break
+              }
+            }
+            if !excluded {
+              store
+              .database()
+              .add_unchecked(dir.path, dir.rank, dir.last_accessed)
+            }
+          }
+          Err(reason) => err_line(errs, "\{location}: \{reason}")
+        }
+      }
+    }
+  }
+  if store.database().is_dirty() {
+    store.database().dedup()
+    let maxage = match @config.maxage(getenv) {
+      Ok(m) => m
+      Err(msg) => {
+        err_line(errs, msg)
+        return 1
+      }
+    }
+    store.database().age(maxage)
+  }
+  match store.save() {
+    Ok(_) => 0
+    Err(err) => {
+      err_line(errs, "保存数据库失败: \{Repr(err)}")
+      1
+    }
+  }
+}
+
+///|
+/// 读单个插件数据文件（路径解析失败一并折算为 Err 文案）
+async fn read_import_file(
+  path : Result[String, String],
+) -> Result[(Array[@platform.ImportRecord], String?), String] {
+  let path = match path {
+    Ok(p) => p
+    Err(msg) => return Err(msg)
+  }
+  match @platform.read_import_lines(path) {
+    Ok(records) => Ok((records, Some(path)))
+    Err(msg) => Err(msg)
+  }
 }

@@ -50,7 +50,20 @@ pub fn Dir::score(self : Dir, now : Int64) -> Double {
 /// 例：40.0 → "  40.0"，9999.95 → "9999.0"（clamp），-1.0 → "   0.0"
 pub fn Dir::format_score(self : Dir, now : Int64) -> String {
   let s = self.score(now).clamp(min=0.0, max=9999.0)
-  let scaled = (s * 10.0).round().to_int64()
+  // 舍入对齐 Rust {:.1}（半界取偶，round-half-to-even）：
+  // 精确半界（如陈旧条目 1.0×0.25=0.25）→ 0.2 而非 0.3
+  let m = s * 10.0
+  let fl = m.floor()
+  let frac = m - fl
+  let scaled = if frac > 0.5 {
+    fl.to_int64() + 1L
+  } else if frac < 0.5 {
+    fl.to_int64()
+  } else if fl % 2.0 == 0.0 {
+    fl.to_int64()
+  } else {
+    fl.to_int64() + 1L
+  }
   let int_part = (scaled / 10L).to_string().pad_start(4, ' ')
   let dec_part = (scaled % 10L).to_string()
   int_part + "." + dec_part

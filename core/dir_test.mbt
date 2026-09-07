@@ -57,3 +57,36 @@ test "format_score：宽度 6、1 位小数、clamp 边界" {
   let carry = @core.Dir::{ path: "/foo", rank: 2499.74, last_accessed: now, }
   inspect(carry.format_score(now), content="9999.0")
 }
+
+///|
+test "format_score：精确半界按 Rust {:.1} 半界取偶（与 zoxide 输出对齐）" {
+  let now = 1000L
+  // 1.0×0.25 = 0.25 → 0.2（0 向下取偶；.round() 会错给 0.3）
+  let a = @core.Dir::{
+    path: "/a",
+    rank: 1.0,
+    last_accessed: now - 2L * @core.WEEK,
+  }
+  inspect(a.format_score(now), content="   0.2")
+  // 3.0×0.25 = 0.75 → 0.8（7 奇数向偶进到 8）
+  let b = @core.Dir::{
+    path: "/b",
+    rank: 3.0,
+    last_accessed: now - 2L * @core.WEEK,
+  }
+  inspect(b.format_score(now), content="   0.8")
+  // 5.0×0.25 = 1.25 → 1.2（2 偶数不动）
+  let c = @core.Dir::{
+    path: "/c",
+    rank: 5.0,
+    last_accessed: now - 2L * @core.WEEK,
+  }
+  inspect(c.format_score(now), content="   1.2")
+  // 7.0×0.25 = 1.75 → 1.8（7 奇数进到 8）
+  let d = @core.Dir::{
+    path: "/d",
+    rank: 7.0,
+    last_accessed: now - 2L * @core.WEEK,
+  }
+  inspect(d.format_score(now), content="   1.8")
+}

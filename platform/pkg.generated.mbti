@@ -7,9 +7,13 @@ import {
 }
 
 // Values
+pub async fn atuin_history_records() -> Result[(Array[ImportRecord], String), String]
+
 pub async fn fzf_select(Array[@core.Dir], Int64, String?) -> Result[String, FzfError]
 
 pub async fn load(String) -> Result[Store, StoreError]
+
+pub async fn read_import_lines(String) -> Result[Array[ImportRecord], String]
 
 pub async fn write_atomic(String, Bytes) -> Unit
 
@@ -20,6 +24,11 @@ pub enum FzfError {
   NotFound
   NoMatch
   Exit(Int)
+} derive(@debug.Debug)
+
+pub(all) struct ImportRecord {
+  line_num : Int
+  result : Result[String, String]
 } derive(@debug.Debug)
 
 pub(all) struct Store {

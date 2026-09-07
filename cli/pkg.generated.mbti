@@ -7,6 +7,8 @@ import {
 }
 
 // Values
+pub fn import_plugins() -> Array[String]
+
 pub fn parse(Array[String]) -> Command
 
 pub fn usage() -> String
@@ -24,8 +26,14 @@ pub(all) enum Command {
   Query(QueryOptions)
   Remove(Array[String])
   Init(InitOptions)
+  Import(ImportOptions)
   Help
   Unknown(String)
+} derive(Eq, @debug.Debug)
+
+pub(all) struct ImportOptions {
+  plugin : String
+  mut merge : Bool
 } derive(Eq, @debug.Debug)
 
 pub(all) struct InitOptions {

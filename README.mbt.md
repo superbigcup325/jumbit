@@ -30,6 +30,8 @@ jumbit query --list --score          # 全部匹配，按得分降序带分数�
 jumbit query --interactive           # fzf 交互选择
 jumbit query --all --exclude ~/tmp   # 跳过存在性检查 / 排除指定目录
 jumbit remove ~/projects/backend     # 从数据库移除
+jumbit import z                      # 从 z/zsh-z/fasd/z.lua/autojump/atuin 导入历史
+jumbit import --merge zsh-z          # 非空库须加 --merge 合并
 jumbit help
 ```
 
@@ -57,14 +59,16 @@ ji               # fzf 交互式跳转
 | `_JB_MAXAGE` | 数据库总分老化阈值 | 10000 |
 | `_JB_RESOLVE_SYMLINKS=1` | add 时解析符号链接 | 关 |
 
+`import` 按各插件标准约定自动探测数据文件，可用 `_Z_DATA`、`_FASD_DATA`、`ZSHZ_DATA`、`_ZL_DATA`、`XDG_DATA_HOME` 定位；atuin 经 `atuin history list` 子进程读取。
+
 ## 与 zoxide 的差异
 
 - 持久化格式为自定义二进制（版本号 + 长度前缀条目），与上游 `db.zo` **不互通**
 - 环境变量前缀 `_ZO_*` → `_JB_*`，两者可共存
 - 关键词大小写归一仅限 ASCII（上游为 Unicode 全量）
 - glob 排除不支持 `{a,b}` 括号展开；`**` 按两个 `*` 处理、不跨分隔符（上游 glob crate 的 `**` 为递归通配）；`*`/`?`/`[...]` 语义对齐
-- 仅支持 Linux；fzf 预览窗口的平台定制未实现
-- 未移植：`import`（外部工具历史导入）、`edit` 子命令、elvish/nushell/posix/powershell/tcsh/xonsh 模板
+- 仅支持 Linux；fzf 预览窗口的平台定制未实现（import 的 autojump/z.lua 路径探测同按 Linux 语义）
+- 未移植：`edit` 子命令、elvish/nushell/posix/powershell/tcsh/xonsh 模板
 
 ## 许可证
 
