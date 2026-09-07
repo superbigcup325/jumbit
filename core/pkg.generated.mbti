@@ -86,7 +86,6 @@ pub(all) struct StreamOptions {
   resolve_symlinks : Bool
   ttl : Int64
 }
-pub fn StreamOptions::new(Int64) -> Self
 
 // Type aliases
 

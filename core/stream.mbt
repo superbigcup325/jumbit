@@ -16,19 +16,6 @@ pub(all) struct StreamOptions {
 }
 
 ///|
-pub fn StreamOptions::new(now : Int64) -> StreamOptions {
-  {
-    now,
-    keywords: [],
-    exclude: [],
-    base_dir: None,
-    exists: false,
-    resolve_symlinks: false,
-    ttl: now - 3L * MONTH,
-  }
-}
-
-///|
 /// 查询流：按得分降序执行完整过滤链（对齐上游 Stream::next 顺序）：
 /// score 排序 → keywords → base_dir → exclude(glob, 命中懒删) → exists(最后，最慢)
 /// → 不存在且超 TTL 懒删。返回按得分从高到低的全部命中。
