@@ -44,3 +44,7 @@ jobs:
         run: |
           moon build --release
           _build/native/release/build/cmd/main/main.exe help > /dev/null
+
+      # 真实二进制全链路：add/query/remove/import/init（shell 矩阵未装的自动跳过）
+      - name: End-to-end smoke (scripts/smoke.sh)
+        run: bash scripts/smoke.sh
