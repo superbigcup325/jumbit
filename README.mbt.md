@@ -2,6 +2,8 @@
 
 a MoonBit rewrite of [zoxide](https://github.com/ajeetdsouza/zoxide): jump to directories in a few keystrokes.
 
+[![CI](https://github.com/superbigcup325/jumbit/actions/workflows/ci.yml/badge.svg)](https://github.com/superbigcup325/jumbit/actions/workflows/ci.yml)
+
 jumbit 记录你去过的目录并按 frecency（频次 × 时间衰减）排序，用少量关键词跳转：
 
 ```bash

@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: Show toolchain version
+        run: moon version --all
+
+      - name: Fetch dependencies
+        run: |
+          moon update
+          moon install
+
+      - name: Lint (check --deny-warn)
+        run: moon check --deny-warn
+
+      - name: Format check
+        run: moon fmt --check
+
+      # pkg.generated.mbti 进版本控制，接口漂移（改了代码没跑 moon info）直接挂
+      - name: Interface freshness (info)
+        run: |
+          moon info
+          git diff --exit-code -- '*.mbti'
+
+      - name: Test
+        run: moon test
+
+      - name: Release build & smoke test
+        run: |
+          moon build --release
+          _build/native/release/build/cmd/main/main.exe help > /dev/null
