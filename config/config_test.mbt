@@ -61,3 +61,77 @@ test "HOME 未设但 _JB_DATA_DIR 合法：不受影响" {
     Err(e) => fail(e)
   }
 }
+
+///|
+test "exclude_dirs：冒号切分并忽略空段" {
+  let get = fake_env([("_JB_EXCLUDE_DIRS", "/mnt/*::/tmp/*")])
+  match exclude_dirs(get, Some("/home/u")) {
+    Ok(globs) => @debug.assert_eq(globs, ["/mnt/*", "/tmp/*"])
+    Err(e) => fail(e)
+  }
+}
+
+///|
+test "exclude_dirs：非法 glob 报错" {
+  let get = fake_env([("_JB_EXCLUDE_DIRS", "[unclosed")])
+  match exclude_dirs(get, Some("/home/u")) {
+    Err(_) => ()
+    Ok(globs) => fail("expected error, got \{Repr(globs)}")
+  }
+}
+
+///|
+test "exclude_dirs：未设置回落 home 的转义字面 glob" {
+  let get = fake_env([])
+  match exclude_dirs(get, Some("/home/u [x]")) {
+    Ok(globs) => @debug.assert_eq(globs, ["/home/u \\[x\\]"])
+    Err(e) => fail(e)
+  }
+}
+
+///|
+test "exclude_dirs：未设置且无 home → 空列表" {
+  match exclude_dirs(fake_env([]), None) {
+    Ok(globs) => @debug.assert_eq(globs.length(), 0)
+    Err(e) => fail(e)
+  }
+}
+
+///|
+test "exclude_dirs：显式列表优先于 home 回落" {
+  let get = fake_env([("_JB_EXCLUDE_DIRS", "/a*")])
+  match exclude_dirs(get, Some("/home/u")) {
+    Ok(globs) => @debug.assert_eq(globs, ["/a*"])
+    Err(e) => fail(e)
+  }
+}
+
+///|
+test "resolve_symlinks：仅值 1 生效" {
+  @debug.assert_eq(
+    resolve_symlinks(fake_env([("_JB_RESOLVE_SYMLINKS", "1")])),
+    true,
+  )
+  @debug.assert_eq(
+    resolve_symlinks(fake_env([("_JB_RESOLVE_SYMLINKS", "0")])),
+    false,
+  )
+  @debug.assert_eq(
+    resolve_symlinks(fake_env([("_JB_RESOLVE_SYMLINKS", "")])),
+    false,
+  )
+  @debug.assert_eq(resolve_symlinks(fake_env([])), false)
+}
+
+///|
+test "escape_glob：特殊字符逐一前置反斜杠" {
+  @debug.assert_eq(escape_glob("a*b"), "a\\*b")
+  @debug.assert_eq(escape_glob("x?y[1]"), "x\\?y\\[1\\]")
+  @debug.assert_eq(escape_glob("c\\d"), "c\\\\d")
+  @debug.assert_eq(escape_glob("/plain/path"), "/plain/path")
+  // 转义结果可被 glob 引擎按字面量匹配回来
+  @debug.assert_eq(
+    @core.glob_match(escape_glob("/home/u [x]"), "/home/u [x]"),
+    true,
+  )
+}
