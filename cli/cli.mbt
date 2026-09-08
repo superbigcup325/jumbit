@@ -43,6 +43,12 @@ pub(all) struct DescribeOptions {
 } derive(Debug, Eq)
 
 ///|
+/// export 的选项（jumbit 扩展）：--agents 输出项目地图 Markdown
+pub(all) struct ExportOptions {
+  mut agents : Bool
+} derive(Debug, Eq)
+
+///|
 pub(all) enum Command {
   Add(AddOptions)
   Query(QueryOptions)
@@ -50,6 +56,7 @@ pub(all) enum Command {
   Init(InitOptions)
   Import(ImportOptions)
   Describe(DescribeOptions)
+  Export(ExportOptions)
   Help
   Unknown(String)
 } derive(Debug, Eq)
@@ -71,6 +78,7 @@ pub fn parse(args : Array[String]) -> Command {
     "init" => parse_init(rest)
     "import" => parse_import(rest)
     "describe" => parse_describe(rest)
+    "export" => parse_export(rest)
     "help" | "--help" | "-h" => Help
     other => Unknown(other)
   }
@@ -217,6 +225,29 @@ fn parse_describe(args : Array[String]) -> Command {
 }
 
 ///|
+/// export 参数解析：当前仅 --agents 一个目标；缺 --agents / 未知 flag 归 Unknown
+fn parse_export(args : Array[String]) -> Command {
+  let opts : ExportOptions = { agents: false, }
+  let mut bad : String? = None
+  for a in args {
+    if a == "--agents" {
+      opts.agents = true
+    } else {
+      bad = Some(a)
+    }
+  }
+  match bad {
+    Some(flag) => Unknown(flag)
+    None =>
+      if opts.agents {
+        Export(opts)
+      } else {
+        Unknown("export: 缺少 --agents")
+      }
+  }
+}
+
+///|
 /// init 参数解析：shell ∈ {bash, zsh, fish}；--cmd C / --hook pwd|prompt|none / --no-cmd
 fn parse_init(args : Array[String]) -> Command {
   if args.is_empty() {
@@ -347,6 +378,7 @@ pub fn usage() -> String {
   "    [--cmd C] [--hook pwd|prompt|none] [--no-cmd]\n" +
   "  jumbit import <plugin> [--merge]        从其他工具导入历史数据（空库直灌，--merge 合并进非空库）\n" +
   "  jumbit describe <path> [--note text]     查看/设置人工标注（--note \"\" 清除，jumbit 扩展）\n" +
+  "  jumbit export --agents                   输出项目地图 Markdown（贴进 AGENTS.md，jumbit 扩展）\n" +
   "    plugin ∈ atuin/autojump/fasd/z/z.lua/zsh-z（坏行逐条上报不中止）\n" +
   "  jumbit help                             显示本帮助\n\n" +
   "环境变量：\n" +

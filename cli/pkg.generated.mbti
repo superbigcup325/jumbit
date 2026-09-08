@@ -28,6 +28,7 @@ pub(all) enum Command {
   Init(InitOptions)
   Import(ImportOptions)
   Describe(DescribeOptions)
+  Export(ExportOptions)
   Help
   Unknown(String)
 } derive(Eq, @debug.Debug)
@@ -35,6 +36,10 @@ pub(all) enum Command {
 pub(all) struct DescribeOptions {
   path : String
   mut note : String?
+} derive(Eq, @debug.Debug)
+
+pub(all) struct ExportOptions {
+  mut agents : Bool
 } derive(Eq, @debug.Debug)
 
 pub(all) struct ImportOptions {

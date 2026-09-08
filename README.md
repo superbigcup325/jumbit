@@ -32,6 +32,7 @@ jumbit query --all --exclude ~/tmp   # 跳过存在性检查 / 排除指定目�
 jumbit query --json                  # 单行 JSON 数组输出全部匹配（agent 通道）
 jumbit query --fuzzy blog            # 精确零命中时按组件子串兜底（jumbit 扩展）
 jumbit describe ~/projects/backend --note "后端服务"   # 人工标注（jumbit 扩展）
+jumbit export --agents               # 项目地图 Markdown（jumbit 扩展）
 jumbit remove ~/projects/backend     # 从数据库移除
 jumbit import z                      # 从 z/zsh-z/fasd/z.lua/autojump/atuin 导入历史
 jumbit import --merge zsh-z          # 非空库须加 --merge 合并
@@ -50,6 +51,15 @@ ji               # fzf 交互式跳转
 ```
 
 参数：`--cmd C` 自定义命令名（默认 `j`，如 `--cmd=cd`）、`--hook pwd|prompt|none` 选择记录触发方式（默认 `pwd`）、`--no-cmd` 只生成内部函数。
+
+## 面向 agent
+
+```bash
+jumbit describe ~/repos/jumbit --note "MoonBit 重写的 zoxide"
+jumbit export --agents >> AGENTS.md
+```
+
+`export --agents` 把有标注的常用目录输出为 Markdown 表格（按 frecency 降序），追加进 AGENTS.md 后，coding agent 打开工作区即可获知项目分布与用途——目录记忆不只喂给 shell，也喂给 agent。
 
 ## 环境变量
 

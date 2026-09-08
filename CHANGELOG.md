@@ -19,6 +19,7 @@
 - 自有二进制持久化格式（4 字节版本号 + 长度前缀条目），32MiB 上限，畸形数据（截断/版本不符/非法 UTF-8/超限）明确报错
 - db v2：条目尾部带 note 人工标注（`Dir::note`，长度 0 编码为无标注），v1 旧库免迁移兼容读；`Database::set_note` 设置/清除并置 dirty；dedup 合并时 note 一侧有值则保留
 - `describe <path> [--note text]`：为已记录条目设置/清除（`--note ""`）/显示人工标注；标注拒绝换行；路径对齐 remove 的双重尝试（原串 → 规范化）
+- `export --agents`：有标注条目按 frecency 降序输出 Markdown「项目地图」（路径/说明两列，`|` 转义保表格完整），可直接追加进 AGENTS.md 供 coding agent 认识工作区；不做存在性检查（离线视图），空库输出空表头
 - 原子写：tmp 文件（系统熵随机名，冲突重试 5 次）+ sync 落盘 + rename 替换，失败自动清理
 - 数据目录解析：`_JB_DATA_DIR`（须绝对路径）优先，回落 `$HOME/.local/share/jumbit`
 - 项目脚手架：以 `moon new` 铺设，`preferred_target = "native"`，MIT 许可证，包结构按 `core`（纯函数内核）/ `platform`（IO 外壳）/ `config` / `cli` 分层
