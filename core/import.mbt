@@ -29,7 +29,7 @@ pub fn parse_z_line(line : String) -> Result[Dir, String] {
     None => return bad
   }
   let rank : Double = @strconv.from_str(head[p2 + 1:]) catch { _ => return bad }
-  Ok({ path: head[0:p2].to_owned(), rank, last_accessed, })
+  Ok({ path: head[0:p2].to_owned(), rank, last_accessed, note: None, })
 }
 
 ///|
@@ -44,7 +44,12 @@ pub fn parse_autojump_line(line : String) -> Result[Dir, String] {
   let rank : Double = @strconv.from_str(rank_str) catch {
     _ => return Err("invalid rank: \{rank_str}")
   }
-  Ok({ path: line[t + 1:].to_owned(), rank: sigmoid(rank), last_accessed: 0L, })
+  Ok({
+    path: line[t + 1:].to_owned(),
+    rank: sigmoid(rank),
+    last_accessed: 0L,
+    note: None,
+  })
 }
 
 ///|
@@ -60,7 +65,12 @@ pub fn parse_atuin_line(line : String) -> Result[Dir, String] {
     Some(e) => e
     None => return Err("invalid timestamp: \"\{ts}\"")
   }
-  Ok({ path: line[t + 1:].to_owned(), rank: 1.0, last_accessed: epoch, })
+  Ok({
+    path: line[t + 1:].to_owned(),
+    rank: 1.0,
+    last_accessed: epoch,
+    note: None,
+  })
 }
 
 ///|

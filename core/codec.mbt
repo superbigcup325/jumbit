@@ -3,8 +3,14 @@
 pub const MAX_SIZE : Int = 32 * 1024 * 1024
 
 ///|
-/// jumbit 自有持久化格式版本（与上游 bincode 格式不互通）
-const CODEC_VERSION : Int = 1
+/// jumbit 自有持久化格式版本（与上游 bincode 格式不互通）。
+/// v2 起条目尾部带 note：[u32 LE 长度][UTF-8 内容]，长度 0 表示 None；
+/// v1（无 note 字段）仍可读，读作 None——旧库无需迁移
+const CODEC_VERSION : Int = 2
+
+///|
+/// 解码侧兼容的最低版本
+const MIN_DECODE_VERSION : Int = 1
 
 ///|
 pub enum CodecError {
@@ -14,7 +20,8 @@ pub enum CodecError {
 } derive(Debug)
 
 ///|
-/// 编码：4 字节 LE 版本号 + 每条目 [u32 LE 路径字节长][UTF-8 路径][f64 LE rank][u64 LE last_accessed]
+/// 编码（恒写当前版本）：4 字节 LE 版本号 +
+/// 每条目 [u32 LE 路径字节长][UTF-8 路径][f64 LE rank][u64 LE last_accessed][u32 LE note 字节长][UTF-8 note]
 pub fn encode(dirs : Array[Dir]) -> Bytes {
   let buf : Array[Byte] = []
   put_u32(buf, CODEC_VERSION)
@@ -26,6 +33,16 @@ pub fn encode(dirs : Array[Dir]) -> Bytes {
     }
     put_u64(buf, dir.rank.reinterpret_as_uint64())
     put_u64(buf, dir.last_accessed.reinterpret_as_uint64())
+    match dir.note {
+      Some(text) => {
+        let note_bytes = @utf8.encode(text)
+        put_u32(buf, note_bytes.length())
+        for b in note_bytes {
+          buf.push(b)
+        }
+      }
+      None => put_u32(buf, 0)
+    }
   }
   Bytes::from_array(buf)
 }
@@ -42,7 +59,7 @@ pub fn decode(bytes : Bytes) -> Result[Array[Dir], CodecError] {
     return Err(CorruptedData)
   }
   let version = get_u32(bytes, 0)
-  if version != CODEC_VERSION {
+  if version < MIN_DECODE_VERSION || version > CODEC_VERSION {
     return Err(UnsupportedVersion(version))
   }
   let dirs : Array[Dir] = []
@@ -71,7 +88,31 @@ pub fn decode(bytes : Bytes) -> Result[Array[Dir], CodecError] {
     }
     let last_accessed = get_u64(bytes, pos).reinterpret_as_int64()
     pos += 8
-    dirs.push({ path, rank, last_accessed, })
+    // v2 条目尾部带 note（长度 0 = None）；v1 无此字段，读作 None
+    let note : String? = if version == 1 {
+      None
+    } else {
+      if pos + 4 > len {
+        return Err(CorruptedData)
+      }
+      let note_len = get_u32(bytes, pos)
+      pos += 4
+      if note_len < 0 || note_len > len - pos {
+        return Err(CorruptedData)
+      }
+      if note_len == 0 {
+        None
+      } else {
+        let text : String = @utf8.decode(
+          bytes.view(start=pos, end=pos + note_len),
+        ) catch {
+          _ => return Err(CorruptedData)
+        }
+        pos += note_len
+        Some(text)
+      }
+    }
+    dirs.push({ path, rank, last_accessed, note, })
   }
   Ok(dirs)
 }

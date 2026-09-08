@@ -32,6 +32,7 @@ test "roundtrip：Unicode 路径" {
       path: "/home/用户/下载/图片",
       rank: 1.5,
       last_accessed: 42L,
+      note: None,
     },
   ]
   match @core.decode(@core.encode(dirs)) {
@@ -43,7 +44,9 @@ test "roundtrip：Unicode 路径" {
 ///|
 test "roundtrip：超长路径（10000 字符）" {
   let long = "/" + "a".repeat(9999)
-  let dirs = [@core.Dir::{ path: long, rank: 1.0, last_accessed: 0L, }]
+  let dirs = [
+    @core.Dir::{ path: long, rank: 1.0, last_accessed: 0L, note: None, },
+  ]
   match @core.decode(@core.encode(dirs)) {
     Ok(out) => @debug.assert_eq(out[0].path, long)
     Err(e) => fail("unexpected: \{Repr(e)}")
@@ -60,7 +63,9 @@ test "空文件 → CorruptedData" {
 
 ///|
 test "截断于路径长度头 → CorruptedData" {
-  let dirs = [@core.Dir::{ path: "/foo/bar", rank: 1.0, last_accessed: 0L, }]
+  let dirs = [
+    @core.Dir::{ path: "/foo/bar", rank: 1.0, last_accessed: 0L, note: None, },
+  ]
   let bytes = @core.encode(dirs).to_array()[0:6] // 版本 4 字节 + 长度头 2 字节
   match @core.decode(Bytes::from_array(bytes)) {
     Err(@core.CorruptedData) => ()
@@ -70,7 +75,9 @@ test "截断于路径长度头 → CorruptedData" {
 
 ///|
 test "截断于 rank 中间 → CorruptedData" {
-  let dirs = [@core.Dir::{ path: "/foo", rank: 1.0, last_accessed: 0L, }]
+  let dirs = [
+    @core.Dir::{ path: "/foo", rank: 1.0, last_accessed: 0L, note: None, },
+  ]
   let bytes = @core.encode(dirs).to_array()[0:16] // 4 版本 + 4 长度 + 4 路径 + 4 rank 半截
   match @core.decode(Bytes::from_array(bytes)) {
     Err(@core.CorruptedData) => ()
@@ -80,7 +87,9 @@ test "截断于 rank 中间 → CorruptedData" {
 
 ///|
 test "版本号不符 → UnsupportedVersion" {
-  let dirs = [@core.Dir::{ path: "/foo", rank: 1.0, last_accessed: 0L, }]
+  let dirs = [
+    @core.Dir::{ path: "/foo", rank: 1.0, last_accessed: 0L, note: None, },
+  ]
   let bytes = @core.encode(dirs).to_array()
   bytes[0] = (999).to_byte() // 小端首字节 = 低 8 位
   match @core.decode(Bytes::from_array(bytes)) {
@@ -157,13 +166,24 @@ test "空路径条目（path_len=0）合法解码" {
 test "roundtrip：特殊浮点与边界时间戳按 bit 保真" {
   let dirs = [
     // NaN：rank 唯一的 f64 非 bit 自反风险点（NaN != NaN）
-    @core.Dir::{ path: "/nan", rank: 0.0 / 0.0, last_accessed: -5L, },
+    @core.Dir::{
+      path: "/nan",
+      rank: 0.0 / 0.0,
+      last_accessed: -5L,
+      note: None,
+    },
     // ±inf 与 Int64 边界
-    @core.Dir::{ path: "/inf", rank: 1.0 / 0.0, last_accessed: -1L, },
+    @core.Dir::{
+      path: "/inf",
+      rank: 1.0 / 0.0,
+      last_accessed: -1L,
+      note: None,
+    },
     @core.Dir::{
       path: "/ninf",
       rank: -1.0 / 0.0,
       last_accessed: 9223372036854775807L,
+      note: None,
     },
   ]
   match @core.decode(@core.encode(dirs)) {
@@ -198,6 +218,86 @@ test "路径含换行字节 → CorruptedData" {
     i.to_byte()
   })
   match @core.decode(Bytes::from_array(buf)) {
+    Err(@core.CorruptedData) => ()
+    other => fail("unexpected: \{Repr(other)}")
+  }
+}
+
+///|
+test "roundtrip v2：note Some/None 均保持" {
+  let dirs = [
+    @core.Dir::{
+      path: "/a",
+      rank: 1.0,
+      last_accessed: 5L,
+      note: Some("后端项目"),
+    },
+    @core.Dir::{ path: "/b", rank: 2.0, last_accessed: 6L, note: None, },
+  ]
+  match @core.decode(@core.encode(dirs)) {
+    Ok(out) => {
+      @debug.assert_eq(out.length(), 2)
+      @debug.assert_eq(out[0].note, Some("后端项目"))
+      @debug.assert_eq(out[1].note, None)
+    }
+    Err(e) => fail("unexpected: \{Repr(e)}")
+  }
+}
+
+///|
+test "v1 兼容读：旧格式条目 note 读作 None" {
+  // v2 条目 = v1 条目 + 4 字节 note 头；降版本号并截去 note 头即得合法 v1 字节
+  let dirs = [
+    @core.Dir::{ path: "/legacy", rank: 1.5, last_accessed: 42L, note: None, },
+  ]
+  let bytes = @core.encode(dirs).to_array()
+  bytes[0] = (1).to_byte()
+  let v1 = Bytes::from_array(bytes[:bytes.length() - 4])
+  match @core.decode(v1) {
+    Ok(out) => {
+      @debug.assert_eq(out.length(), 1)
+      @debug.assert_eq(out[0].path, "/legacy")
+      @debug.assert_eq(out[0].rank, 1.5)
+      @debug.assert_eq(out[0].last_accessed, 42L)
+      @debug.assert_eq(out[0].note, None)
+    }
+    Err(e) => fail("unexpected: \{Repr(e)}")
+  }
+}
+
+///|
+test "v2 note 长度非法 → CorruptedData（负值/越界）" {
+  let dirs = [
+    @core.Dir::{ path: "/a", rank: 1.0, last_accessed: 0L, note: None, },
+  ]
+  // 尾 4 字节为 note 长度：改 0xFFFFFFFF（有符号读负）→ 拒
+  let neg = @core.encode(dirs).to_array()
+  for i in (neg.length() - 4)..<neg.length() {
+    neg[i] = (255).to_byte()
+  }
+  match @core.decode(Bytes::from_array(neg)) {
+    Err(@core.CorruptedData) => ()
+    other => fail("unexpected: \{Repr(other)}")
+  }
+  // 长度超出剩余字节 → 拒
+  let over = @core.encode(dirs).to_array()
+  over[over.length() - 1] = (100).to_byte()
+  match @core.decode(Bytes::from_array(over)) {
+    Err(@core.CorruptedData) => ()
+    other => fail("unexpected: \{Repr(other)}")
+  }
+}
+
+///|
+test "v2 note 坏 UTF-8 → CorruptedData" {
+  let dirs = [
+    @core.Dir::{ path: "/a", rank: 1.0, last_accessed: 0L, note: None, },
+  ]
+  // note 长度改 1、内容放 0xFF（非法 UTF-8 起始）
+  let bad = @core.encode(dirs).to_array()
+  bad[bad.length() - 4] = (1).to_byte()
+  bad[bad.length() - 1] = (255).to_byte()
+  match @core.decode(Bytes::from_array(bad)) {
     Err(@core.CorruptedData) => ()
     other => fail("unexpected: \{Repr(other)}")
   }

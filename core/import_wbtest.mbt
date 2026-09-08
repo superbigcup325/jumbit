@@ -176,7 +176,10 @@ test "days_from_civil：与已知 epoch 交叉验证" {
 ///|
 /// 折叠测试辅助：路径 → 带定位条目（rank/时间对折叠不可见，取占位值）
 fn loc(path : String) -> LocatedDir {
-  { location: path, result: Ok({ path, rank: 1.0, last_accessed: 0L, }), }
+  {
+    location: path,
+    result: Ok({ path, rank: 1.0, last_accessed: 0L, note: None, }),
+  }
 }
 
 ///|
@@ -235,11 +238,11 @@ test "collapse_consecutive：定位随条目保留" {
   let items = [
     {
       location: "line 1",
-      result: Ok({ path: "/x", rank: 1.0, last_accessed: 0L, }),
+      result: Ok({ path: "/x", rank: 1.0, last_accessed: 0L, note: None, }),
     },
     {
       location: "line 2",
-      result: Ok({ path: "/x", rank: 1.0, last_accessed: 5L, }),
+      result: Ok({ path: "/x", rank: 1.0, last_accessed: 5L, note: None, }),
     },
   ]
   let out = collapse_consecutive(items)

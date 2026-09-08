@@ -40,6 +40,7 @@ pub fn Database::add(
           0.0
         },
         last_accessed: now,
+        note: None,
       })
   }
   self.dirty = true
@@ -68,6 +69,7 @@ pub fn Database::add_update(
           0.0
         },
         last_accessed: now,
+        note: None,
       })
   }
   self.dirty = true
@@ -142,7 +144,7 @@ pub fn Database::add_unchecked(
   rank : Double,
   now : Int64,
 ) -> Unit {
-  self.dirs.push({ path, rank, last_accessed: now, })
+  self.dirs.push({ path, rank, last_accessed: now, note: None, })
   self.dirty = true
 }
 
@@ -177,7 +179,7 @@ pub fn Database::age(self : Database, max_age : Double) -> Unit {
 
 ///|
 /// 合并重复路径：先按路径排序，相邻同路径条目 rank 相加、last_accessed 取最大
-/// （对齐上游 Database::dedup）
+/// （对齐上游 Database::dedup）；note 为 jumbit 扩展，一侧有值则保留（信息不丢）
 pub fn Database::dedup(self : Database) -> Unit {
   self.sort_by_path()
   for i in self.dirs.length()>..1 {
@@ -190,7 +192,28 @@ pub fn Database::dedup(self : Database) -> Unit {
         curr.last_accessed
       }
       prev.rank = prev.rank + curr.rank
+      if prev.note is None {
+        prev.note = curr.note
+      }
       self.swap_remove(i)
     }
+  }
+}
+
+///|
+/// 设置条目标注（jumbit 扩展）：None 清除。命中返回 true 并置 dirty；
+/// 路径不在库中返回 false（describe 只标注已记录条目）
+pub fn Database::set_note(
+  self : Database,
+  path : String,
+  note : String?,
+) -> Bool {
+  match self.find_idx(path) {
+    Some(i) => {
+      self.dirs[i].note = note
+      self.dirty = true
+      true
+    }
+    None => false
   }
 }

@@ -17,11 +17,13 @@ pub const WEEK : Int64 = 7L * DAY
 pub const MONTH : Int64 = 30L * DAY
 
 ///|
-/// 单条目录记录：三字段模型（对齐上游 src/db/dir.rs）
+/// 单条目录记录：path/rank/last_accessed 三字段对齐上游 src/db/dir.rs；
+/// note 为 jumbit 扩展（describe 的人工标注，v2 格式起持久化，None 编码为空）
 pub(all) struct Dir {
   path : String
   mut rank : Double
   mut last_accessed : Int64
+  mut note : String?
 } derive(Debug)
 
 ///|

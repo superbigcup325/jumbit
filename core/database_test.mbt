@@ -67,13 +67,20 @@ test "all() 返回副本：外部增删不影响库内部" {
   let db = @core.Database::new()
   db.add("/foo", 1.0, 0L)
   let snapshot = db.all()
-  snapshot.push(@core.Dir::{ path: "/injected", rank: 9.0, last_accessed: 0L, })
+  snapshot.push(@core.Dir::{
+    path: "/injected",
+    rank: 9.0,
+    last_accessed: 0L,
+    note: None,
+  })
   @debug.assert_eq(db.all().length(), 1)
 }
 
 ///|
 test "from_dirs：解码入口构建，初始未标脏" {
-  let dirs = [@core.Dir::{ path: "/a", rank: 1.0, last_accessed: 0L, }]
+  let dirs = [
+    @core.Dir::{ path: "/a", rank: 1.0, last_accessed: 0L, note: None, },
+  ]
   let db = @core.Database::from_dirs(dirs)
   @debug.assert_eq(db.is_dirty(), false)
   @debug.assert_eq(db.all().length(), 1)
@@ -183,4 +190,48 @@ test "sort_by_path：字典序" {
   @debug.assert_eq(db.all()[0].path, "/a")
   @debug.assert_eq(db.all()[1].path, "/b")
   @debug.assert_eq(db.all()[2].path, "/c")
+}
+
+///|
+test "set_note：命中置 dirty 返回 true，未命中返回 false" {
+  let db = @core.Database::from_dirs([
+    @core.Dir::{ path: "/a", rank: 1.0, last_accessed: 0L, note: None, },
+  ])
+  db.mark_clean()
+  @debug.assert_eq(db.set_note("/missing", Some("x")), false)
+  @debug.assert_eq(db.is_dirty(), false)
+  @debug.assert_eq(db.set_note("/a", Some("后端")), true)
+  @debug.assert_eq(db.is_dirty(), true)
+  @debug.assert_eq(db.all()[0].note, Some("后端"))
+  // None 即清除
+  @debug.assert_eq(db.set_note("/a", None), true)
+  @debug.assert_eq(db.all()[0].note, None)
+}
+
+///|
+test "dedup：note 一侧有值则保留（信息不丢）" {
+  let a = @core.Database::from_dirs([
+    @core.Dir::{
+      path: "/dup",
+      rank: 1.0,
+      last_accessed: 0L,
+      note: Some("保留我"),
+    },
+    @core.Dir::{ path: "/dup", rank: 1.0, last_accessed: 5L, note: None, },
+  ])
+  a.dedup()
+  @debug.assert_eq(a.all().length(), 1)
+  @debug.assert_eq(a.all()[0].note, Some("保留我"))
+  let b = @core.Database::from_dirs([
+    @core.Dir::{ path: "/dup", rank: 1.0, last_accessed: 0L, note: None, },
+    @core.Dir::{
+      path: "/dup",
+      rank: 1.0,
+      last_accessed: 5L,
+      note: Some("补上"),
+    },
+  ])
+  b.dedup()
+  @debug.assert_eq(b.all().length(), 1)
+  @debug.assert_eq(b.all()[0].note, Some("补上"))
 }

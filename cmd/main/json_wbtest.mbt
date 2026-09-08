@@ -35,8 +35,18 @@ test "render_json：空数组与多条目形状（键序固定）" {
   let now = 1000L
   @debug.assert_eq(render_json([], now, "exact"), "[]")
   // last_accessed 距 now 不足 1h → score 含 ×4.0 衰减乘数
-  let d1 : @core.Dir = { path: "/a", rank: 1.0, last_accessed: 999L, }
-  let d2 : @core.Dir = { path: "/b x\"y", rank: 2.0, last_accessed: 998L, }
+  let d1 : @core.Dir = {
+    path: "/a",
+    rank: 1.0,
+    last_accessed: 999L,
+    note: None,
+  }
+  let d2 : @core.Dir = {
+    path: "/b x\"y",
+    rank: 2.0,
+    last_accessed: 998L,
+    note: None,
+  }
   @debug.assert_eq(
     render_json([d1, d2], now, "exact"),
     "[{\"path\":\"/a\",\"score\":4,\"last_accessed\":999,\"matched_by\":\"exact\"}," +

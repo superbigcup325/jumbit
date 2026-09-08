@@ -73,6 +73,7 @@ pub fn Database::mark_clean(Self) -> Unit
 pub fn Database::new() -> Self
 pub async fn Database::query_all(Self, StreamOptions, async (String) -> Bool) -> Array[Dir]
 pub fn Database::remove(Self, String) -> Bool
+pub fn Database::set_note(Self, String, String?) -> Bool
 pub fn Database::sort_by_path(Self) -> Unit
 pub fn Database::sort_by_score(Self, Int64) -> Unit
 pub fn Database::swap_remove(Self, Int) -> Unit
@@ -81,6 +82,7 @@ pub(all) struct Dir {
   path : String
   mut rank : Double
   mut last_accessed : Int64
+  mut note : String?
 } derive(@debug.Debug)
 pub fn Dir::format_score(Self, Int64) -> String
 pub fn Dir::score(Self, Int64) -> Double
