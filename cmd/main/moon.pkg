@@ -3,7 +3,6 @@ import {
   "moonbitlang/async/fs" @afs,
   "moonbitlang/async/stdio",
   "moonbitlang/core/debug",
-  "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/env",
   "moonbitlang/x/sys",
   "superbigcup325/jumbit/cli",
@@ -12,5 +11,9 @@ import {
   "superbigcup325/jumbit/platform",
   "superbigcup325/jumbit/templates" @tpl,
 }
+
+import {
+  "moonbitlang/core/encoding/utf8",
+} for "wbtest"
 
 pkgtype(kind: "executable")

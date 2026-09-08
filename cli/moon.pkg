@@ -1,6 +1,6 @@
 import {
   "moonbitlang/core/debug",
-  "moonbitlang/core/strconv",
+  "moonbitlang/core/string",
   "superbigcup325/jumbit",
   "superbigcup325/jumbit/templates" @tpl,
 }

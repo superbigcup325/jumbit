@@ -80,20 +80,13 @@ pub fn maxage(get : (String) -> String?) -> Result[Double, String] {
   match get("_JB_MAXAGE") {
     None => Ok(10000.0)
     Some(value) => {
-      let parsed : Result[Int, String] = Ok(@strconv.from_str(value)) catch {
-        e => {
-          ignore(e)
-          Err("_JB_MAXAGE 必须是非负整数: \{value}")
-        }
+      let n = @string.parse_int(value) catch {
+        _ => return Err("_JB_MAXAGE 必须是非负整数: \{value}")
       }
-      match parsed {
-        Ok(n) =>
-          if n < 0 {
-            Err("_JB_MAXAGE 必须是非负整数: \{value}")
-          } else {
-            Ok(n.to_double())
-          }
-        Err(msg) => Err(msg)
+      if n < 0 {
+        Err("_JB_MAXAGE 必须是非负整数: \{value}")
+      } else {
+        Ok(n.to_double())
       }
     }
   }

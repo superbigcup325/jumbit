@@ -17,7 +17,7 @@ pub fn parse_z_line(line : String) -> Result[Dir, String] {
     None => return bad
   }
   // 上游按 u64 解析：Int64 溢出（>2^63-1）与负数均拒为坏行
-  let last_accessed : Int64 = @strconv.from_str(line[p1 + 1:]) catch {
+  let last_accessed : Int64 = @string.parse_int64(line[p1 + 1:]) catch {
     _ => return bad
   }
   if last_accessed < 0L {
@@ -28,7 +28,9 @@ pub fn parse_z_line(line : String) -> Result[Dir, String] {
     Some(i) => i
     None => return bad
   }
-  let rank : Double = @strconv.from_str(head[p2 + 1:]) catch { _ => return bad }
+  let rank : Double = @string.parse_double(head[p2 + 1:]) catch {
+    _ => return bad
+  }
   Ok({ path: head[0:p2].to_owned(), rank, last_accessed, note: None, })
 }
 
@@ -41,7 +43,7 @@ pub fn parse_autojump_line(line : String) -> Result[Dir, String] {
     None => return Err("invalid entry: \{line}")
   }
   let rank_str = line[0:t].to_owned()
-  let rank : Double = @strconv.from_str(rank_str) catch {
+  let rank : Double = @string.parse_double(rank_str) catch {
     _ => {
       // 对齐上游 anyhow 消息的 Rust ParseFloatError Display 后缀
       let reason = if rank_str == "" {

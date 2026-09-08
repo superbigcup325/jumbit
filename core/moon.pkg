@@ -1,8 +1,8 @@
 import {
   "moonbitlang/core/debug",
+  "moonbitlang/core/string",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/math",
-  "moonbitlang/core/strconv",
 }
 
 import {

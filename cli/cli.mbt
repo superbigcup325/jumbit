@@ -98,15 +98,14 @@ fn parse_add(args : Array[String]) -> Command {
       escaped = true
     } else if !escaped && a == "--score" {
       if i + 1 < n {
-        let parsed : Result[Double, String] = Ok(@strconv.from_str(args[i + 1])) catch {
-          e => {
-            ignore(e)
-            Err("--score 必须是数字: \{args[i + 1]}")
+        let v = @string.parse_double(args[i + 1]) catch {
+          _ => {
+            bad = Some("--score 必须是数字: \{args[i + 1]}")
+            1.0 // 占位：bad 非空时命令结果为 Unknown，score 不会被使用
           }
         }
-        match parsed {
-          Ok(v) => opts.score = v
-          Err(msg) => bad = Some(msg)
+        if bad is None {
+          opts.score = v
         }
         i += 1
       } else {

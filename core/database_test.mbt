@@ -243,8 +243,8 @@ test "sort_by_score：NaN 按 IEEE totalOrder 排最前（上游 total_cmp 对�
     @core.Dir::{ path: "/normal", rank: 1.0, last_accessed: 100L, note: None, },
     @core.Dir::{
       path: "/nan",
-      // 用 from_str("nan")（import 真实路径）而非 0.0/0.0——后者是编译期折叠的负 NaN
-      rank: @strconv.from_str("nan") catch {
+      // 用 parse_double("nan")（import 真实路径）而非 0.0/0.0——后者是编译期折叠的负 NaN
+      rank: @string.parse_double("nan") catch {
         _ => 1.0
       },
       last_accessed: 100L,
