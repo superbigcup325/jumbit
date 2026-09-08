@@ -1,5 +1,6 @@
 ///|
-/// query 的选项与关键词（--exclude 为精确路径，对齐上游语义；glob 排除走 _JB_EXCLUDE_DIRS）
+/// query 的选项与关键词（--exclude 为精确路径，对齐上游语义；glob 排除走 _JB_EXCLUDE_DIRS；
+/// --json/--fuzzy 为 jumbit 扩展，上游无此语义）
 pub(all) struct QueryOptions {
   keywords : Array[String]
   mut all : Bool
@@ -7,6 +8,7 @@ pub(all) struct QueryOptions {
   mut score : Bool
   mut interactive : Bool
   mut exclude : String?
+  mut json : Bool
 } derive(Debug, Eq)
 
 ///|
@@ -115,6 +117,7 @@ fn parse_query(args : Array[String]) -> Command {
     score: false,
     interactive: false,
     exclude: None,
+    json: false,
   }
   let mut bad : String? = None
   let mut escaped = false
@@ -130,6 +133,7 @@ fn parse_query(args : Array[String]) -> Command {
         "--list" => opts.list = true
         "--score" => opts.score = true
         "--interactive" => opts.interactive = true
+        "--json" => opts.json = true
         "--exclude" =>
           if i + 1 < n {
             opts.exclude = Some(args[i + 1])
@@ -148,6 +152,9 @@ fn parse_query(args : Array[String]) -> Command {
       opts.keywords.push(a)
     }
     i += 1
+  }
+  if bad is None && opts.json && opts.interactive {
+    bad = Some("--json 与 --interactive 互斥")
   }
   match bad {
     Some(flag) => Unknown(flag)
@@ -280,6 +287,7 @@ pub fn usage() -> String {
   "    --all                                 跳过存在性检查\n" +
   "    --exclude <path>                      排除指定目录（精确路径）\n" +
   "    --interactive                         fzf 交互式选择\n" +
+  "    --json                                单行 JSON 数组输出全部匹配（agent 通道，与 --interactive 互斥）\n" +
   "  jumbit init <shell>                     生成 shell 集成脚本（默认定义 j/ji，hook=pwd）\n" +
   "    [--cmd C] [--hook pwd|prompt|none] [--no-cmd]\n" +
   "  jumbit import <plugin> [--merge]        从其他工具导入历史数据（空库直灌，--merge 合并进非空库）\n" +

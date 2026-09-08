@@ -67,6 +67,18 @@ if ! echo "$out" | grep -qE '^ *[0-9]+\.[0-9] .*tmp'; then
   exit 1
 fi
 
+echo "== query --json：单行 JSON 数组（agent 通道）=="
+jdata=$(mktemp -d "${TMPDIR:-/tmp}/jumbit-json-XXXX")
+printf '/smoke-json|1|1704067200\n' > "$jdata/z.txt"
+_JB_DATA_DIR="$jdata" _Z_DATA="$jdata/z.txt" "$bin" import z >/dev/null 2>&1
+json_out=$(_JB_DATA_DIR="$jdata" "$bin" query --json --all)
+expected='[{"path":"/smoke-json","score":0.25,"last_accessed":1704067200,"matched_by":"exact"}]'
+if [ "$json_out" != "$expected" ]; then
+  echo "✗ --json 输出不符: [$json_out]" >&2
+  exit 1
+fi
+rm -rf "$jdata"
+
 echo "== 未知命令应退出码 2 =="
 if _JB_DATA_DIR="$data" "$bin" frobnicate 2>/dev/null; then
   echo "✗ 未知命令退出码应为 2" >&2

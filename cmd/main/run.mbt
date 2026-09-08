@@ -274,6 +274,10 @@ async fn run_query(
       err_line(errs, "无匹配: \{kw}")
     }
     1
+  } else if qopts.json {
+    // agent 通道：单行 JSON 数组（含全部匹配与 matched_by 证据字段）
+    println(render_json(remaining, now, "exact"))
+    0
   } else if qopts.interactive {
     match @platform.fzf_select(remaining, now, @config.fzf_opts(getenv)) {
       Ok(selection) => {

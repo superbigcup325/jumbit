@@ -29,6 +29,7 @@ jumbit query backend                 # 输出匹配的最高分目录
 jumbit query --list --score          # 全部匹配，按得分降序带分数前缀
 jumbit query --interactive           # fzf 交互选择
 jumbit query --all --exclude ~/tmp   # 跳过存在性检查 / 排除指定目录
+jumbit query --json                  # 单行 JSON 数组输出全部匹配（agent 通道）
 jumbit remove ~/projects/backend     # 从数据库移除
 jumbit import z                      # 从 z/zsh-z/fasd/z.lua/autojump/atuin 导入历史
 jumbit import --merge zsh-z          # 非空库须加 --merge 合并

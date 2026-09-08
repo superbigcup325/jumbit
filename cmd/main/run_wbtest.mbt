@@ -651,3 +651,28 @@ async test "import atuin：连续同路径折叠 + 错误不打断链（PATH 注
   cleanup_test_dir(data)
   cleanup_test_dir(bindir)
 }
+
+///|
+async test "query --json：--all 可查假路径、miss 退出码 1、--interactive 互斥退出码 2" {
+  let data = make_test_dir("json-data")
+  let zdir = make_test_dir("json-z")
+  let zfile = zdir + "/zdata"
+  @platform.write_atomic(
+    zfile, b"/imp-json-alpha|1.0|0\n/imp-json-beta|2.0|0\n",
+  )
+  let errs : Array[String] = []
+  let env = env_map([("_JB_DATA_DIR", data), ("_Z_DATA", zfile)])
+  @debug.assert_eq(run(["import", "z"], env, errs), 0)
+  // --all 跳过存在性检查：假路径不被懒删除（JSON 字节形状由 json_wbtest 与 smoke 锁定）
+  @debug.assert_eq(run(["query", "--json", "--all"], env_with(data), errs), 0)
+  @debug.assert_eq(
+    run(["query", "--json", "--all", "nosuch"], env_with(data), errs),
+    1,
+  )
+  @debug.assert_eq(
+    run(["query", "--json", "--interactive"], env_with(data), errs),
+    2,
+  )
+  cleanup_test_dir(data)
+  cleanup_test_dir(zdir)
+}

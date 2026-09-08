@@ -6,6 +6,7 @@
 
 ### Added
 
+- `query --json`：单行 JSON 数组输出全部匹配（path/score/last_accessed/matched_by），面向脚本与 agent 的结构化通道，与 `--interactive` 互斥
 - `import <plugin>`：从其他工具导入历史数据，支持 `atuin`/`autojump`/`fasd`/`z`/`z.lua`/`zsh-z`（对齐上游 cmd/import.rs + import/ 六模块）
   - 空库直灌、非空库须 `--merge`（可位于插件名前后，上游 global flag 语义）
   - 数据文件按各插件标准约定自动探测（`_Z_DATA`/`_FASD_DATA`/`ZSHZ_DATA`/`_ZL_DATA`/`XDG_DATA_HOME`）；z.lua 主路径缺失回落 fish 变体路径；atuin 经 `atuin history list --print0` 子进程读取

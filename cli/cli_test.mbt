@@ -7,8 +7,9 @@ fn query_opts(
   list? : Bool = false,
   score? : Bool = false,
   exclude? : String? = None,
+  json? : Bool = false,
 ) -> @cli.QueryOptions {
-  { keywords, all, list, score, interactive: false, exclude, }
+  { keywords, all, list, score, interactive: false, exclude, json, }
 }
 
 ///|
@@ -56,6 +57,22 @@ test "parse：未知 flag 与缺值归 Unknown" {
   @debug.assert_eq(
     @cli.parse(["query", "--exclude"]),
     @cli.Unknown("--exclude 缺少路径参数"),
+  )
+}
+
+///|
+test "parse：query --json 与 --interactive 互斥" {
+  @debug.assert_eq(
+    @cli.parse(["query", "--json", "kw"]),
+    @cli.Query(query_opts(keywords=["kw"], json=true)),
+  )
+  @debug.assert_eq(
+    @cli.parse(["query", "--json", "--interactive"]),
+    @cli.Unknown("--json 与 --interactive 互斥"),
+  )
+  @debug.assert_eq(
+    @cli.parse(["query", "--interactive", "--json"]),
+    @cli.Unknown("--json 与 --interactive 互斥"),
   )
 }
 
