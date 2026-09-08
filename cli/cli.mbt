@@ -13,7 +13,7 @@ pub(all) struct QueryOptions {
 } derive(Debug, Eq)
 
 ///|
-/// 子命令（MVP 命令面：add / query / help）
+/// 子命令（add / query / remove / init / import / describe / export / help）
 pub(all) struct AddOptions {
   paths : Array[String]
   mut score : Double
@@ -85,6 +85,14 @@ pub fn parse(args : Array[String]) -> Command {
 }
 
 ///|
+/// 浮点解析（raise → Option）：供需要分支而非中止的解析处使用
+fn parse_double_opt(s : String) -> Double? {
+  Some(@string.parse_double(s)) catch {
+    _ => None
+  }
+}
+
+///|
 /// add 参数解析：可选一次 `--score <n>`；裸 `--` 剥离后全部为路径
 fn parse_add(args : Array[String]) -> Command {
   let opts : AddOptions = { paths: [], score: 1.0, }
@@ -98,14 +106,9 @@ fn parse_add(args : Array[String]) -> Command {
       escaped = true
     } else if !escaped && a == "--score" {
       if i + 1 < n {
-        let v = @string.parse_double(args[i + 1]) catch {
-          _ => {
-            bad = Some("--score 必须是数字: \{args[i + 1]}")
-            1.0 // 占位：bad 非空时命令结果为 Unknown，score 不会被使用
-          }
-        }
-        if bad is None {
-          opts.score = v
+        match parse_double_opt(args[i + 1]) {
+          Some(v) => opts.score = v
+          None => bad = Some("--score 必须是数字: \{args[i + 1]}")
         }
         i += 1
       } else {

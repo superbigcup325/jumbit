@@ -12,6 +12,52 @@ fn err_line(errs : Array[String], msg : String) -> Unit {
 }
 
 ///|
+/// 配置解析步骤的统一出口：Err 文案写入 errs 后返回 None，调用方以
+/// `match { None => return 1 }` 提前退出。各子命令保留各自的解析顺序
+/// （对齐上游：add 先读配置再开库，query/import 先开库）
+/// 各子命令保留各自的解析顺序（对齐上游：add 先读配置再开库，query/import 先开库）
+fn[T] cfg(r : Result[T, String], errs : Array[String]) -> T? {
+  match r {
+    Ok(v) => Some(v)
+    Err(msg) => {
+      err_line(errs, msg)
+      None
+    }
+  }
+}
+
+///|
+/// 打开数据库：打开失败的文案与配置错误分开（含 Repr 调试格式）
+async fn open_store(
+  data_dir : String,
+  errs : Array[String],
+) -> @platform.Store? {
+  match @platform.load(data_dir) {
+    Ok(s) => Some(s)
+    Err(err) => {
+      err_line(errs, "打开数据库失败: \{Repr(err)}")
+      None
+    }
+  }
+}
+
+///|
+/// 结束统一落盘：保存失败时退出码覆盖为 1，否则透传原退出码
+async fn finish(
+  store : @platform.Store,
+  errs : Array[String],
+  code : Int,
+) -> Int {
+  match store.save() {
+    Ok(_) => code
+    Err(err) => {
+      err_line(errs, "保存数据库失败: \{Repr(err)}")
+      1
+    }
+  }
+}
+
+///|
 /// 全部子命令的执行入口。
 /// 返回进程退出码：0 成功 / 1 运行失败（含配置错误，对齐上游 ExitCode::FAILURE）
 /// / 2 用法错误（对齐 clap 参数解析错误）。stderr 消息写入 errs。
@@ -50,6 +96,40 @@ fn echo_enabled(getenv : (String) -> String?) -> Bool {
 }
 
 ///|
+/// _JB_EXCLUDE_DIRS glob 命中检测（add 与 import 共用；命中即静默跳过）
+fn glob_hit(globs : Array[String], path : String) -> Bool {
+  for pattern in globs {
+    if @core.glob_match(pattern, path) {
+      return true
+    }
+  }
+  false
+}
+
+///|
+/// 双重尝试（对齐上游 remove.rs 的双重查找语义）：先原串，未中再按 cwd 规范化重试
+fn try_twice(
+  db : @core.Database,
+  path : String,
+  cwd : String,
+  op : (@core.Database, String) -> Bool,
+) -> Bool {
+  if op(db, path) {
+    return true
+  }
+  op(db, @core.resolve_path(path, cwd))
+}
+
+///|
+/// 双重查找：try_twice 的查找版（describe 显示路需要下标而非布尔）
+fn find_twice(db : @core.Database, path : String, cwd : String) -> Int? {
+  match db.find_idx(path) {
+    Some(i) => Some(i)
+    None => db.find_idx(@core.resolve_path(path, cwd))
+  }
+}
+
+///|
 /// add（对齐上游 add.rs）：
 /// - 按 _JB_RESOLVE_SYMLINKS 选择 realpath（canonicalize）或 resolve_path
 /// - 换行路径 / _JB_EXCLUDE_DIRS glob 命中 → 静默跳过；非目录 → 立即报错中止
@@ -63,34 +143,22 @@ async fn run_add(
     err_line(errs, "add: 缺少路径参数")
     return 2
   }
-  let data_dir = match @config.data_dir(getenv) {
-    Ok(d) => d
-    Err(msg) => {
-      err_line(errs, msg)
-      return 1
-    }
+  let data_dir = match cfg(@config.data_dir(getenv), errs) {
+    Some(data_dir) => data_dir
+    None => return 1
   }
-  let globs = match @config.exclude_dirs(getenv, getenv("HOME")) {
-    Ok(g) => g
-    Err(msg) => {
-      err_line(errs, msg)
-      return 1
-    }
+  let globs = match cfg(@config.exclude_dirs(getenv, getenv("HOME")), errs) {
+    Some(globs) => globs
+    None => return 1
   }
-  let maxage = match @config.maxage(getenv) {
-    Ok(m) => m
-    Err(msg) => {
-      err_line(errs, msg)
-      return 1
-    }
+  let maxage = match cfg(@config.maxage(getenv), errs) {
+    Some(maxage) => maxage
+    None => return 1
   }
   let resolve_symlinks = @config.resolve_symlinks(getenv)
-  let store = match @platform.load(data_dir) {
-    Ok(s) => s
-    Err(err) => {
-      err_line(errs, "打开数据库失败: \{Repr(err)}")
-      return 1
-    }
+  let store = match open_store(data_dir, errs) {
+    Some(s) => s
+    None => return 1
   }
   let cwd = match @env.current_dir() {
     Some(d) => d
@@ -114,14 +182,7 @@ async fn run_add(
       continue
     }
     // _JB_EXCLUDE_DIRS 命中 → 静默跳过
-    let mut excluded = false
-    for pattern in globs {
-      if @core.glob_match(pattern, resolved) {
-        excluded = true
-        break
-      }
-    }
-    if excluded {
+    if glob_hit(globs, resolved) {
       continue
     }
     let kind = @afs.kind(resolved) catch {
@@ -142,13 +203,7 @@ async fn run_add(
   if store.database().is_dirty() {
     store.database().age(maxage)
   }
-  match store.save() {
-    Ok(_) => 0
-    Err(err) => {
-      err_line(errs, "保存数据库失败: \{Repr(err)}")
-      1
-    }
-  }
+  finish(store, errs, 0)
 }
 
 ///|
@@ -162,110 +217,72 @@ async fn run_remove(
     err_line(errs, "remove: 缺少路径参数")
     return 2
   }
-  let data_dir = match @config.data_dir(getenv) {
-    Ok(d) => d
-    Err(msg) => {
-      err_line(errs, msg)
-      return 1
-    }
+  let data_dir = match cfg(@config.data_dir(getenv), errs) {
+    Some(data_dir) => data_dir
+    None => return 1
   }
-  let store = match @platform.load(data_dir) {
-    Ok(s) => s
-    Err(err) => {
-      err_line(errs, "打开数据库失败: \{Repr(err)}")
-      return 1
-    }
+  let store = match open_store(data_dir, errs) {
+    Some(s) => s
+    None => return 1
   }
   let cwd = match @env.current_dir() {
     Some(d) => d
     None => "/"
   }
   for path in paths {
-    let mut removed = store.database().remove(path)
-    if !removed {
-      let resolved = @core.resolve_path(path, cwd)
-      removed = store.database().remove(resolved)
-    }
+    let removed = try_twice(store.database(), path, cwd, fn(db, p) {
+      db.remove(p)
+    })
     if !removed {
       err_line(errs, "path not found in database: \{path}")
       return 1
     }
   }
-  match store.save() {
-    Ok(_) => 0
-    Err(err) => {
-      err_line(errs, "保存数据库失败: \{Repr(err)}")
-      1
-    }
-  }
+  finish(store, errs, 0)
 }
 
 ///|
-/// query：完整过滤链（core/stream）+ --exclude 精确路径过滤 + 三种输出模式。
+/// query：完整过滤链（core/stream）+ --exclude 精确路径过滤 + 输出模式选择。
 /// 排序与懒删除会标脏，结束统一 save 落盘（对齐上游 query 后 save）。
 async fn run_query(
   qopts : @cli.QueryOptions,
   getenv : (String) -> String?,
   errs : Array[String],
 ) -> Int {
-  let data_dir = match @config.data_dir(getenv) {
-    Ok(d) => d
-    Err(msg) => {
-      err_line(errs, msg)
-      return 1
-    }
+  let data_dir = match cfg(@config.data_dir(getenv), errs) {
+    Some(data_dir) => data_dir
+    None => return 1
   }
-  let store = match @platform.load(data_dir) {
-    Ok(s) => s
-    Err(err) => {
-      err_line(errs, "打开数据库失败: \{Repr(err)}")
-      return 1
-    }
+  let store = match open_store(data_dir, errs) {
+    Some(s) => s
+    None => return 1
   }
-  let globs = match @config.exclude_dirs(getenv, getenv("HOME")) {
-    Ok(g) => g
-    Err(msg) => {
-      err_line(errs, msg)
-      return 1
-    }
+  let globs = match cfg(@config.exclude_dirs(getenv, getenv("HOME")), errs) {
+    Some(globs) => globs
+    None => return 1
   }
   let resolve_symlinks = @config.resolve_symlinks(getenv)
   let now = current_second()
-  let stream_opts : @core.StreamOptions = {
-    now,
-    keywords: qopts.keywords,
-    exclude: globs,
-    base_dir: None,
-    exists: !qopts.all,
-    resolve_symlinks,
-    ttl: now - 3L * @core.MONTH,
-  }
   // exists 回调：kind 检查；resolve_symlinks=true 时不跟随符号链接（上游反向逻辑）
+  let exists = async fn(path : String) { dir_exists(path, resolve_symlinks) }
   let hits = store
     .database()
-    .query_all(stream_opts, async fn(path) {
-      dir_exists(path, resolve_symlinks)
-    })
+    .query_all(
+      make_stream_opts(now, globs, resolve_symlinks, qopts.keywords, qopts.all),
+      exists,
+    )
   // --exclude 为精确路径过滤（对齐上游 query_first/list 的跳过循环）
   let mut matched_by = "exact"
   let mut remaining = apply_exclude(hits, qopts.exclude)
   if hits.is_empty() && qopts.fuzzy && !qopts.keywords.is_empty() {
     // 模糊兜底路（jumbit 扩展）：仅精确路零命中时启用；同一过滤链
     // （exclude glob 命中懒删 / exists / TTL 懒删）照常生效
-    let fuzzy_opts : @core.StreamOptions = {
-      now,
-      keywords: [],
-      exclude: globs,
-      base_dir: None,
-      exists: !qopts.all,
-      resolve_symlinks,
-      ttl: now - 3L * @core.MONTH,
-    }
     let candidates = store
       .database()
-      .query_all(fuzzy_opts, async fn(path) {
-        dir_exists(path, resolve_symlinks)
-      })
+      .query_all(
+        make_stream_opts(now, globs, resolve_symlinks, [], qopts.all),
+        exists,
+      )
     let fuzzy_hits : Array[@core.Dir] = []
     for d in candidates {
       if @core.filter_by_keywords_fuzzy(qopts.keywords, d.path) {
@@ -321,12 +338,26 @@ async fn run_query(
     println(render(remaining[0], now, qopts.score, " "))
     0
   }
-  match store.save() {
-    Ok(_) => code
-    Err(err) => {
-      err_line(errs, "保存数据库失败: \{Repr(err)}")
-      1
-    }
+  finish(store, errs, code)
+}
+
+///|
+/// StreamOptions 组装：精确路与模糊兜底路共用同一过滤链参数
+fn make_stream_opts(
+  now : Int64,
+  globs : Array[String],
+  resolve_symlinks : Bool,
+  keywords : Array[String],
+  all : Bool,
+) -> @core.StreamOptions {
+  {
+    now,
+    keywords,
+    exclude: globs,
+    base_dir: None,
+    exists: !all,
+    resolve_symlinks,
+    ttl: now - 3L * @core.MONTH,
   }
 }
 
@@ -409,19 +440,13 @@ async fn run_describe(
   getenv : (String) -> String?,
   errs : Array[String],
 ) -> Int {
-  let data_dir = match @config.data_dir(getenv) {
-    Ok(d) => d
-    Err(msg) => {
-      err_line(errs, msg)
-      return 1
-    }
+  let data_dir = match cfg(@config.data_dir(getenv), errs) {
+    Some(data_dir) => data_dir
+    None => return 1
   }
-  let store = match @platform.load(data_dir) {
-    Ok(s) => s
-    Err(err) => {
-      err_line(errs, "打开数据库失败: \{Repr(err)}")
-      return 1
-    }
+  let store = match open_store(data_dir, errs) {
+    Some(s) => s
+    None => return 1
   }
   let cwd = match @env.current_dir() {
     Some(d) => d
@@ -432,53 +457,30 @@ async fn run_describe(
     Some(text) => {
       // 空串即清除
       let note = if text == "" { None } else { Some(text) }
-      let mut ok = db.set_note(dopts.path, note)
-      if !ok {
-        let resolved = @core.resolve_path(dopts.path, cwd)
-        if resolved != dopts.path {
-          ok = db.set_note(resolved, note)
-        }
-      }
+      let ok = try_twice(db, dopts.path, cwd, fn(db, p) { db.set_note(p, note) })
       if !ok {
         err_line(errs, "path not found in database: \{dopts.path}")
         return 1
       }
     }
     None => {
-      let idx = match db.find_idx(dopts.path) {
-        Some(i) => Some(i)
-        None => {
-          let resolved = @core.resolve_path(dopts.path, cwd)
-          if resolved != dopts.path {
-            db.find_idx(resolved)
-          } else {
-            None
-          }
-        }
-      }
-      match idx {
+      let i = match find_twice(db, dopts.path, cwd) {
+        Some(i) => i
         None => {
           err_line(errs, "path not found in database: \{dopts.path}")
           return 1
         }
-        Some(i) =>
-          match db.all()[i].note {
-            Some(text) => println(text)
-            None => {
-              err_line(errs, "describe: \{dopts.path} 无标注")
-              return 1
-            }
-          }
+      }
+      match db.all()[i].note {
+        Some(text) => println(text)
+        None => {
+          err_line(errs, "describe: \{dopts.path} 无标注")
+          return 1
+        }
       }
     }
   }
-  match store.save() {
-    Ok(_) => 0
-    Err(err) => {
-      err_line(errs, "保存数据库失败: \{Repr(err)}")
-      1
-    }
-  }
+  finish(store, errs, 0)
 }
 
 ///|
@@ -490,19 +492,13 @@ async fn run_export(
   getenv : (String) -> String?,
   errs : Array[String],
 ) -> Int {
-  let data_dir = match @config.data_dir(getenv) {
-    Ok(d) => d
-    Err(msg) => {
-      err_line(errs, msg)
-      return 1
-    }
+  let data_dir = match cfg(@config.data_dir(getenv), errs) {
+    Some(data_dir) => data_dir
+    None => return 1
   }
-  let store = match @platform.load(data_dir) {
-    Ok(s) => s
-    Err(err) => {
-      err_line(errs, "打开数据库失败: \{Repr(err)}")
-      return 1
-    }
+  let store = match open_store(data_dir, errs) {
+    Some(s) => s
+    None => return 1
   }
   let noted : Array[@core.Dir] = []
   for d in store.database().all() {
@@ -510,6 +506,7 @@ async fn run_export(
       noted.push(d)
     }
   }
+  // 经临时 Database 排序：复用 core 的 sort_by_score（含 NaN total_cmp 语义）
   let ranked = @core.Database::from_dirs(noted)
   ranked.sort_by_score(current_second())
   println(
@@ -524,13 +521,7 @@ async fn run_export(
     }
     println("| \{md_cell(d.path)} | \{md_cell(note)} |")
   }
-  match store.save() {
-    Ok(_) => 0
-    Err(err) => {
-      err_line(errs, "保存数据库失败: \{Repr(err)}")
-      1
-    }
-  }
+  finish(store, errs, 0)
 }
 
 ///|
@@ -556,19 +547,13 @@ async fn run_import(
   getenv : (String) -> String?,
   errs : Array[String],
 ) -> Int {
-  let data_dir = match @config.data_dir(getenv) {
-    Ok(d) => d
-    Err(msg) => {
-      err_line(errs, msg)
-      return 1
-    }
+  let data_dir = match cfg(@config.data_dir(getenv), errs) {
+    Some(data_dir) => data_dir
+    None => return 1
   }
-  let store = match @platform.load(data_dir) {
-    Ok(s) => s
-    Err(err) => {
-      err_line(errs, "打开数据库失败: \{Repr(err)}")
-      return 1
-    }
+  let store = match open_store(data_dir, errs) {
+    Some(s) => s
+    None => return 1
   }
   if !iopts.merge && !store.database().is_empty() {
     err_line(
@@ -576,12 +561,9 @@ async fn run_import(
     )
     return 1
   }
-  let globs = match @config.exclude_dirs(getenv, getenv("HOME")) {
-    Ok(g) => g
-    Err(msg) => {
-      err_line(errs, msg)
-      return 1
-    }
+  let globs = match cfg(@config.exclude_dirs(getenv, getenv("HOME")), errs) {
+    Some(globs) => globs
+    None => return 1
   }
   // 读数据源：source 为 None 表示无文件来源（atuin），上报定位用 `line N`
   let loaded : Result[(Array[@platform.ImportRecord], String?), String] = match
@@ -657,39 +639,22 @@ async fn run_import(
   for entry in entries {
     match entry.result {
       Err(reason) => err_line(errs, "\{entry.location}: \{reason}")
-      Ok(dir) => {
+      Ok(dir) =>
         // _JB_EXCLUDE_DIRS 命中 → 静默跳过（对齐上游 exclude_dirs 过滤）
-        let mut excluded = false
-        for pattern in globs {
-          if @core.glob_match(pattern, dir.path) {
-            excluded = true
-            break
-          }
-        }
-        if !excluded {
+        if !glob_hit(globs, dir.path) {
           store.database().add_unchecked(dir.path, dir.rank, dir.last_accessed)
         }
-      }
     }
   }
   if store.database().is_dirty() {
     store.database().dedup()
-    let maxage = match @config.maxage(getenv) {
-      Ok(m) => m
-      Err(msg) => {
-        err_line(errs, msg)
-        return 1
-      }
+    let maxage = match cfg(@config.maxage(getenv), errs) {
+      Some(maxage) => maxage
+      None => return 1
     }
     store.database().age(maxage)
   }
-  match store.save() {
-    Ok(_) => 0
-    Err(err) => {
-      err_line(errs, "保存数据库失败: \{Repr(err)}")
-      1
-    }
-  }
+  finish(store, errs, 0)
 }
 
 ///|
