@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- 数据集对拍工具：`scripts/gen_dataset.py`（路径池采样 + Zipf 访问分布 + 时间衰减 + 边界行，固定种子可复现）与 `scripts/dataset_check.sh`（import 六插件 / aging / --merge 八场景与真 zoxide 0.10.0 差分对拍，含排序正确性、退出码与坏行 stderr 逐字节比对）
 
 - `query --json`：单行 JSON 数组输出全部匹配（path/score/last_accessed/matched_by），面向脚本与 agent 的结构化通道，与 `--interactive` 互斥
 - `query --fuzzy`：精确匹配零命中时的兜底路——各关键词（ASCII 归一）为某路径组件的子串即命中，不限末组件、无序且允许同组件；`--json` 的 `matched_by` 出 `exact`/`fuzzy` 双值标注证据来源
@@ -39,13 +40,3 @@
 - 端到端冒烟脚本 `scripts/smoke.sh`：真实二进制验证 add→query 回显与错误退出码
 - 开发者回归脚本 `scripts/regression.sh`：`moon check --deny-warn`、`moon test`、`moon fmt --check`、`moon info` 接口面冻结四道闸，任一失败即非零退出
 
-### Fixed
-
-- 得分显示在精确半界（如陈旧条目 1.0×0.25=0.25）改按 Rust `{:.1}` 的半界取偶舍入，`--score` 前缀与上游逐字节一致（此前 `.round()` 半界远离零，0.25 误显 0.3）
-- 持久化解码拒绝路径字节含 NUL/换行的库文件（此前仅 add 入口拦截，手工构造的库文件可绕过）
-
-### Internal
-
-- Database 封装收敛：字段改为外部不可构造/原地修改，`all()` 返回数组副本，保证 dirty 标志一致性
-
-[Unreleased]: https://github.com/superbigcup325/jumbit
