@@ -5,6 +5,13 @@ on:
     branches: [main]
   pull_request:
 
+env:
+  # 工具链版本钉死：cli.moonbitlang.com 不提供历史版本下载（带版本的路径 403），
+  # 用 actions/cache 把安装结果钉在这个常量上实现可复现。
+  # 升级流程 = bump 此常量 → 本地全量验证（check/test/fmt/info + smoke）→ 同步提交。
+  # 本仓库曾因 latest 漂移挂掉：v0.10.12 改名了 strconv.from_str。
+  MOONBIT_VERSION: 0.1.20260904
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -12,13 +19,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      - name: Set up MoonBit
-        run: |
-          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
-          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+      - name: Restore MoonBit toolchain (pinned by MOONBIT_VERSION)
+        id: moon-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.moon
+          key: moonbit-${{ env.MOONBIT_VERSION }}
 
-      - name: Show toolchain version
-        run: moon version --all
+      - name: Install MoonBit (cache miss only)
+        if: steps.moon-cache.outputs.cache-hit != 'true'
+        run: curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+
+      - name: Add MoonBit to PATH
+        run: echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      # latest 会漂移：安装/缓存结果与钉住版本不符时立即失败，逼出显式升级
+      - name: Verify pinned toolchain version
+        run: |
+          moon version --all
+          moon version | grep -F "${{ env.MOONBIT_VERSION }}"
 
       - name: Fetch dependencies
         run: |
