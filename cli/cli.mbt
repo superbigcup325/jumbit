@@ -36,12 +36,20 @@ pub(all) struct ImportOptions {
 } derive(Debug, Eq)
 
 ///|
+/// describe 的选项（jumbit 扩展）：note 为 None 表示显示模式，Some("") 表示清除
+pub(all) struct DescribeOptions {
+  path : String
+  mut note : String?
+} derive(Debug, Eq)
+
+///|
 pub(all) enum Command {
   Add(AddOptions)
   Query(QueryOptions)
   Remove(Array[String])
   Init(InitOptions)
   Import(ImportOptions)
+  Describe(DescribeOptions)
   Help
   Unknown(String)
 } derive(Debug, Eq)
@@ -62,6 +70,7 @@ pub fn parse(args : Array[String]) -> Command {
     "remove" => Remove(strip_double_dash(rest))
     "init" => parse_init(rest)
     "import" => parse_import(rest)
+    "describe" => parse_describe(rest)
     "help" | "--help" | "-h" => Help
     other => Unknown(other)
   }
@@ -162,6 +171,48 @@ fn parse_query(args : Array[String]) -> Command {
   match bad {
     Some(flag) => Unknown(flag)
     None => Query(opts)
+  }
+}
+
+///|
+/// describe 参数解析：<path> [--note <text>]；标注拒绝换行/回车（export 的
+/// Markdown 表格与 CLI 单行输出完整性）；未知 flag/缺值归 Unknown
+fn parse_describe(args : Array[String]) -> Command {
+  let mut path : String? = None
+  let mut note : String? = None
+  let mut bad : String? = None
+  let n = args.length()
+  let mut i = 0
+  while i < n {
+    let a = args[i]
+    if a == "--note" {
+      if i + 1 < n {
+        note = Some(args[i + 1])
+        i += 1
+      } else {
+        bad = Some("--note 缺少标注文本")
+      }
+    } else if a.has_prefix("-") && a != "-" {
+      bad = Some(a)
+    } else if path is None {
+      path = Some(a)
+    } else {
+      bad = Some(a)
+    }
+    i += 1
+  }
+  if bad is None && note is Some(t) {
+    if t.contains("\n") || t.contains("\r") {
+      bad = Some("describe: 标注不能包含换行")
+    }
+  }
+  match bad {
+    Some(flag) => Unknown(flag)
+    None =>
+      match path {
+        Some(p) => Describe({ path: p, note, })
+        None => Unknown("describe: 缺少路径参数")
+      }
   }
 }
 
@@ -295,6 +346,7 @@ pub fn usage() -> String {
   "  jumbit init <shell>                     生成 shell 集成脚本（默认定义 j/ji，hook=pwd）\n" +
   "    [--cmd C] [--hook pwd|prompt|none] [--no-cmd]\n" +
   "  jumbit import <plugin> [--merge]        从其他工具导入历史数据（空库直灌，--merge 合并进非空库）\n" +
+  "  jumbit describe <path> [--note text]     查看/设置人工标注（--note \"\" 清除，jumbit 扩展）\n" +
   "    plugin ∈ atuin/autojump/fasd/z/z.lua/zsh-z（坏行逐条上报不中止）\n" +
   "  jumbit help                             显示本帮助\n\n" +
   "环境变量：\n" +

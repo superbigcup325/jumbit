@@ -27,8 +27,14 @@ pub(all) enum Command {
   Remove(Array[String])
   Init(InitOptions)
   Import(ImportOptions)
+  Describe(DescribeOptions)
   Help
   Unknown(String)
+} derive(Eq, @debug.Debug)
+
+pub(all) struct DescribeOptions {
+  path : String
+  mut note : String?
 } derive(Eq, @debug.Debug)
 
 pub(all) struct ImportOptions {

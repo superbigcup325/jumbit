@@ -35,6 +35,7 @@ pub async fn run(
     @cli.Remove(paths) => run_remove(paths, getenv, errs)
     @cli.Init(iopts) => run_init(iopts, getenv, errs)
     @cli.Import(iopts) => run_import(iopts, getenv, errs)
+    @cli.Describe(dopts) => run_describe(dopts, getenv, errs)
   }
 }
 
@@ -397,6 +398,86 @@ fn run_init(
   }
   println(source)
   0
+}
+
+///|
+/// describe（jumbit 扩展）：为已记录条目设置/清除/显示人工标注。
+/// 路径对齐 remove 的双重尝试：先原串，未中再按 cwd 规范化
+async fn run_describe(
+  dopts : @cli.DescribeOptions,
+  getenv : (String) -> String?,
+  errs : Array[String],
+) -> Int {
+  let data_dir = match @config.data_dir(getenv) {
+    Ok(d) => d
+    Err(msg) => {
+      err_line(errs, msg)
+      return 1
+    }
+  }
+  let store = match @platform.load(data_dir) {
+    Ok(s) => s
+    Err(err) => {
+      err_line(errs, "打开数据库失败: \{Repr(err)}")
+      return 1
+    }
+  }
+  let cwd = match @env.current_dir() {
+    Some(d) => d
+    None => "/"
+  }
+  let db = store.database()
+  match dopts.note {
+    Some(text) => {
+      // 空串即清除
+      let note = if text == "" { None } else { Some(text) }
+      let mut ok = db.set_note(dopts.path, note)
+      if !ok {
+        let resolved = @core.resolve_path(dopts.path, cwd)
+        if resolved != dopts.path {
+          ok = db.set_note(resolved, note)
+        }
+      }
+      if !ok {
+        err_line(errs, "path not found in database: \{dopts.path}")
+        return 1
+      }
+    }
+    None => {
+      let idx = match db.find_idx(dopts.path) {
+        Some(i) => Some(i)
+        None => {
+          let resolved = @core.resolve_path(dopts.path, cwd)
+          if resolved != dopts.path {
+            db.find_idx(resolved)
+          } else {
+            None
+          }
+        }
+      }
+      match idx {
+        None => {
+          err_line(errs, "path not found in database: \{dopts.path}")
+          return 1
+        }
+        Some(i) =>
+          match db.all()[i].note {
+            Some(text) => println(text)
+            None => {
+              err_line(errs, "describe: \{dopts.path} 无标注")
+              return 1
+            }
+          }
+      }
+    }
+  }
+  match store.save() {
+    Ok(_) => 0
+    Err(err) => {
+      err_line(errs, "保存数据库失败: \{Repr(err)}")
+      1
+    }
+  }
 }
 
 ///|
