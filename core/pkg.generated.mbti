@@ -28,6 +28,8 @@ pub fn encode(Array[Dir]) -> Bytes
 
 pub fn filter_by_keywords(Array[String], String) -> Bool
 
+pub fn filter_by_keywords_fuzzy(Array[String], String) -> Bool
+
 pub fn glob_match(String, String) -> Bool
 
 pub fn glob_matches(String, String) -> Result[Bool, GlobError]

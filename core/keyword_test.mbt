@@ -97,3 +97,26 @@ test "最右命中：中间关键词取最靠右的出现，重叠即拒绝" {
   // 与上游一致：最后 "o" 命中末字符，剩余 "/foobar" 容得下 "bar"
   @debug.assert_eq(@core.filter_by_keywords(["bar", "o"], "/foobar/o"), true)
 }
+
+///|
+test "filter_by_keywords_fuzzy：各关键词独立命中组件子串（不限末组件、无序）" {
+  // 关键词同组件乱序（exact 因有序消耗会 miss）
+  assert_true(filter_by_keywords_fuzzy(["work", "blog"], "/home/u/work-blog"))
+  // 关键词落在非末组件（exact 因末组件锚定会 miss）
+  assert_true(filter_by_keywords_fuzzy(["blog"], "/home/u/blog/work"))
+  // ASCII 小写归一，与 exact 一致
+  assert_true(filter_by_keywords_fuzzy(["BLOG"], "/home/u/Work-Blog"))
+  // 组件边界内的子串即可
+  assert_true(filter_by_keywords_fuzzy(["log"], "/home/u/work-blog"))
+}
+
+///|
+test "filter_by_keywords_fuzzy：全部关键词须命中，缺一即 false" {
+  assert_false(filter_by_keywords_fuzzy(["blog", "zzz"], "/home/u/work-blog"))
+  assert_false(filter_by_keywords_fuzzy(["nov1", "nov2"], "/home/u/work-blog"))
+}
+
+///|
+test "filter_by_keywords_fuzzy：空关键词恒 true（与 exact 一致）" {
+  assert_true(filter_by_keywords_fuzzy([], "/any/path"))
+}

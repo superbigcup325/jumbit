@@ -9,6 +9,7 @@ pub(all) struct QueryOptions {
   mut interactive : Bool
   mut exclude : String?
   mut json : Bool
+  mut fuzzy : Bool
 } derive(Debug, Eq)
 
 ///|
@@ -118,6 +119,7 @@ fn parse_query(args : Array[String]) -> Command {
     interactive: false,
     exclude: None,
     json: false,
+    fuzzy: false,
   }
   let mut bad : String? = None
   let mut escaped = false
@@ -134,6 +136,7 @@ fn parse_query(args : Array[String]) -> Command {
         "--score" => opts.score = true
         "--interactive" => opts.interactive = true
         "--json" => opts.json = true
+        "--fuzzy" => opts.fuzzy = true
         "--exclude" =>
           if i + 1 < n {
             opts.exclude = Some(args[i + 1])
@@ -288,6 +291,7 @@ pub fn usage() -> String {
   "    --exclude <path>                      排除指定目录（精确路径）\n" +
   "    --interactive                         fzf 交互式选择\n" +
   "    --json                                单行 JSON 数组输出全部匹配（agent 通道，与 --interactive 互斥）\n" +
+  "    --fuzzy                               精确零命中时按组件子串兜底（jumbit 扩展）\n" +
   "  jumbit init <shell>                     生成 shell 集成脚本（默认定义 j/ji，hook=pwd）\n" +
   "    [--cmd C] [--hook pwd|prompt|none] [--no-cmd]\n" +
   "  jumbit import <plugin> [--merge]        从其他工具导入历史数据（空库直灌，--merge 合并进非空库）\n" +

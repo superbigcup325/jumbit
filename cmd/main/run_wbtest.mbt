@@ -676,3 +676,34 @@ async test "query --json：--all 可查假路径、miss 退出码 1、--interact
   cleanup_test_dir(data)
   cleanup_test_dir(zdir)
 }
+
+///|
+async test "query --fuzzy：精确零命中兜底组件子串（扩展语义，默认行为不变）" {
+  let data = make_test_dir("fz-data")
+  let zdir = make_test_dir("fz-z")
+  let zfile = zdir + "/zdata"
+  // 关键词落在非末组件：exact 末组件锚定 miss，fuzzy 兜底
+  @platform.write_atomic(zfile, b"/imp-fz/blog/work|1|0\n")
+  let errs : Array[String] = []
+  let env = env_map([("_JB_DATA_DIR", data), ("_Z_DATA", zfile)])
+  @debug.assert_eq(run(["import", "z"], env, errs), 0)
+  // 默认语义不变：exact miss → 退出码 1
+  @debug.assert_eq(run(["query", "--all", "blog"], env_with(data), errs), 1)
+  // --fuzzy 兜底命中
+  @debug.assert_eq(
+    run(["query", "--all", "--fuzzy", "blog"], env_with(data), errs),
+    0,
+  )
+  // 组件内子串（拼错场景）同样兜底
+  @debug.assert_eq(
+    run(["query", "--all", "--fuzzy", "blo"], env_with(data), errs),
+    0,
+  )
+  // 多关键词缺一不命中
+  @debug.assert_eq(
+    run(["query", "--all", "--fuzzy", "blog", "zzz"], env_with(data), errs),
+    1,
+  )
+  cleanup_test_dir(data)
+  cleanup_test_dir(zdir)
+}

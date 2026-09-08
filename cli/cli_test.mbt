@@ -8,8 +8,9 @@ fn query_opts(
   score? : Bool = false,
   exclude? : String? = None,
   json? : Bool = false,
+  fuzzy? : Bool = false,
 ) -> @cli.QueryOptions {
-  { keywords, all, list, score, interactive: false, exclude, json, }
+  { keywords, all, list, score, interactive: false, exclude, json, fuzzy, }
 }
 
 ///|
@@ -286,4 +287,17 @@ test "parse：import 非法用法归 Unknown" {
   )
   @debug.assert_eq(@cli.parse(["import", "z", "extra"]), @cli.Unknown("extra"))
   @debug.assert_eq(@cli.parse(["import", "--bogus"]), @cli.Unknown("--bogus"))
+}
+
+///|
+test "parse：query --fuzzy" {
+  @debug.assert_eq(
+    @cli.parse(["query", "--fuzzy", "kw"]),
+    @cli.Query(query_opts(keywords=["kw"], fuzzy=true)),
+  )
+  // 与 --json 可组合（agent 通道：模糊结果带 matched_by=fuzzy）
+  @debug.assert_eq(
+    @cli.parse(["query", "--fuzzy", "--json", "kw"]),
+    @cli.Query(query_opts(keywords=["kw"], fuzzy=true, json=true)),
+  )
 }

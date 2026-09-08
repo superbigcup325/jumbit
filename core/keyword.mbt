@@ -30,3 +30,32 @@ pub fn filter_by_keywords(keywords : Array[String], path : String) -> Bool {
   }
   true
 }
+
+///|
+/// 模糊关键词匹配（jumbit 扩展，上游无此语义；README 注明）：
+/// 全部关键词（ASCII 小写归一，与 filter_by_keywords 一致）各自命中至少一个
+/// 路径组件的子串即通过——不限末组件、关键词间无序且允许同组件。
+/// 仅作 `query --fuzzy` 的精确零命中兜底路，不进入默认语义；空数组恒 true。
+pub fn filter_by_keywords_fuzzy(
+  keywords : Array[String],
+  path : String,
+) -> Bool {
+  if keywords.is_empty() {
+    return true
+  }
+  let lower = path.to_lower()
+  for kw in keywords {
+    let k = kw.to_lower()
+    let mut hit = false
+    for comp in lower.split("/") {
+      if comp.find(k) is Some(_) {
+        hit = true
+        break
+      }
+    }
+    if !hit {
+      return false
+    }
+  }
+  true
+}

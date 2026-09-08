@@ -242,26 +242,38 @@ async fn run_query(
   let hits = store
     .database()
     .query_all(stream_opts, async fn(path) {
-      let kind = @afs.kind(path, follow_symlink=!resolve_symlinks) catch {
-        err => {
-          ignore(err)
-          @afs.Unknown
-        }
-      }
-      kind == @afs.Directory
+      dir_exists(path, resolve_symlinks)
     })
   // --exclude 为精确路径过滤（对齐上游 query_first/list 的跳过循环）
-  let remaining = match qopts.exclude {
-    Some(exclude_path) => {
-      let out : Array[@core.Dir] = []
-      for d in hits {
-        if d.path != exclude_path {
-          out.push(d)
-        }
-      }
-      out
+  let mut matched_by = "exact"
+  let mut remaining = apply_exclude(hits, qopts.exclude)
+  if hits.is_empty() && qopts.fuzzy && !qopts.keywords.is_empty() {
+    // 模糊兜底路（jumbit 扩展）：仅精确路零命中时启用；同一过滤链
+    // （exclude glob 命中懒删 / exists / TTL 懒删）照常生效
+    let fuzzy_opts : @core.StreamOptions = {
+      now,
+      keywords: [],
+      exclude: globs,
+      base_dir: None,
+      exists: !qopts.all,
+      resolve_symlinks,
+      ttl: now - 3L * @core.MONTH,
     }
-    None => hits
+    let candidates = store
+      .database()
+      .query_all(fuzzy_opts, async fn(path) {
+        dir_exists(path, resolve_symlinks)
+      })
+    let fuzzy_hits : Array[@core.Dir] = []
+    for d in candidates {
+      if @core.filter_by_keywords_fuzzy(qopts.keywords, d.path) {
+        fuzzy_hits.push(d)
+      }
+    }
+    remaining = apply_exclude(fuzzy_hits, qopts.exclude)
+    if !remaining.is_empty() {
+      matched_by = "fuzzy"
+    }
   }
   let code = if remaining.is_empty() {
     if hits.length() > 0 {
@@ -276,7 +288,7 @@ async fn run_query(
     1
   } else if qopts.json {
     // agent 通道：单行 JSON 数组（含全部匹配与 matched_by 证据字段）
-    println(render_json(remaining, now, "exact"))
+    println(render_json(remaining, now, matched_by))
     0
   } else if qopts.interactive {
     match @platform.fzf_select(remaining, now, @config.fzf_opts(getenv)) {
@@ -313,6 +325,39 @@ async fn run_query(
       err_line(errs, "保存数据库失败: \{Repr(err)}")
       1
     }
+  }
+}
+
+///|
+/// exists 回调：kind 检查；resolve_symlinks=true 时不跟随符号链接（上游反向逻辑）。
+/// 精确路与模糊兜底路共用
+async fn dir_exists(path : String, resolve_symlinks : Bool) -> Bool {
+  let kind = @afs.kind(path, follow_symlink=!resolve_symlinks) catch {
+    err => {
+      ignore(err)
+      @afs.Unknown
+    }
+  }
+  kind == @afs.Directory
+}
+
+///|
+/// --exclude 精确路径过滤（对齐上游 query_first/list 的跳过循环）
+fn apply_exclude(
+  dirs : Array[@core.Dir],
+  exclude : String?,
+) -> Array[@core.Dir] {
+  match exclude {
+    Some(exclude_path) => {
+      let out : Array[@core.Dir] = []
+      for d in dirs {
+        if d.path != exclude_path {
+          out.push(d)
+        }
+      }
+      out
+    }
+    None => dirs
   }
 }
 

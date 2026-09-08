@@ -79,6 +79,22 @@ if [ "$json_out" != "$expected" ]; then
 fi
 rm -rf "$jdata"
 
+echo "== query --fuzzy：精确零命中兜底（matched_by=fuzzy）=="
+fdata=$(mktemp -d "${TMPDIR:-/tmp}/jumbit-fz-XXXX")
+printf '/smoke-fz/blog/work|1|0\n' > "$fdata/z.txt"
+_JB_DATA_DIR="$fdata" _Z_DATA="$fdata/z.txt" "$bin" import z >/dev/null 2>&1
+if _JB_DATA_DIR="$fdata" "$bin" query --json --all blog >/dev/null 2>&1; then
+  echo "✗ exact 应 miss" >&2
+  exit 1
+fi
+fz_out=$(_JB_DATA_DIR="$fdata" "$bin" query --json --all --fuzzy blog)
+fz_expected='[{"path":"/smoke-fz/blog/work","score":0.25,"last_accessed":0,"matched_by":"fuzzy"}]'
+if [ "$fz_out" != "$fz_expected" ]; then
+  echo "✗ --fuzzy 输出不符: [$fz_out]" >&2
+  exit 1
+fi
+rm -rf "$fdata"
+
 echo "== 未知命令应退出码 2 =="
 if _JB_DATA_DIR="$data" "$bin" frobnicate 2>/dev/null; then
   echo "✗ 未知命令退出码应为 2" >&2
