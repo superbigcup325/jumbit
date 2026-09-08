@@ -153,7 +153,7 @@ async test "base_dir：组件级前缀（字符串前缀陷阱被排除）" {
 ///|
 async test "query_all 顺序：得分从高到低" {
   let db = @core.Database::new()
-  let now = 100000L
+  let now = 1788833590L
   db.add("/old", 1.0, now - 60L * @core.DAY)
   db.add("/new", 1.0, now)
   db.add("/mid", 1.0, now - 2L * @core.HOUR)

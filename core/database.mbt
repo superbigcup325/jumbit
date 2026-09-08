@@ -111,8 +111,23 @@ pub fn Database::mark_clean(self : Database) -> Unit {
 ///|
 /// 按得分升序原地排序（对齐上游：Stream 从尾部倒序取最高分）
 pub fn Database::sort_by_score(self : Database, now : Int64) -> Unit {
-  self.dirs.sort_by(fn(a, b) { a.score(now).compare(b.score(now)) })
+  self.dirs.sort_by(fn(a, b) { total_cmp(a.score(now), b.score(now)) })
   self.dirty = true
+}
+
+///|
+/// IEEE 754 totalOrder 比较（对齐上游 f64::total_cmp 的位技巧）：
+/// 按 i64 位型折叠符号位后比较——+NaN 大于一切、-NaN 小于一切、-0.0 < +0.0。
+/// import 的 nan/inf 字面量会使 score 出现 NaN，上游排序因此把 NaN 条目排在
+/// 降序输出最前，普通 compare 做不到这一点
+fn total_cmp(a : Double, b : Double) -> Int {
+  let la = a.reinterpret_as_uint64()
+  let lb = b.reinterpret_as_uint64()
+  let sa = (la.reinterpret_as_int64() >> 63).reinterpret_as_uint64() >> 1
+  let sb = (lb.reinterpret_as_int64() >> 63).reinterpret_as_uint64() >> 1
+  let ka = la.reinterpret_as_int64().lxor(sa.reinterpret_as_int64())
+  let kb = lb.reinterpret_as_int64().lxor(sb.reinterpret_as_int64())
+  ka.compare(kb)
 }
 
 ///|
@@ -186,7 +201,11 @@ pub fn Database::dedup(self : Database) -> Unit {
     let curr = self.dirs[i]
     let prev = self.dirs[i - 1]
     if curr.path == prev.path {
-      prev.last_accessed = if prev.last_accessed > curr.last_accessed {
+      // la 取 max 对齐上游 u64 域语义（Epoch = u64，0.10.0 对拍实测）：
+      // 负 epoch（1969 边界）在 u64 域是极大值，会在合并中胜出
+      let prev_u = prev.last_accessed.reinterpret_as_uint64()
+      let curr_u = curr.last_accessed.reinterpret_as_uint64()
+      prev.last_accessed = if prev_u >= curr_u {
         prev.last_accessed
       } else {
         curr.last_accessed

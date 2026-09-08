@@ -42,7 +42,15 @@ pub fn parse_autojump_line(line : String) -> Result[Dir, String] {
   }
   let rank_str = line[0:t].to_owned()
   let rank : Double = @strconv.from_str(rank_str) catch {
-    _ => return Err("invalid rank: \{rank_str}")
+    _ => {
+      // 对齐上游 anyhow 消息的 Rust ParseFloatError Display 后缀
+      let reason = if rank_str == "" {
+        "cannot parse float from empty string"
+      } else {
+        "invalid float literal"
+      }
+      return Err("invalid rank: \{rank_str}: \{reason}")
+    }
   }
   Ok({
     path: line[t + 1:].to_owned(),
@@ -62,8 +70,8 @@ pub fn parse_atuin_line(line : String) -> Result[Dir, String] {
   }
   let ts = line[0:t].to_owned()
   let epoch = match parse_atuin_timestamp(ts) {
-    Some(e) => e
-    None => return Err("invalid timestamp: \"\{ts}\"")
+    Ok(e) => e
+    Err(reason) => return Err(atuin_ts_message(ts, reason))
   }
   Ok({
     path: line[t + 1:].to_owned(),
@@ -115,73 +123,88 @@ fn sigmoid(x : Double) -> Double {
 }
 
 ///|
-/// 解析 `YYYY-MM-DD HH:MM:SS`（严格 19 字符、固定分隔符、纯数字、范围校验，
-/// 对齐 time crate 解析行为：day 对当月长度校验、闰年规则、秒 0-59）→ Unix 秒（UTC）
-fn parse_atuin_timestamp(ts : String) -> Int64? {
-  if ts.length() != 19 {
-    return None
+/// 时间戳错误原因（对齐上游 time crate 解析 + anyhow {:#} 链式 Display；
+/// 每类消息的真值经与 zoxide 0.10.0 对拍实测）：
+/// - 组件非数字/超出字面范围 → "the 'X' component could not be parsed"（链两层）
+/// - day 符合 1..=31 但超出当月长度（闰日）→ "day was not in range"（链三层）
+/// - 固定布局分隔符错 → "a character literal was not valid"（链两层）
+/// - 前 19 位合法但尾部有多余字符 → "unexpected trailing characters; ..."（链两层）
+pub(all) enum AtuinTsError {
+  Component(String)
+  CharLiteral
+  Trailing
+  DayRange
+} derive(Debug, Eq)
+
+///|
+fn atuin_ts_message(ts : String, reason : AtuinTsError) -> String {
+  let base = "invalid timestamp: \"\{ts}\""
+  match reason {
+    Component(name) =>
+      "\{base}: the '\{name}' component could not be parsed: the '\{name}' component could not be parsed"
+    CharLiteral =>
+      "\{base}: a character literal was not valid: a character literal was not valid"
+    Trailing =>
+      "\{base}: unexpected trailing characters; the end of input was expected: unexpected trailing characters; the end of input was expected"
+    DayRange =>
+      "\{base}: day was not in range: day was not in range: day was not in range"
   }
-  if ts[4] != '-' ||
-    ts[7] != '-' ||
-    ts[10] != ' ' ||
-    ts[13] != ':' ||
-    ts[16] != ':' {
-    return None
-  }
-  let year = match parse_digits(ts[0:4]) {
-    Some(v) => v
-    None => return None
-  }
-  let month = match parse_digits(ts[5:7]) {
-    Some(v) => v
-    None => return None
-  }
-  let day = match parse_digits(ts[8:10]) {
-    Some(v) => v
-    None => return None
-  }
-  let hour = match parse_digits(ts[11:13]) {
-    Some(v) => v
-    None => return None
-  }
-  let minute = match parse_digits(ts[14:16]) {
-    Some(v) => v
-    None => return None
-  }
-  let second = match parse_digits(ts[17:19]) {
-    Some(v) => v
-    None => return None
-  }
-  if month < 1 || month > 12 {
-    return None
-  }
-  if day < 1 || day > days_in_month(year, month) {
-    return None
-  }
-  if hour > 23 || minute > 59 || second > 59 {
-    return None
-  }
-  let days = days_from_civil(year, month, day)
-  let time_of_day = hour.to_int64() * 3600L +
-    minute.to_int64() * 60L +
-    second.to_int64()
-  Some(days * 86400L + time_of_day)
 }
 
 ///|
-/// 纯 ASCII 数字段 → Int（拒绝空串/符号/其他字符；溢出走 from_str 失败）
-fn parse_digits(v : StringView) -> Int? {
-  if v.length() == 0 {
-    return None
-  }
-  for i in 0..<v.length() {
-    let c = v[i]
-    if c < '0' || c > '9' {
-      return None
+/// 解析 `YYYY-MM-DD HH:MM:SS`（19 字符固定布局、UTC）→ Unix 秒。
+/// 逐位置状态机复刻上游 time crate 的解析顺序：位置靠前的组件先报错；
+/// 数字段即时做字面范围校验，全部通过后再做当月长度/闰年校验（DayRange）。
+fn parse_atuin_timestamp(ts : String) -> Result[Int64, AtuinTsError] {
+  let names = ["year", "month", "day", "hour", "minute", "second"]
+  let widths = [4, 2, 2, 2, 2, 2]
+  // 分隔符 UTF-16 码元：'-','=45、' '=32、':'=58（String 索引返回码元）
+  let seps : Array[UInt16] = [45, 45, 32, 58, 58, 58]
+  let vals : Array[Int] = []
+  let mut pos = 0
+  let n = ts.length()
+  for seg in 0..<6 {
+    let mut v = 0
+    for _ in 0..<widths[seg] {
+      if pos >= n {
+        return Err(Component(names[seg]))
+      }
+      let c = ts[pos]
+      if c < 48 || c > 57 {
+        return Err(Component(names[seg]))
+      }
+      v = v * 10 + (c.to_int() - 48)
+      pos += 1
+    }
+    // 字面范围（组件级）：解析完本段立即校验（上游按组件顺序即时失败）
+    match seg {
+      1 => if v < 1 || v > 12 { return Err(Component(names[seg])) }
+      3 => if v > 23 { return Err(Component(names[seg])) }
+      4 | 5 => if v > 59 { return Err(Component(names[seg])) }
+      _ => ()
+    }
+    vals.push(v)
+    if seg < 5 {
+      if pos >= n || ts[pos] != seps[seg] {
+        return Err(CharLiteral)
+      }
+      pos += 1
     }
   }
-  let n : Int = @strconv.from_str(v) catch { _ => return None }
-  Some(n)
+  if pos < n {
+    return Err(Trailing)
+  }
+  let year = vals[0]
+  let month = vals[1]
+  let day = vals[2]
+  if day < 1 || day > days_in_month(year, month) {
+    return Err(DayRange)
+  }
+  let days = days_from_civil(year, month, day)
+  let time_of_day = vals[3].to_int64() * 3600L +
+    vals[4].to_int64() * 60L +
+    vals[5].to_int64()
+  Ok(days * 86400L + time_of_day)
 }
 
 ///|

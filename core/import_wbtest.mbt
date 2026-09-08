@@ -88,8 +88,14 @@ test "parse_autojump_line：路径含 \t 按首 \t 切（上游 split_once 语�
 ///|
 test "parse_autojump_line：坏行族" {
   expect_err(parse_autojump_line("/a"), "invalid entry: /a")
-  expect_err(parse_autojump_line("abc\t/a"), "invalid rank: abc")
-  expect_err(parse_autojump_line("\t/a"), "invalid rank: ")
+  expect_err(
+    parse_autojump_line("abc\t/a"),
+    "invalid rank: abc: invalid float literal",
+  )
+  expect_err(
+    parse_autojump_line("\t/a"),
+    "invalid rank: : cannot parse float from empty string",
+  )
 }
 
 ///|
@@ -116,7 +122,7 @@ test "parse_atuin_line：闰日（2000-02-29 闰年合法；1900 非、2100 非�
   @debug.assert_eq(d.last_accessed, 951825600L)
   expect_err(
     parse_atuin_line("1900-02-29 00:00:00\t/a"),
-    "invalid timestamp: \"1900-02-29 00:00:00\"",
+    "invalid timestamp: \"1900-02-29 00:00:00\": day was not in range: day was not in range: day was not in range",
   )
 }
 
@@ -134,31 +140,31 @@ test "parse_atuin_line：坏行族（无 \t/超范围/格式错）" {
   )
   expect_err(
     parse_atuin_line("2024-13-01 00:00:00\t/a"),
-    "invalid timestamp: \"2024-13-01 00:00:00\"",
+    "invalid timestamp: \"2024-13-01 00:00:00\": the 'month' component could not be parsed: the 'month' component could not be parsed",
   )
   expect_err(
     parse_atuin_line("2023-02-29 00:00:00\t/a"),
-    "invalid timestamp: \"2023-02-29 00:00:00\"",
+    "invalid timestamp: \"2023-02-29 00:00:00\": day was not in range: day was not in range: day was not in range",
   )
   expect_err(
     parse_atuin_line("2024-01-01 24:00:00\t/a"),
-    "invalid timestamp: \"2024-01-01 24:00:00\"",
+    "invalid timestamp: \"2024-01-01 24:00:00\": the 'hour' component could not be parsed: the 'hour' component could not be parsed",
   )
   expect_err(
     parse_atuin_line("2024-01-01 00:60:00\t/a"),
-    "invalid timestamp: \"2024-01-01 00:60:00\"",
+    "invalid timestamp: \"2024-01-01 00:60:00\": the 'minute' component could not be parsed: the 'minute' component could not be parsed",
   )
   expect_err(
     parse_atuin_line("2024-4-01 00:00:00\t/a"),
-    "invalid timestamp: \"2024-4-01 00:00:00\"",
+    "invalid timestamp: \"2024-4-01 00:00:00\": the 'month' component could not be parsed: the 'month' component could not be parsed",
   )
   expect_err(
     parse_atuin_line("2024/01/01 00:00:00\t/a"),
-    "invalid timestamp: \"2024/01/01 00:00:00\"",
+    "invalid timestamp: \"2024/01/01 00:00:00\": a character literal was not valid: a character literal was not valid",
   )
   expect_err(
     parse_atuin_line("2024-01-01T00:00:00\t/a"),
-    "invalid timestamp: \"2024-01-01T00:00:00\"",
+    "invalid timestamp: \"2024-01-01T00:00:00\": a character literal was not valid: a character literal was not valid",
   )
 }
 
@@ -249,4 +255,12 @@ test "collapse_consecutive：定位随条目保留" {
   @debug.assert_eq(out.length(), 1)
   @debug.assert_eq(out[0].location, "line 1")
   @debug.assert_eq(expect_dir(out[0].result).last_accessed, 0L)
+}
+
+///|
+test "parse_autojump_line：坏 rank 消息带 Rust ParseFloatError 后缀（上游对拍）" {
+  expect_err(
+    parse_autojump_line("\t/a"),
+    "invalid rank: : cannot parse float from empty string",
+  )
 }

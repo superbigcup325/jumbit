@@ -30,9 +30,13 @@ pub(all) struct Dir {
 /// frecency 得分 = rank × 时间衰减系数（Epoch 单位：秒）
 /// 衰减档位：<1h ×4.0 / <1d ×2.0 / <1w ×0.5 / 其余 ×0.25
 pub fn Dir::score(self : Dir, now : Int64) -> Double {
-  // now < last_accessed（时钟回拨）按 0 间隔处理，落 <1h 档
-  let duration = if now > self.last_accessed {
-    now - self.last_accessed
+  // 衰减间隔对齐上游的 u64 saturating_sub 语义（zoxide 0.10.0 对拍实测）：
+  // last_accessed 为负（1969 边界：i64 域 -1 = u64 域极大值）或未来时间戳时，
+  // u64 域比较下溢饱和为 0 → 落 <1h ×4.0 档，而非 i64 直减得到的大数
+  let now_u = now.reinterpret_as_uint64()
+  let la_u = self.last_accessed.reinterpret_as_uint64()
+  let duration = if now_u >= la_u {
+    (now_u - la_u).reinterpret_as_int64()
   } else {
     0L
   }
@@ -52,6 +56,11 @@ pub fn Dir::score(self : Dir, now : Int64) -> Double {
 /// 例：40.0 → "  40.0"，9999.95 → "9999.0"（clamp），-1.0 → "   0.0"
 pub fn Dir::format_score(self : Dir, now : Int64) -> String {
   let s = self.score(now).clamp(min=0.0, max=9999.0)
+  // Rust {:.1} 对 NaN 显示 "NaN"（:>6.1 即右对齐 6 宽）；NaN 可经 import 的
+  // nan/inf 字面量或 inf+(-inf) 聚合进入库
+  if s.is_nan() {
+    return "   NaN"
+  }
   // 舍入对齐 Rust {:.1}（半界取偶，round-half-to-even）：
   // 精确半界（如陈旧条目 1.0×0.25=0.25）→ 0.2 而非 0.3
   let m = s * 10.0

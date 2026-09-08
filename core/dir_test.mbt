@@ -105,7 +105,8 @@ test "format_score：宽度 6、1 位小数、clamp 边界" {
 
 ///|
 test "format_score：精确半界按 Rust {:.1} 半界取偶（与 zoxide 输出对齐）" {
-  let now = 1000L
+  // now 取现实量级：now-2*WEEK 需保持正 epoch（负 la 会落 ×4 档，见 score 测试）
+  let now = 1788833590L
   // 1.0×0.25 = 0.25 → 0.2（0 向下取偶；.round() 会错给 0.3）
   let a = @core.Dir::{
     path: "/a",
@@ -138,4 +139,17 @@ test "format_score：精确半界按 Rust {:.1} 半界取偶（与 zoxide 输出
     note: None,
   }
   inspect(d.format_score(now), content="   1.8")
+}
+
+///|
+test "score：负 last_accessed 走 u64 饱和语义落 ×4 档（上游对拍实测）" {
+  // 1969-12-31 23:59:59 = epoch -1：i64 直减得到巨大 age，上游 u64 域下溢饱和为 0
+  let dir = @core.Dir::{
+    path: "/a",
+    rank: 13.0,
+    last_accessed: -1L,
+    note: None,
+  }
+  let now = 1788833590L
+  inspect(dir.score(now), content="52")
 }

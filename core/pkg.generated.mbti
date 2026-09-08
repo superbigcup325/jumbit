@@ -49,6 +49,13 @@ pub fn validate_glob(String) -> GlobError?
 // Errors
 
 // Types and methods
+pub(all) enum AtuinTsError {
+  Component(String)
+  CharLiteral
+  Trailing
+  DayRange
+} derive(Eq, @debug.Debug)
+
 pub enum CodecError {
   CorruptedData
   UnsupportedVersion(Int)

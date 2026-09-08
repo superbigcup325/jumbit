@@ -44,7 +44,8 @@ test "dirty 标志流转" {
 ///|
 test "sort_by_score：升序，最近访问的排尾部" {
   let db = @core.Database::new()
-  let now = 100000L
+  // now 取现实量级：负 la 在 u64 饱和语义下会落 ×4 档（见 dir_test）
+  let now = 1788833590L
   db.add("/old", 1.0, now - 60L * @core.DAY) // ×0.25
   db.add("/mid", 1.0, now - 2L * @core.HOUR) // ×2.0
   db.add("/new", 1.0, now) // ×4.0
@@ -234,4 +235,63 @@ test "dedup：note 一侧有值则保留（信息不丢）" {
   b.dedup()
   @debug.assert_eq(b.all().length(), 1)
   @debug.assert_eq(b.all()[0].note, Some("补上"))
+}
+
+///|
+test "sort_by_score：NaN 按 IEEE totalOrder 排最前（上游 total_cmp 对拍）" {
+  let db = @core.Database::from_dirs([
+    @core.Dir::{ path: "/normal", rank: 1.0, last_accessed: 100L, note: None, },
+    @core.Dir::{
+      path: "/nan",
+      // 用 from_str("nan")（import 真实路径）而非 0.0/0.0——后者是编译期折叠的负 NaN
+      rank: @strconv.from_str("nan") catch {
+        _ => 1.0
+      },
+      last_accessed: 100L,
+      note: None,
+    },
+    @core.Dir::{ path: "/low", rank: 0.1, last_accessed: 100L, note: None, },
+  ])
+  db.sort_by_score(100L)
+  // 上游 sort_unstable_by(total_cmp) 升序 + 流倒序遍历 = NaN 在降序输出最前
+  @debug.assert_eq(db.all()[db.all().length() - 1].path, "/nan")
+  @debug.assert_eq(db.all()[0].path, "/low")
+}
+
+///|
+test "format_score：NaN 显示 NaN（Rust {:.1} 对齐）" {
+  let dir = @core.Dir::{
+    path: "/nan",
+    rank: 0.0 / 0.0,
+    last_accessed: 100L,
+    note: None,
+  }
+  inspect(dir.format_score(100L), content="   NaN")
+}
+
+///|
+test "dedup：la 合并对齐上游 u64 域语义（负 epoch 胜出）" {
+  // 上游 Epoch = u64：1969(-1) 在 u64 域是极大值，dedup max 中胜出
+  let a = @core.Database::from_dirs([
+    @core.Dir::{ path: "/dup", rank: 1.0, last_accessed: -1L, note: None, },
+    @core.Dir::{
+      path: "/dup",
+      rank: 1.0,
+      last_accessed: 1788829200L,
+      note: None,
+    },
+  ])
+  a.dedup()
+  @debug.assert_eq(a.all()[0].last_accessed, -1L)
+  let b = @core.Database::from_dirs([
+    @core.Dir::{
+      path: "/dup",
+      rank: 1.0,
+      last_accessed: 1788829200L,
+      note: None,
+    },
+    @core.Dir::{ path: "/dup", rank: 1.0, last_accessed: -1L, note: None, },
+  ])
+  b.dedup()
+  @debug.assert_eq(b.all()[0].last_accessed, -1L)
 }
