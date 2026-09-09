@@ -16,22 +16,29 @@ pub fn parse_z_line(line : String) -> Result[Dir, String] {
     Some(i) => i
     None => return bad
   }
-  // 上游按 u64 解析：Int64 溢出（>2^63-1）与负数均拒为坏行
-  let last_accessed : Int64 = @string.parse_int64(line[p1 + 1:]) catch {
+  // 上游按 u64 解析（0..=2^64-1，前导 + 合法，溢出/负数拒为坏行）；位模式
+  // 经 i64 字段原样保存（u64::MAX 即 i64 的 -1），下游 score/dedup 已按
+  // u64 域比较（0.10.0 对拍实测：u64::MAX 接受且落 ×4 档）
+  let la_str = line[p1 + 1:]
+  let la_body = if la_str.has_prefix("+") { la_str[1:] } else { la_str }
+  let last_accessed : UInt64 = @string.parse_uint64(la_body) catch {
     _ => return bad
-  }
-  if last_accessed < 0L {
-    return bad
   }
   let head = line[0:p1]
   let p2 = match head.rev_find("|") {
     Some(i) => i
     None => return bad
   }
-  let rank : Double = @string.parse_double(head[p2 + 1:]) catch {
-    _ => return bad
+  let rank = match parse_f64(head[p2 + 1:]) {
+    Ok(v) => v
+    Err(_) => return bad
   }
-  Ok({ path: head[0:p2].to_owned(), rank, last_accessed, note: None, })
+  Ok({
+    path: head[0:p2].to_owned(),
+    rank,
+    last_accessed: last_accessed.reinterpret_as_int64(),
+    note: None,
+  })
 }
 
 ///|
@@ -43,8 +50,9 @@ pub fn parse_autojump_line(line : String) -> Result[Dir, String] {
     None => return Err("invalid entry: \{line}")
   }
   let rank_str = line[0:t].to_owned()
-  let rank : Double = @string.parse_double(rank_str) catch {
-    _ => {
+  let rank = match parse_f64(rank_str) {
+    Ok(v) => v
+    Err(_) => {
       // 对齐上游 anyhow 消息的 Rust ParseFloatError Display 后缀
       let reason = if rank_str == "" {
         "cannot parse float from empty string"

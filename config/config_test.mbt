@@ -134,6 +134,15 @@ test "maxage：前导正号与前导零（对齐上游 parse::<u32> 语义）" {
     Ok(v) => @debug.assert_eq(v, 7.0)
     Err(e) => fail(e)
   }
+  // u32::MAX 接受、u32::MAX+1 拒绝（0.10.0 探针实测）
+  match maxage(fake_env([("_JB_MAXAGE", "4294967295")])) {
+    Ok(v) => @debug.assert_eq(v, 4294967295.0)
+    Err(e) => fail(e)
+  }
+  @debug.assert_eq(
+    maxage(fake_env([("_JB_MAXAGE", "4294967296")])) is Err(_),
+    true,
+  )
 }
 
 ///|

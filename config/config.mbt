@@ -75,19 +75,17 @@ pub fn escape_glob(path : String) -> String {
 }
 
 ///|
-/// _JB_MAXAGE：数据库总分老化阈值（默认 10000；上游解析为 u32，这里同限制）
+/// _JB_MAXAGE：数据库总分老化阈值（默认 10000；上游解析为 u32，同域：
+/// 0..=4294967295，前导 + 合法——Rust u32::from_str 语义，0.10.0 探针实测）
 pub fn maxage(get : (String) -> String?) -> Result[Double, String] {
   match get("_JB_MAXAGE") {
     None => Ok(10000.0)
     Some(value) => {
-      let n = @string.parse_int(value) catch {
+      let body = if value.has_prefix("+") { value[1:] } else { value }
+      let n = @string.parse_uint(body) catch {
         _ => return Err("_JB_MAXAGE 必须是非负整数: \{value}")
       }
-      if n < 0 {
-        Err("_JB_MAXAGE 必须是非负整数: \{value}")
-      } else {
-        Ok(n.to_double())
-      }
+      Ok(n.to_double())
     }
   }
 }

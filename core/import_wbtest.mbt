@@ -65,6 +65,25 @@ test "parse_z_line：坏行族（缺段/坏数/负时间戳/空串段）" {
 }
 
 ///|
+test "parse_z_line：last_accessed 为 u64 域（0.10.0 探针实测）" {
+  // u64::MAX 接受，i64 字段按位保存为 -1；score 在 u64 域下落 ×4 档
+  let d = expect_dir(parse_z_line("/a|1.5|18446744073709551615"))
+  @debug.assert_eq(
+    d.last_accessed.reinterpret_as_uint64(),
+    18446744073709551615UL,
+  )
+  @debug.assert_eq(d.score(1000L), 6.0)
+  // 前导 + 合法（Rust u64::from_str 语义）
+  let d2 = expect_dir(parse_z_line("/a|1.5|+5"))
+  @debug.assert_eq(d2.last_accessed, 5L)
+  // 溢出 u64 拒为坏行
+  expect_err(
+    parse_z_line("/a|1.5|18446744073709551616"),
+    "invalid entry: /a|1.5|18446744073709551616",
+  )
+}
+
+///|
 test "parse_autojump_line：rank 过 sigmoid，last_accessed=0" {
   let d = expect_dir(parse_autojump_line("3.7\t/home/user"))
   @debug.assert_eq(d.path, "/home/user")

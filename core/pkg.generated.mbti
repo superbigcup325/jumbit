@@ -38,6 +38,8 @@ pub fn parse_atuin_line(String) -> Result[Dir, String]
 
 pub fn parse_autojump_line(String) -> Result[Dir, String]
 
+pub fn parse_f64(StringView) -> Result[Double, Unit]
+
 pub fn parse_z_line(String) -> Result[Dir, String]
 
 pub fn resolve_path(String, String) -> String

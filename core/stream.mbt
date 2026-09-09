@@ -42,7 +42,10 @@ pub async fn Database::query_all(
       continue
     }
     if opts.exists && !exists(dir.path) {
-      if dir.last_accessed < opts.ttl {
+      // TTL 比较在 u64 域（对齐上游 Epoch=u64）：纪元前负 epoch 位型上是
+      // 极大值，不会被懒删除（0.10.0 混沌对拍实测）
+      if dir.last_accessed.reinterpret_as_uint64() <
+        opts.ttl.reinterpret_as_uint64() {
         self.swap_remove(i)
       }
       continue

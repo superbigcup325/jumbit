@@ -124,7 +124,48 @@ async test "read_import_lines：无尾随换行也能取末行，坏 UTF-8 只�
   @debug.assert_eq(records.length(), 2)
   @debug.assert_eq(records[0].result, Ok("/a|1|100"))
   @debug.assert_eq(records[1].line_num, 2)
-  @debug.assert_eq(records[1].result, Err("invalid utf-8"))
+  // 文案对齐上游 str::from_utf8 + anyhow 链式 Display（zoxide 0.10.0 探针实测）
+  @debug.assert_eq(
+    records[1].result,
+    Err("invalid utf-8: invalid utf-8 sequence of 1 bytes from index 0"),
+  )
+  @afs.rmdir(dir, recursive=true)
+}
+
+///|
+async test "read_import_lines：坏 UTF-8 逐类文案对齐 std 定位语义" {
+  // 各类的期望值均为与真 zoxide 0.10.0 逐字节探针实测（2026-09-09）
+  let dir = make_tmp_dir()
+  let path = dir + "/zdata"
+  write_atomic(
+    path,
+    // 1 起始坏/双字节次字节坏/三字节 E0 域坏/ED 代理区/四字节 F4 域坏 → 1 字节；
+    // 三字节第三字节坏 → 2 字节；四字节第四字节坏 → 3 字节；中文为合法对照；
+    // 行尾 C3 在剥 \r 后成切片末尾 → incomplete
+     b"/a|1.5|100\xff\n/b|\xc3cd|100\n/c|\xe0\x80\x80|100\n/d|\xed\xa0\x80|100\n/e|\xf4\x90\x80\x80|100\n/f|\xe0\xa0\x41|100\n/g|\xf0\x9f\x92\x41|100\n/h|\xe4\xb8\xad|1.5|100\n/i|1.5|100\xc3\r\n",
+  )
+  let records = match read_import_lines(path) {
+    Ok(r) => r
+    Err(e) => fail("\{Repr(e)}")
+  }
+  let expect = fn(idx : Int, msg : String) -> Unit raise {
+    match records[idx].result {
+      Err(m) => @debug.assert_eq(m, msg)
+      Ok(_) => fail("行 \{idx + 1} 应报坏行")
+    }
+  }
+  expect(0, "invalid utf-8: invalid utf-8 sequence of 1 bytes from index 10")
+  expect(1, "invalid utf-8: invalid utf-8 sequence of 1 bytes from index 3")
+  expect(2, "invalid utf-8: invalid utf-8 sequence of 1 bytes from index 3")
+  expect(3, "invalid utf-8: invalid utf-8 sequence of 1 bytes from index 3")
+  expect(4, "invalid utf-8: invalid utf-8 sequence of 1 bytes from index 3")
+  expect(5, "invalid utf-8: invalid utf-8 sequence of 2 bytes from index 3")
+  expect(6, "invalid utf-8: invalid utf-8 sequence of 3 bytes from index 3")
+  match records[7].result {
+    Ok("/h|中|1.5|100") => ()
+    other => fail("\{Repr(other)}")
+  }
+  expect(8, "invalid utf-8: incomplete utf-8 byte sequence from index 10")
   @afs.rmdir(dir, recursive=true)
 }
 

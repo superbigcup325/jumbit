@@ -294,7 +294,13 @@ async fn run_query(
       matched_by = "fuzzy"
     }
   }
-  let code = if remaining.is_empty() {
+  let code = if qopts.list {
+    // --list 空结果静默、退出码 0（对齐上游 query_list：不进 no match 错误路）
+    for d in remaining {
+      println(render(d, now, qopts.score, " "))
+    }
+    0
+  } else if remaining.is_empty() {
     if hits.length() > 0 {
       // 有命中但全被 --exclude 排除
       err_line(errs, "you are already in the only match")

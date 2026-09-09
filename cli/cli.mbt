@@ -85,10 +85,12 @@ pub fn parse(args : Array[String]) -> Command {
 }
 
 ///|
-/// 浮点解析（raise → Option）：供需要分支而非中止的解析处使用
+/// 浮点解析（raise → Option）：供需要分支而非中止的解析处使用；
+/// 语义对齐 Rust f64::from_str（clap 同款：溢出饱和 ±inf、拒下划线）
 fn parse_double_opt(s : String) -> Double? {
-  Some(@string.parse_double(s)) catch {
-    _ => None
+  match @core.parse_f64(s) {
+    Ok(v) => Some(v)
+    Err(_) => None
   }
 }
 
