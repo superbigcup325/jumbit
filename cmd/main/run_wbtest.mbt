@@ -776,3 +776,16 @@ async test "export --agents：有标注条目出地图，缺 --agents 退出码 
   cleanup_test_dir(plain)
   cleanup_test_dir(empty)
 }
+
+///|
+test "forward_atuin_stderr：剥原文尾换行再透传（上游继承 stderr 字节原样）" {
+  let errs : Array[String] = []
+  forward_atuin_stderr(errs, "a\nb\n")
+  @debug.assert_eq(errs, ["a\nb"])
+  let errs2 : Array[String] = []
+  forward_atuin_stderr(errs2, "no-eol")
+  @debug.assert_eq(errs2, ["no-eol"])
+  let errs3 : Array[String] = []
+  forward_atuin_stderr(errs3, "")
+  @debug.assert_eq(errs3, [])
+}

@@ -586,9 +586,7 @@ async fn run_import(
     "atuin" =>
       match @platform.atuin_history_records() {
         Ok((records, stderr_text)) => {
-          if stderr_text != "" {
-            err_line(errs, stderr_text)
-          }
+          forward_atuin_stderr(errs, stderr_text)
           Ok((records, None))
         }
         Err(msg) => Err(msg)
@@ -670,6 +668,21 @@ async fn run_import(
     store.database().age(maxage)
   }
   finish(store, errs, 0)
+}
+
+///|
+/// atuin stderr 透传（对齐上游继承 stderr 的字节原样）：err_line 会补尾换行，
+/// 原文自带的尾换行须先剥掉，否则多出一个空行（v18 真机回放实测的真分歧）
+fn forward_atuin_stderr(errs : Array[String], text : String) -> Unit {
+  if text == "" {
+    return
+  }
+  let t = if text.has_suffix("\n") {
+    text[0:text.length() - 1].to_owned()
+  } else {
+    text
+  }
+  err_line(errs, t)
 }
 
 ///|
