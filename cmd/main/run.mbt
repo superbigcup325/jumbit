@@ -348,11 +348,6 @@ async fn run_query(
       Err(@platform.NoMatch) => 1
       Err(@platform.Exit(c)) => c
     }
-  } else if qopts.list {
-    for d in remaining {
-      println(render(d, now, qopts.score, " "))
-    }
-    0
   } else {
     println(render(remaining[0], now, qopts.score, " "))
     0
