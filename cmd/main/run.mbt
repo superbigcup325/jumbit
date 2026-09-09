@@ -301,7 +301,8 @@ async fn run_query(
   }
   let code = if qopts.list {
     // --list 空结果静默、退出码 0（对齐上游 query_list：不进 no match 错误路）
-    for d in remaining {
+    let shown = take_limit(remaining, qopts.limit)
+    for d in shown {
       println(render(d, now, qopts.score, " "))
     }
     0
@@ -318,7 +319,7 @@ async fn run_query(
     1
   } else if qopts.json {
     // agent 通道：单行 JSON 数组（含全部匹配与 matched_by 证据字段）
-    println(render_json(remaining, now, matched_by))
+    println(render_json(take_limit(remaining, qopts.limit), now, matched_by))
     0
   } else if qopts.interactive {
     match @platform.fzf_select(remaining, now, @config.fzf_opts(getenv)) {
@@ -350,6 +351,23 @@ async fn run_query(
     0
   }
   finish(store, errs, code)
+}
+
+///|
+/// --limit 截断：None=不截断；取排序后（remaining 已降序）的前 n 条，不重排。
+/// 截断收在各输出分支内——提前统一截 remaining 会让 limit 0 撞上游空检查错误路
+fn take_limit(dirs : Array[@core.Dir], limit : Int?) -> Array[@core.Dir] {
+  match limit {
+    None => dirs
+    Some(n) => {
+      let out : Array[@core.Dir] = []
+      let bound = if n < dirs.length() { n } else { dirs.length() }
+      for i in 0..<bound {
+        out.push(dirs[i])
+      }
+      out
+    }
+  }
 }
 
 ///|

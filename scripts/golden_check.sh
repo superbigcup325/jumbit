@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 数据集 D8：jumbit 扩展面（query --json / --fuzzy / matched_by / describe /
+# 数据集 D8：jumbit 扩展面（query --json / --fuzzy / matched_by / --limit / describe /
 # export --agents）的 golden 冻结。上游无对应物、无裁判可用，人工核验后的
 # golden 文件即裁判；命令面输出逐字节比对（stdout/stderr/退出码三元组）。
 #
@@ -117,6 +117,13 @@ g json-exists-filtered query --json beta
 g text-exists-empty query --list --score
 g json-after-lazy query --json --all
 
+# --- --limit 截断（jumbit 扩展；全 --all 数据路径，不触碰上面懒删除后的库状态）---
+g json-limit-2 query --json --all --limit 2
+g limit-zero query --json --all --limit 0
+g limit-mutex query --limit 2
+g limit-invalid-value query --json --all --limit abc
+g limit-negative query --json --all --limit -1
+
 if [ "$mode" = update ]; then
   echo "== golden 已重生成至 $golden/（请 git diff 人工审查后冻结）=="
   rm -rf "$tmp"
@@ -138,7 +145,8 @@ for case in json-empty-db list-empty-db miss-with-kw import-quiet \
   json-fuzzy-exact-wins json-fuzzy-serv json-fuzzy-multi json-fuzzy-nonlast \
   json-mutex describe-note describe-show describe-note-pipe describe-note-uni \
   agents-table describe-clear agents-after-clear describe-note-newline \
-  describe-missing json-exists-filtered text-exists-empty json-after-lazy; do
+  describe-missing json-exists-filtered text-exists-empty json-after-lazy \
+  json-limit-2 limit-zero limit-mutex limit-invalid-value limit-negative; do
   local_ok=1
   for ext in out err code; do
     [ "$(cmp_case "$case" "$ext")" = 1 ] || local_ok=0

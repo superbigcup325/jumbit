@@ -30,6 +30,7 @@ jumbit query --list --score          # 全部匹配，按得分降序带分数�
 jumbit query --interactive           # fzf 交互选择
 jumbit query --all --exclude ~/tmp   # 跳过存在性检查 / 排除指定目录
 jumbit query --json                  # 单行 JSON 数组输出全部匹配（agent 通道）
+jumbit query --list --limit 5        # 只输出前 5 条（列表型输出通用，jumbit 扩展）
 jumbit query --fuzzy blog            # 精确零命中时按组件子串兜底（jumbit 扩展）
 jumbit describe ~/projects/backend --note "后端服务"   # 人工标注（jumbit 扩展）
 jumbit export --agents               # 项目地图 Markdown（jumbit 扩展）
@@ -82,7 +83,7 @@ jumbit export --agents >> AGENTS.md
 - glob 排除不支持 `{a,b}` 括号展开；`**` 按两个 `*` 处理、不跨分隔符（上游 glob crate 的 `**` 为递归通配）；`*`/`?`/`[...]` 语义对齐
 - 仅支持 Linux；fzf 预览窗口的平台定制未实现（import 的 autojump/z.lua 路径探测同按 Linux 语义）
 - 未移植：`edit` 子命令、elvish/nushell/posix/powershell/tcsh/xonsh 模板
-- 扩展（上游无）：`query --json`（单行 JSON 数组，含 `matched_by` 证据字段）、`query --fuzzy`（仅精确匹配零命中时启用，各关键词为某路径组件的子串即命中——不限末组件、无序且允许同组件，大小写归一同主路仅 ASCII）、`describe`（条目人工标注，随库持久化）与 `export --agents`（项目地图）
+- 扩展（上游无）：`query --json`（单行 JSON 数组，含 `matched_by` 证据字段）、`query --limit <n>`（`--list`/`--json` 输出的前 n 条截断，`--limit 0` 为空输出、退出码 0；重复出现后者覆盖）、`query --fuzzy`（仅精确匹配零命中时启用，各关键词为某路径组件的子串即命中——不限末组件、无序且允许同组件，大小写归一同主路仅 ASCII）、`describe`（条目人工标注，随库持久化）与 `export --agents`（项目地图）
 
 ## 许可证
 

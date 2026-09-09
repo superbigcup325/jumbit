@@ -9,8 +9,19 @@ fn query_opts(
   exclude? : String? = None,
   json? : Bool = false,
   fuzzy? : Bool = false,
+  limit? : Int? = None,
 ) -> @cli.QueryOptions {
-  { keywords, all, list, score, interactive: false, exclude, json, fuzzy, }
+  {
+    keywords,
+    all,
+    list,
+    score,
+    interactive: false,
+    exclude,
+    json,
+    fuzzy,
+    limit,
+  }
 }
 
 ///|

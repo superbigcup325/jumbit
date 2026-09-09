@@ -1,6 +1,6 @@
 ///|
 /// query 的选项与关键词（--exclude 为精确路径，对齐上游语义；glob 排除走 _JB_EXCLUDE_DIRS；
-/// --json/--fuzzy 为 jumbit 扩展，上游无此语义）
+/// --json/--fuzzy/--limit/--tsv 为 jumbit 扩展，上游无此语义）
 pub(all) struct QueryOptions {
   keywords : Array[String]
   mut all : Bool
@@ -10,6 +10,8 @@ pub(all) struct QueryOptions {
   mut exclude : String?
   mut json : Bool
   mut fuzzy : Bool
+  /// --limit <n>：列表型输出（--list/--json/--tsv）的前 n 条截断，None=未设
+  mut limit : Int?
 } derive(Debug, Eq)
 
 ///|
@@ -143,8 +145,11 @@ fn parse_query(args : Array[String]) -> Command {
     exclude: None,
     json: false,
     fuzzy: false,
+    limit: None,
   }
   let mut bad : String? = None
+  // 参数值语义错误（--limit 缺值/值非法）：归 Invalid 而非 Unknown
+  let mut invalid : String? = None
   let mut escaped = false
   let n = args.length()
   let mut i = 0
@@ -160,6 +165,17 @@ fn parse_query(args : Array[String]) -> Command {
         "--interactive" => opts.interactive = true
         "--json" => opts.json = true
         "--fuzzy" => opts.fuzzy = true
+        "--limit" =>
+          // 带值 flag（模式照 --exclude）；值非法归 Invalid，重复出现后者覆盖
+          if i + 1 < n {
+            match parse_limit_value(args[i + 1]) {
+              Ok(v) => opts.limit = Some(v)
+              Err(msg) => invalid = Some(msg)
+            }
+            i += 1
+          } else {
+            invalid = Some("--limit 缺少非负整数参数")
+          }
         "--exclude" =>
           if i + 1 < n {
             opts.exclude = Some(args[i + 1])
@@ -179,13 +195,35 @@ fn parse_query(args : Array[String]) -> Command {
     }
     i += 1
   }
-  if bad is None && opts.json && opts.interactive {
-    return Invalid("--json 与 --interactive 互斥")
+  if bad is None && invalid is Some(msg) {
+    return Invalid(msg)
+  }
+  if bad is None {
+    // 输出通道互斥（jumbit 扩展 flag 冲突）
+    if opts.json && opts.interactive {
+      return Invalid("--json 与 --interactive 互斥")
+    }
+    if opts.limit is Some(_) && !(opts.list || opts.json) {
+      return Invalid("--limit 仅在 --list/--json 下生效")
+    }
   }
   match bad {
     Some(flag) => Unknown(flag)
     None => Query(opts)
   }
+}
+
+///|
+/// --limit 值解析：非负十进制整数（core parse_uint64，与 import last_accessed
+/// 同源——拒前导 +/负数/浮点/垃圾）；超 Int 上限同拒（截断数无更大语义）
+fn parse_limit_value(s : String) -> Result[Int, String] {
+  let v = @string.parse_uint64(s) catch {
+    _ => return Err("--limit 需要非负整数参数: \{s}")
+  }
+  if v.compare(2147483647UL) > 0 {
+    return Err("--limit 需要非负整数参数: \{s}")
+  }
+  Ok(v.to_int())
 }
 
 ///|
@@ -380,6 +418,7 @@ pub fn usage() -> String {
   "    --interactive                         fzf 交互式选择\n" +
   "    --json                                单行 JSON 数组输出全部匹配（agent 通道，与 --interactive 互斥）\n" +
   "    --fuzzy                               精确零命中时按组件子串兜底（jumbit 扩展）\n" +
+  "    --limit <n>                           只输出前 n 条（与 --list/--json/--tsv 组合，jumbit 扩展）\n" +
   "  jumbit init <shell>                     生成 shell 集成脚本（默认定义 j/ji，hook=pwd）\n" +
   "    [--cmd C] [--hook pwd|prompt|none] [--no-cmd]\n" +
   "  jumbit import <plugin> [--merge]        从其他工具导入历史数据（空库直灌，--merge 合并进非空库）\n" +

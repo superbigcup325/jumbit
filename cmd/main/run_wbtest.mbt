@@ -789,3 +789,58 @@ test "forward_atuin_stderr：剥原文尾换行再透传（上游继承 stderr �
   forward_atuin_stderr(errs3, "")
   @debug.assert_eq(errs3, [])
 }
+
+///|
+async test "query --limit：三路截断与 0=空输出（扩展语义）" {
+  let data = make_test_dir("lim-data")
+  let zdir = make_test_dir("lim-z")
+  let zfile = zdir + "/zdata"
+  // 三条不同得分：beta 8.0 / mid 4.0×?——la=0 全 ×0.25：2.0→0.5、1.0→0.25
+  @platform.write_atomic(
+    zfile, b"/imp-lim-alpha|1.0|0\n/imp-lim-beta|2.0|1099511627776\n/imp-lim-mid|4.0|0\n",
+  )
+  let errs : Array[String] = []
+  let env = env_map([("_JB_DATA_DIR", data), ("_Z_DATA", zfile)])
+  @debug.assert_eq(run(["import", "z"], env, errs), 0)
+  // --list --limit 2：截前两条（排序后），不重排
+  @debug.assert_eq(
+    run(
+      ["query", "--list", "--score", "--all", "--limit", "2"],
+      env_with(data),
+      errs,
+    ),
+    0,
+  )
+  // --json --limit 0：空数组 + 退出码 0（不走空检查错误路）
+  @debug.assert_eq(
+    run(["query", "--json", "--all", "--limit", "0"], env_with(data), errs),
+    0,
+  )
+  // --limit 大于结果数：全量输出不报错
+  @debug.assert_eq(
+    run(["query", "--list", "--all", "--limit", "99"], env_with(data), errs),
+    0,
+  )
+  // 裸 query + limit 已被 parse 层拒绝（cli_test 锁定），此处不再覆盖
+  cleanup_test_dir(data)
+  cleanup_test_dir(zdir)
+}
+
+///|
+test "take_limit：None 不截断、取排序后前 n 条、0=空、超界取全量" {
+  let dir = (p : String, r : Double) => @core.Dir::{
+    path: p,
+    rank: r,
+    last_accessed: 0L,
+    note: None,
+  }
+  // 模拟 remaining：已按得分降序
+  let dirs = [dir("/a", 8.0), dir("/b", 1.0), dir("/c", 0.5)]
+  @debug.assert_eq(take_limit(dirs, None).length(), 3)
+  let two = take_limit(dirs, Some(2))
+  @debug.assert_eq(two.length(), 2)
+  @debug.assert_eq(two[0].path, "/a")
+  @debug.assert_eq(two[1].path, "/b")
+  @debug.assert_eq(take_limit(dirs, Some(0)).length(), 0)
+  @debug.assert_eq(take_limit(dirs, Some(99)).length(), 3)
+}

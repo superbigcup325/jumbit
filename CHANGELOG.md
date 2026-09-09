@@ -8,6 +8,7 @@
 - 数据集对拍工具：`scripts/gen_dataset.py`（路径池采样 + Zipf 访问分布 + 时间衰减 + 边界行，固定种子可复现）与 `scripts/dataset_check.sh`（import 六插件 / aging / --merge 八场景与真 zoxide 0.10.0 差分对拍，含排序正确性、退出码与坏行 stderr 逐字节比对）
 
 - `query --json`：单行 JSON 数组输出全部匹配（path/score/last_accessed/matched_by），面向脚本与 agent 的结构化通道，与 `--interactive` 互斥
+- `query --limit <n>`：`--list`/`--json` 列表型输出的统一截断，取排序后前 n 条；`--limit 0` 为空输出加退出码 0，不触发无匹配错误路；与单结果路、`--interactive` 组合报参数错误
 - `query --fuzzy`：精确匹配零命中时的兜底路——各关键词（ASCII 归一）为某路径组件的子串即命中，不限末组件、无序且允许同组件；`--json` 的 `matched_by` 出 `exact`/`fuzzy` 双值标注证据来源
 - `import <plugin>`：从其他工具导入历史数据，支持 `atuin`/`autojump`/`fasd`/`z`/`z.lua`/`zsh-z`（对齐上游 cmd/import.rs + import/ 六模块）
   - 空库直灌、非空库须 `--merge`（可位于插件名前后，上游 global flag 语义）
