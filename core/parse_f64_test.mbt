@@ -32,6 +32,15 @@ test "parse_f64：特殊字面量大小写不敏感、符号可选" {
 }
 
 ///|
+test "parse_f64：nan 为正 NaN（符号位为 0）" {
+  // 0.0/0.0 会被 MoonBit 编译期折叠成负 NaN（符号位 1，totalOrder 最小值，
+  // total_cmp 排序位置随之翻转）；Rust "nan".parse() 是正 NaN。payload 位
+  // 不承载语义（MoonBit 运行时为 0x7FF8000000000001），只锁符号位
+  let nan = f64_ok(@core.parse_f64("nan"))
+  assert_true(nan.is_nan() && nan.reinterpret_as_uint64() >> 63 == 0UL)
+}
+
+///|
 test "parse_f64：常规语法（+/.5/5./前导零/指数）" {
   @debug.assert_eq(f64_ok(@core.parse_f64("+1.5")), 1.5)
   @debug.assert_eq(f64_ok(@core.parse_f64(".5")), 0.5)

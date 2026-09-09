@@ -69,11 +69,11 @@ test "parse：query --json 与 --interactive 互斥" {
   )
   @debug.assert_eq(
     @cli.parse(["query", "--json", "--interactive"]),
-    @cli.Unknown("--json 与 --interactive 互斥"),
+    @cli.Invalid("--json 与 --interactive 互斥"),
   )
   @debug.assert_eq(
     @cli.parse(["query", "--interactive", "--json"]),
-    @cli.Unknown("--json 与 --interactive 互斥"),
+    @cli.Invalid("--json 与 --interactive 互斥"),
   )
 }
 
@@ -332,7 +332,7 @@ test "parse：describe 坏参族" {
   )
   @debug.assert_eq(
     @cli.parse(["describe", "/a", "--note", "多\n行"]),
-    @cli.Unknown("describe: 标注不能包含换行"),
+    @cli.Invalid("describe: 标注不能包含换行"),
   )
   @debug.assert_eq(@cli.parse(["describe", "/a", "/b"]), @cli.Unknown("/b"))
   @debug.assert_eq(

@@ -59,6 +59,8 @@ pub(all) enum Command {
   Export(ExportOptions)
   Help
   Unknown(String)
+  /// 参数值语义错误（flag 组合冲突/值非法）：文案原样上报，不带「未知命令」前缀
+  Invalid(String)
 } derive(Debug, Eq)
 
 ///|
@@ -178,7 +180,7 @@ fn parse_query(args : Array[String]) -> Command {
     i += 1
   }
   if bad is None && opts.json && opts.interactive {
-    bad = Some("--json 与 --interactive 互斥")
+    return Invalid("--json 与 --interactive 互斥")
   }
   match bad {
     Some(flag) => Unknown(flag)
@@ -215,7 +217,7 @@ fn parse_describe(args : Array[String]) -> Command {
   }
   if bad is None && note is Some(t) {
     if t.contains("\n") || t.contains("\r") {
-      bad = Some("describe: 标注不能包含换行")
+      return Invalid("describe: 标注不能包含换行")
     }
   }
   match bad {

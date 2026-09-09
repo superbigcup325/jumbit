@@ -31,6 +31,7 @@ pub(all) enum Command {
   Export(ExportOptions)
   Help
   Unknown(String)
+  Invalid(String)
 } derive(Eq, @debug.Debug)
 
 pub(all) struct DescribeOptions {

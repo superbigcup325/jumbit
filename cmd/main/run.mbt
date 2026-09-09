@@ -77,6 +77,11 @@ pub async fn run(
       2
     }
     @cli.Add(aopts) => run_add(aopts, getenv, errs)
+    @cli.Invalid(msg) => {
+      err_line(errs, msg)
+      err_line(errs, "运行 jumbit help 查看用法")
+      2
+    }
     @cli.Query(qopts) => run_query(qopts, getenv, errs)
     @cli.Remove(paths) => run_remove(paths, getenv, errs)
     @cli.Init(iopts) => run_init(iopts, getenv, errs)
@@ -512,7 +517,9 @@ async fn run_export(
       noted.push(d)
     }
   }
-  // 经临时 Database 排序：复用 core 的 sort_by_score（含 NaN total_cmp 语义）
+  // 经临时 Database 排序：复用 core 的 sort_by_score（含 NaN total_cmp 语义）；
+  // sort_by_score 为升序（Stream 靠倒序遍历取降序），此处倒序遍历实现声明的
+  // frecency 降序
   let ranked = @core.Database::from_dirs(noted)
   ranked.sort_by_score(current_second())
   println(
@@ -520,7 +527,9 @@ async fn run_export(
   )
   println("| 路径 | 说明 |")
   println("|---|---|")
-  for d in ranked.all() {
+  let dirs = ranked.all()
+  for i in dirs.length()>..0 {
+    let d = dirs[i]
     let note = match d.note {
       Some(t) => t
       None => ""
