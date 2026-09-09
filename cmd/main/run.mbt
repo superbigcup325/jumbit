@@ -321,6 +321,13 @@ async fn run_query(
     // agent 通道：单行 JSON 数组（含全部匹配与 matched_by 证据字段）
     println(render_json(take_limit(remaining, qopts.limit), now, matched_by))
     0
+  } else if qopts.tsv {
+    // agent 通道：无表头 Tab 分隔行（--limit 0 → 不输出任何行，head -0 语义）
+    let shown = take_limit(remaining, qopts.limit)
+    if shown.length() > 0 {
+      println(render_tsv(shown, now, matched_by))
+    }
+    0
   } else if qopts.interactive {
     match @platform.fzf_select(remaining, now, @config.fzf_opts(getenv)) {
       Ok(selection) => {

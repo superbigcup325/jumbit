@@ -29,13 +29,20 @@ fn json_escape(s : String) -> String {
 }
 
 ///|
-/// JSON 数字：NaN/±Infinity 不是合法 JSON 数值（import 可带进异常 rank），出 null
+/// JSON 数字：NaN/±Infinity 不是合法 JSON 数值（import 可带进异常 rank），出 null；
+/// 有限数走 double_short 最短表示（与 --tsv 的 score 列共用）
 fn json_number(v : Double) -> String {
   if v.is_nan() || v.is_inf() {
     "null"
   } else {
-    v.to_string()
+    double_short(v)
   }
+}
+
+///|
+/// 有限浮点最短表示（4.0→"4"、0.75→"0.75"）：--json 与 --tsv 共用的数字形态
+fn double_short(v : Double) -> String {
+  v.to_string()
 }
 
 ///|

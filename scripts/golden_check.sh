@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# 数据集 D8：jumbit 扩展面（query --json / --fuzzy / matched_by / --limit / describe /
-# export --agents）的 golden 冻结。上游无对应物、无裁判可用，人工核验后的
+# 数据集 D8：jumbit 扩展面（query --json / --fuzzy / matched_by / --limit / --tsv /
+# describe / export --agents）的 golden 冻结。上游无对应物、无裁判可用，人工核验后的
 # golden 文件即裁判；命令面输出逐字节比对（stdout/stderr/退出码三元组）。
 #
 # 确定性设计（golden 不随机器/时间漂移）：
@@ -100,6 +100,13 @@ g json-fuzzy-multi query --json --all --fuzzy web serv
 g json-fuzzy-nonlast query --json --all --fuzzy myapp
 g json-mutex query --json --interactive
 
+# --- --tsv 数据通道（jumbit 扩展；无表头，path 原样不转义；全 --all 不改库，
+#     须在懒删除段之前跑才能见到全量行：tab 路径/nan/转义路径）---
+g tsv-all query --tsv --all
+g tsv-limit-2 query --tsv --all --limit 2
+g tsv-mutex-json query --tsv --json --all
+g tsv-mutex-interactive query --tsv --interactive
+
 # --- describe / export --agents ---
 g describe-note describe /golden/alpha --note "Alpha 服务"
 g describe-show describe /golden/alpha
@@ -146,7 +153,8 @@ for case in json-empty-db list-empty-db miss-with-kw import-quiet \
   json-mutex describe-note describe-show describe-note-pipe describe-note-uni \
   agents-table describe-clear agents-after-clear describe-note-newline \
   describe-missing json-exists-filtered text-exists-empty json-after-lazy \
-  json-limit-2 limit-zero limit-mutex limit-invalid-value limit-negative; do
+  json-limit-2 limit-zero limit-mutex limit-invalid-value limit-negative \
+  tsv-all tsv-limit-2 tsv-mutex-json tsv-mutex-interactive; do
   local_ok=1
   for ext in out err code; do
     [ "$(cmp_case "$case" "$ext")" = 1 ] || local_ok=0

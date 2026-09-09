@@ -12,6 +12,8 @@ pub(all) struct QueryOptions {
   mut fuzzy : Bool
   /// --limit <n>：列表型输出（--list/--json/--tsv）的前 n 条截断，None=未设
   mut limit : Int?
+  /// --tsv：无表头 Tab 分隔数据通道（jumbit 扩展）
+  mut tsv : Bool
 } derive(Debug, Eq)
 
 ///|
@@ -146,6 +148,7 @@ fn parse_query(args : Array[String]) -> Command {
     json: false,
     fuzzy: false,
     limit: None,
+    tsv: false,
   }
   let mut bad : String? = None
   // 参数值语义错误（--limit 缺值/值非法）：归 Invalid 而非 Unknown
@@ -165,6 +168,7 @@ fn parse_query(args : Array[String]) -> Command {
         "--interactive" => opts.interactive = true
         "--json" => opts.json = true
         "--fuzzy" => opts.fuzzy = true
+        "--tsv" => opts.tsv = true
         "--limit" =>
           // 带值 flag（模式照 --exclude）；值非法归 Invalid，重复出现后者覆盖
           if i + 1 < n {
@@ -199,12 +203,19 @@ fn parse_query(args : Array[String]) -> Command {
     return Invalid(msg)
   }
   if bad is None {
-    // 输出通道互斥（jumbit 扩展 flag 冲突）
+    // 输出通道互斥（jumbit 扩展 flag 两两冲突；--list --tsv 沿用 --list --json
+    // 既有先例：--list 胜出，另一通道被忽略，不校验）
+    if opts.tsv && opts.json {
+      return Invalid("--tsv 与 --json 互斥")
+    }
+    if opts.tsv && opts.interactive {
+      return Invalid("--tsv 与 --interactive 互斥")
+    }
     if opts.json && opts.interactive {
       return Invalid("--json 与 --interactive 互斥")
     }
-    if opts.limit is Some(_) && !(opts.list || opts.json) {
-      return Invalid("--limit 仅在 --list/--json 下生效")
+    if opts.limit is Some(_) && !(opts.list || opts.json || opts.tsv) {
+      return Invalid("--limit 仅在 --list/--json/--tsv 下生效")
     }
   }
   match bad {
@@ -418,6 +429,7 @@ pub fn usage() -> String {
   "    --interactive                         fzf 交互式选择\n" +
   "    --json                                单行 JSON 数组输出全部匹配（agent 通道，与 --interactive 互斥）\n" +
   "    --fuzzy                               精确零命中时按组件子串兜底（jumbit 扩展）\n" +
+  "    --tsv                                Tab 分隔输出 path/score/last_accessed/matched_by（jumbit 扩展，与 --json/--interactive 互斥）\n" +
   "    --limit <n>                           只输出前 n 条（与 --list/--json/--tsv 组合，jumbit 扩展）\n" +
   "  jumbit init <shell>                     生成 shell 集成脚本（默认定义 j/ji，hook=pwd）\n" +
   "    [--cmd C] [--hook pwd|prompt|none] [--no-cmd]\n" +

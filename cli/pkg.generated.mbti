@@ -65,6 +65,7 @@ pub(all) struct QueryOptions {
   mut json : Bool
   mut fuzzy : Bool
   mut limit : Int?
+  mut tsv : Bool
 } derive(Eq, @debug.Debug)
 
 // Type aliases
