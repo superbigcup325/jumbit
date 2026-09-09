@@ -1,0 +1,6 @@
+<!-- jumbit export --agents：项目地图，按常用度（frecency）降序 -->
+| 路径 | 说明 |
+|---|---|
+| /golden/beta | db\|primary |
+| /golden/alpha | Alpha 服务 |
+| /golden/service/web-app | 前端 React |
