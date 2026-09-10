@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-11
+
 ### Added
 - 数据集对拍工具：`scripts/gen_dataset.py`（路径池采样 + Zipf 访问分布 + 时间衰减 + 边界行，固定种子可复现）与 `scripts/dataset_check.sh`（import 六插件 / aging / --merge 八场景与真 zoxide 0.10.0 差分对拍，含排序正确性、退出码与坏行 stderr 逐字节比对）
 
