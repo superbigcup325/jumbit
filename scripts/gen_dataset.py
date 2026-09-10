@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import argparse
+import itertools
 import os
 import random
 import subprocess
@@ -62,6 +63,20 @@ def real_dir_pool(max_depth: int, limit: int) -> list[str]:
     # 过滤明显噪声：超长路径、含换行不可能出现，find 也不会给出
     pool = [p for p in out if len(p) < 250 and p != home][:limit]
     return pool
+
+
+def synthetic_pool(n: int) -> list[str]:
+    """合成唯一路径池（性能规模集用）：组件词池 + 六位序号保证 n 条互不相同。
+
+    末组件来自 10 词小池，供关键词查询场景按末组件命中约 1/10 条目。
+    """
+    words = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot",
+             "golf", "hotel", "india", "juliet", "kilo", "lima"]
+    tails = ["src", "docs", "build", "test", "tools", "bin", "lib", "conf", "data", "log"]
+    return [
+        f"/opt/{words[i % len(words)]}/{words[(i // len(words)) % len(words)]}-{i:06d}/{tails[i % len(tails)]}"
+        for i in range(n)
+    ]
 
 
 def zipf_pick(rng: random.Random, pool: list[str]) -> str:
@@ -131,6 +146,7 @@ BAD_AJ_LINES = ["bad-line", "", "\t", "x\t", "1.5|no-tab"]
 
 def gen_z(
     rng: random.Random, lines: int, pool: list[str], now: int, allow_edge: bool,
+    path_iter=None,
 ) -> list[str]:
     offsets = unique_offsets(rng, lines)
     out = []
@@ -138,7 +154,7 @@ def gen_z(
         if rng.random() < 0.01:
             out.append(rng.choice(BAD_Z_LINES))
             continue
-        path = zipf_pick(rng, pool)
+        path = next(path_iter) if path_iter is not None else zipf_pick(rng, pool)
         if path == "":
             continue
         out.append(f"{path}|{pick_rank(rng, allow_edge)}|{now - offsets[i]}")
@@ -206,17 +222,30 @@ def main() -> None:
     ap.add_argument("--now", type=int, default=NOW, help="时间戳基准 epoch 秒")
     ap.add_argument("--rank-edge", action="store_true",
                     help="掺入 nan/inf/1e308 边界 rank（仅供内容级对拍，逐字节对拍勿用）")
+    ap.add_argument("--unique-paths", type=int, default=0,
+                    help="改用合成唯一路径池（性能规模集，仅 --format z）：路径逐行轮转，"
+                         "每路径约 lines/N 次（触发 dedup），不与本机真实池/Zipf 叠加")
     args = ap.parse_args()
+
+    if args.unique_paths and args.format != "z":
+        ap.error("--unique-paths 仅支持 --format z")
 
     rng = random.Random(args.seed)
     now = args.now
 
-    pool = real_dir_pool(args.max_depth, 800) + EDGE_PATHS
-    if not pool:
-        pool = list(EDGE_PATHS)
+    path_iter = None
+    if args.unique_paths:
+        order = synthetic_pool(args.unique_paths)
+        rng.shuffle(order)
+        path_iter = itertools.cycle(order)
+        pool = order  # 仅供末尾统计显示
+    else:
+        pool = real_dir_pool(args.max_depth, 800) + EDGE_PATHS
+        if not pool:
+            pool = list(EDGE_PATHS)
 
     if args.format == "z":
-        lines_ = gen_z(rng, args.lines, pool, now, args.rank_edge)
+        lines_ = gen_z(rng, args.lines, pool, now, args.rank_edge, path_iter)
     elif args.format == "autojump":
         lines_ = gen_autojump(rng, args.lines, pool, now, args.rank_edge)
     else:
