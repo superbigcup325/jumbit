@@ -43,6 +43,7 @@
 - 调试回显 `_JB_ECHO=1`：add 时回显记录的目录
 - 端到端冒烟脚本 `scripts/smoke.sh`：真实二进制验证 add→query 回显与错误退出码
 - 开发者回归脚本 `scripts/regression.sh`：`moon check --deny-warn`、`moon test`、`moon fmt --check`、`moon info` 接口面冻结四道闸，任一失败即非零退出
+
 ### Fixed
 
 - 得分显示在精确半界（如陈旧条目 1.0×0.25=0.25）改按 Rust `{:.1}` 的半界取偶舍入，`--score` 前缀与上游逐字节一致（此前 `.round()` 半界远离零，0.25 误显 0.3）

@@ -41,7 +41,7 @@ for shell in bash zsh fish; do
 done
 
 echo "== init bash source 实测 =="
-eval "$("$bin" init bash --cmd j)" 
+eval "$("$bin" init bash --cmd j)"
 type __jumbit_z >/dev/null && type __jumbit_zi >/dev/null && type j >/dev/null || {
   echo "✗ source 后函数未定义" >&2
   exit 1
