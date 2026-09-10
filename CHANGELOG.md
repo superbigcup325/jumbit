@@ -46,6 +46,10 @@
 - 得分显示在精确半界（如陈旧条目 1.0×0.25=0.25）改按 Rust `{:.1}` 的半界取偶舍入，`--score` 前缀与上游逐字节一致（此前 `.round()` 半界远离零，0.25 误显 0.3）
 - 持久化解码拒绝路径字节含 NUL/换行的库文件（此前仅 add 入口拦截，手工构造的库文件可绕过）
 
+### 已知问题
+
+- 非 finite rank 毒库（继承自上游 0.10.0，2026-09-10 与真 zoxide Linux 探针逐字节对拍一致）：`import`（z 系/autojump；atuin rank 恒 1.0 不受影响）接受 `inf`/`nan` 字面量与 `1e309` 等溢出饱和为 inf 的大数入库（Rust `f64::from_str` 语义），`add --score` 同样接受。后果：`age()` 遇 `total=inf` 因子归零，库内其余条目被清出（rank < 1）而 NaN 条目幸存；`total=NaN` 使 `total > max_age` 永假，老化从此永久停摆；全程退出码 0 无告警。上游修复 [ajeetdsouza/zoxide#1280](https://github.com/ajeetdsouza/zoxide/pull/1280) 为 open PR 未合并，合并后跟进调整（import 拒收非 finite rank、按行号报错）
+
 ### Internal
 
 - Database 封装收敛：字段改为外部不可构造/原地修改，`all()` 返回数组副本，保证 dirty 标志一致性
