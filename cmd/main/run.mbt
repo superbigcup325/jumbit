@@ -460,6 +460,7 @@ fn run_init(
     "powershell" =>
       @tpl.render_powershell(cmd, iopts.hook, echo, resolve_symlinks)
     "tcsh" => @tpl.render_tcsh(cmd, iopts.hook, echo, resolve_symlinks)
+    "xonsh" => @tpl.render_xonsh(cmd, iopts.hook, echo, resolve_symlinks)
     other => {
       err_line(errs, "init: 不支持的 shell: \{other}")
       return 2

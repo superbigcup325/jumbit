@@ -4,7 +4,7 @@
 fn render_all() -> Array[(String, String)] {
   let out : Array[(String, String)] = []
   let shells = [
-    "bash", "zsh", "fish", "elvish", "nushell", "posix", "powershell", "tcsh",
+    "bash", "zsh", "fish", "elvish", "nushell", "posix", "powershell", "tcsh", "xonsh",
   ]
   let hooks = [@templates.HookNone, HookPrompt, HookPwd]
   for shell in shells {
@@ -22,6 +22,7 @@ fn render_all() -> Array[(String, String)] {
               "powershell" =>
                 @templates.render_powershell(cmd, hook, echo, resolve)
               "tcsh" => @templates.render_tcsh(cmd, hook, echo, resolve)
+              "xonsh" => @templates.render_xonsh(cmd, hook, echo, resolve)
               _ => "" // 不可达：shells 数组仅八种
             }
             out.push(
@@ -39,9 +40,9 @@ fn render_all() -> Array[(String, String)] {
 }
 
 ///|
-test "模板矩阵：24 变体 × 8 shell 全部非空且无 zoxide 残留" {
+test "模板矩阵：24 变体 × 9 shell 全部非空且无 zoxide 残留" {
   let all = render_all()
-  @debug.assert_eq(all.length(), 192)
+  @debug.assert_eq(all.length(), 216)
   for pair in all {
     let src = pair.1
     @debug.assert_eq(src.length() > 100, true)
@@ -72,7 +73,8 @@ test "模板矩阵：--no-cmd 不定义 j 命令并输出 not configured" {
           pair.0.contains("elvish") ||
           pair.0.contains("nushell") ||
           pair.0.contains("posix") ||
-          pair.0.contains("powershell")
+          pair.0.contains("powershell") ||
+          pair.0.contains("xonsh")
         )
       if !none_not_configured {
         fail("有命令的变体却输出 not configured: \{pair.0}")
@@ -99,6 +101,46 @@ test "模板矩阵：hook=pwd/prompt 生成对应钩子，none 不生成" {
   // hook=prompt 的 fish 变体挂 fish_prompt 事件
   let prompt_fish = @templates.render_fish(Some("j"), HookPrompt, false, false)
   @debug.assert_eq(prompt_fish.contains("--on-event fish_prompt"), true)
+  // posix：none 输出 not configured；pwd 不支持（提示替代）；prompt 挂 PS1
+  let none_posix = @templates.render_posix(None, HookNone, false, false)
+  @debug.assert_eq(none_posix.contains("# -- not configured --"), true)
+  let pwd_posix = @templates.render_posix(Some("j"), HookPwd, false, false)
+  @debug.assert_eq(pwd_posix.contains("PWD hooks are not supported"), true)
+  // tcsh：prompt 别名 __jumbit_hook，pwd 挂 precmd
+  let prompt_tcsh = @templates.render_tcsh(Some("j"), HookPrompt, false, false)
+  @debug.assert_eq(prompt_tcsh.contains("alias __jumbit_hook"), true)
+  let pwd_tcsh = @templates.render_tcsh(Some("j"), HookPwd, false, false)
+  @debug.assert_eq(pwd_tcsh.contains("alias precmd"), true)
+  // powershell：none 输出 not configured，prompt 定义 __jumbit_hook
+  let none_powershell = @templates.render_powershell(
+    None,
+    HookNone,
+    false,
+    false,
+  )
+  @debug.assert_eq(none_powershell.contains("# -- not configured --"), true)
+  let hook_powershell = @templates.render_powershell(
+    Some("j"),
+    HookPrompt,
+    false,
+    false,
+  )
+  @debug.assert_eq(
+    hook_powershell.contains("function global:__jumbit_hook"),
+    true,
+  )
+  // xonsh：none 输出 not configured；prompt/pwd 挂 events 装饰器
+  let none_xonsh = @templates.render_xonsh(None, HookNone, false, false)
+  @debug.assert_eq(none_xonsh.contains("# -- not configured --"), true)
+  let prompt_xonsh = @templates.render_xonsh(
+    Some("j"),
+    HookPrompt,
+    false,
+    false,
+  )
+  @debug.assert_eq(prompt_xonsh.contains("on_post_prompt"), true)
+  let pwd_xonsh = @templates.render_xonsh(Some("j"), HookPwd, false, false)
+  @debug.assert_eq(pwd_xonsh.contains("on_chdir"), true)
   // hook=prompt/pwd 的 elvish 变体挂 before-readline/after-chdir；none 输出 not configured
   let prompt_elvish = @templates.render_elvish(
     Some("j"),

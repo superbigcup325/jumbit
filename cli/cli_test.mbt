@@ -219,13 +219,13 @@ test "parse：init 用法错误归 Unknown" {
   @debug.assert_eq(
     @cli.parse(["init"]),
     @cli.Unknown(
-      "init: 缺少 shell 参数（bash/zsh/fish/elvish/nushell/posix/powershell/tcsh）",
+      "init: 缺少 shell 参数（bash/zsh/fish/elvish/nushell/posix/powershell/tcsh/xonsh）",
     ),
   )
   @debug.assert_eq(
     @cli.parse(["init", "csh"]),
     @cli.Unknown(
-      "init: 不支持的 shell: csh（当前支持 bash/zsh/fish/elvish/nushell/posix/powershell/tcsh）",
+      "init: 不支持的 shell: csh（当前支持 bash/zsh/fish/elvish/nushell/posix/powershell/tcsh/xonsh）",
     ),
   )
   @debug.assert_eq(

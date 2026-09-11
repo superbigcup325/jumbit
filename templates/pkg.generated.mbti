@@ -20,6 +20,8 @@ pub fn render_powershell(String?, Hook, Bool, Bool) -> String
 
 pub fn render_tcsh(String?, Hook, Bool, Bool) -> String
 
+pub fn render_xonsh(String?, Hook, Bool, Bool) -> String
+
 pub fn render_zsh(String?, Hook, Bool, Bool) -> String
 
 // Errors
