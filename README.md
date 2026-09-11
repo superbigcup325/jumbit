@@ -112,6 +112,46 @@ jumbit export --agents >> AGENTS.md
 | /home/you/projects/backend-api | 后端服务 |
 ```
 
+## 与其他工具集成
+
+jumbit 的目录记忆经 CLI 面供给其他工具消费，以下配置均经真机验证（sesh 2.29 / yazi 26.9）
+
+### sesh（tmux 会话管理器）
+
+sesh v2.29.0 起提供 `[frecency]` 配置节，可把 frecency 后端从 zoxide 整体换成 jumbit。写入 `~/.config/sesh/sesh.toml`：
+
+```toml
+[frecency]
+list_command = "jumbit query --list --score"
+query_command = "jumbit query {}"
+add_command = "jumbit add {}"
+remove_command = "jumbit remove {}"
+```
+
+`sesh list -z` 列出 jumbit 记录（按得分降序）；`sesh connect <名字或路径>` 创建并连接会话，连接后经 `add_command` 回写使用记录——跳转决策与记忆积累双向打通
+
+### yazi（终端文件管理器）
+
+yazi 26.x 经 `--cwd-file` 支持退出时回传所在目录，社区惯例是 shell 包装函数。加入 `~/.bashrc` 或 `~/.zshrc`：
+
+```sh
+yj() {
+	local start="$PWD" tmp cwd
+	if [ "$#" -gt 0 ]; then
+		start="$(jumbit query "$@")" || return 1
+	fi
+	tmp="$(mktemp)" || return 1
+	yazi "$start" --cwd-file="$tmp"
+	if cwd="$(command cat -- "$tmp")" && [ -n "$cwd" ]; then
+		jumbit add -- "$cwd"
+		[ "$cwd" != "$PWD" ] && builtin cd -- "$cwd"
+	fi
+	rm -f -- "$tmp"
+}
+```
+
+`yj <关键词>` 经 jumbit 解析出目录作为 yazi 起点进入文件管理；退出后自动 `jumbit add` 喂入本次到达的目录并 cd 过去——文件管理器成为目录记忆的采集器
+
 ## 导入
 
 如果你在用以下插件，可以把历史目录数据导入 jumbit。数据文件按各插件的标准约定自动探测：
