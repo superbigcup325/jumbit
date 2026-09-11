@@ -218,12 +218,14 @@ test "parse：init --cmd/--hook/--no-cmd 覆盖默认" {
 test "parse：init 用法错误归 Unknown" {
   @debug.assert_eq(
     @cli.parse(["init"]),
-    @cli.Unknown("init: 缺少 shell 参数（bash/zsh/fish/elvish/nushell）"),
+    @cli.Unknown(
+      "init: 缺少 shell 参数（bash/zsh/fish/elvish/nushell/posix）",
+    ),
   )
   @debug.assert_eq(
     @cli.parse(["init", "powershell"]),
     @cli.Unknown(
-      "init: 不支持的 shell: powershell（当前支持 bash/zsh/fish/elvish/nushell）",
+      "init: 不支持的 shell: powershell（当前支持 bash/zsh/fish/elvish/nushell/posix）",
     ),
   )
   @debug.assert_eq(

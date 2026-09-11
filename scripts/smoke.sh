@@ -24,7 +24,7 @@ if [ "$out" != "$target" ]; then
 fi
 
 echo "== init 模板语法校验（参数矩阵抽样）=="
-for shell in bash zsh fish elvish nushell; do
+for shell in bash zsh fish elvish nushell posix; do
   if ! command -v "$shell" >/dev/null; then
     echo "  跳过 $shell（未安装）"
     continue
@@ -36,6 +36,8 @@ for shell in bash zsh fish elvish nushell; do
       _JB_ECHO=1 "$bin" init zsh $args | zsh -n || { echo "✗ zsh -n 失败: $args" >&2; exit 1; }
     elif [ "$shell" = "fish" ]; then
       _JB_RESOLVE_SYMLINKS=1 "$bin" init fish $args | fish -n || { echo "✗ fish -n 失败: $args" >&2; exit 1; }
+    elif [ "$shell" = "posix" ]; then
+      "$bin" init posix $args | sh -n || { echo "✗ sh -n 失败: $args" >&2; exit 1; }
     elif [ "$shell" = "nushell" ]; then
       nufile=$(mktemp /tmp/jumbit-nu-XXXX.nu)
       "$bin" init nushell $args > "$nufile"

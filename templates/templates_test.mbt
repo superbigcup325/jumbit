@@ -3,7 +3,7 @@
 ///|
 fn render_all() -> Array[(String, String)] {
   let out : Array[(String, String)] = []
-  let shells = ["bash", "zsh", "fish", "elvish", "nushell"]
+  let shells = ["bash", "zsh", "fish", "elvish", "nushell", "posix"]
   let hooks = [@templates.HookNone, HookPrompt, HookPwd]
   for shell in shells {
     for cmd in [Some("j"), None] {
@@ -16,6 +16,7 @@ fn render_all() -> Array[(String, String)] {
               "fish" => @templates.render_fish(cmd, hook, echo, resolve)
               "elvish" => @templates.render_elvish(cmd, hook, echo, resolve)
               "nushell" => @templates.render_nushell(cmd, hook, echo, resolve)
+              "posix" => @templates.render_posix(cmd, hook, echo, resolve)
               _ => "" // 不可达：shells 数组仅三种
             }
             out.push(
@@ -35,7 +36,7 @@ fn render_all() -> Array[(String, String)] {
 ///|
 test "模板矩阵：24 变体 × 4 shell 全部非空且无 zoxide 残留" {
   let all = render_all()
-  @debug.assert_eq(all.length(), 120)
+  @debug.assert_eq(all.length(), 144)
   for pair in all {
     let src = pair.1
     @debug.assert_eq(src.length() > 100, true)
@@ -64,7 +65,8 @@ test "模板矩阵：--no-cmd 不定义 j 命令并输出 not configured" {
         (
           pair.0.contains("fish") ||
           pair.0.contains("elvish") ||
-          pair.0.contains("nushell")
+          pair.0.contains("nushell") ||
+          pair.0.contains("posix")
         )
       if !none_not_configured {
         fail("有命令的变体却输出 not configured: \{pair.0}")
@@ -115,6 +117,18 @@ test "模板矩阵：hook=pwd/prompt 生成对应钩子，none 不生成" {
   @debug.assert_eq(pwd_nushell.contains("hooks.env_change.PWD"), true)
   let none_nushell = @templates.render_nushell(None, HookNone, false, false)
   @debug.assert_eq(none_nushell.contains("# -- not configured --"), true)
+  // posix：none 输出 not configured；pwd 钩子不支持（输出替代提示）；prompt 挂 PS1
+  let none_posix = @templates.render_posix(None, HookNone, false, false)
+  @debug.assert_eq(none_posix.contains("# -- not configured --"), true)
+  let pwd_posix = @templates.render_posix(Some("j"), HookPwd, false, false)
+  @debug.assert_eq(pwd_posix.contains("PWD hooks are not supported"), true)
+  let prompt_posix = @templates.render_posix(
+    Some("j"),
+    HookPrompt,
+    false,
+    false,
+  )
+  @debug.assert_eq(prompt_posix.contains("__jumbit_hook"), true)
 }
 
 ///|
