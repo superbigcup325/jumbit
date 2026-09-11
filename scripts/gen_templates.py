@@ -103,11 +103,20 @@ def tokenize(tpl: str) -> list[Token]:
         raise ValueError(f"未闭合的 {open_pat}（偏移 {start}）")
 
     while pos < n:
+        # askama 注释 {#- ... -#} / {# ... #}：整块跳过
+        cmt = tpl.find("{#", pos)
         cand = []
         for open_pat, close_pat, kind in (("{%", "%}", "stmt"), ("{{", "}}", "expr")):
             idx = tpl.find(open_pat, pos)
             if idx != -1:
                 cand.append((idx, open_pat, close_pat, kind))
+        if cmt != -1 and (not cand or cmt < min(cand)[0]):
+            cend = tpl.find("#}", cmt)
+            assert cend != -1, "未闭合的 {#"
+            if cmt > pos:
+                tokens.append(Token("text", tpl[pos:cmt]))
+            pos = cend + 2
+            continue
         if not cand:
             tokens.append(Token("text", tpl[pos:]))
             break
@@ -456,6 +465,9 @@ def main() -> None:
 
     tpl = open(f"{args.src}/{args.shell}.txt", encoding="utf-8").read()
     code = transpile(tpl, args.shell)
+    # 模板未使用 resolve_symlinks 的 shell（elvish）：参数下划线前缀消 unused 警告
+    if "resolve_symlinks" not in tpl:
+        code = code.replace("resolve_symlinks : Bool,", "_resolve_symlinks : Bool,")
     if args.stdout:
         print(code, end="")
     else:

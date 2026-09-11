@@ -24,7 +24,7 @@ if [ "$out" != "$target" ]; then
 fi
 
 echo "== init 模板语法校验（参数矩阵抽样）=="
-for shell in bash zsh fish; do
+for shell in bash zsh fish elvish; do
   if ! command -v "$shell" >/dev/null; then
     echo "  跳过 $shell（未安装）"
     continue
@@ -34,8 +34,23 @@ for shell in bash zsh fish; do
       _JB_ECHO=1 _JB_RESOLVE_SYMLINKS=1 "$bin" init bash $args | bash -n || { echo "✗ bash -n 失败: $args" >&2; exit 1; }
     elif [ "$shell" = "zsh" ]; then
       _JB_ECHO=1 "$bin" init zsh $args | zsh -n || { echo "✗ zsh -n 失败: $args" >&2; exit 1; }
-    else
+    elif [ "$shell" = "fish" ]; then
       _JB_RESOLVE_SYMLINKS=1 "$bin" init fish $args | fish -n || { echo "✗ fish -n 失败: $args" >&2; exit 1; }
+    else
+      # elvish 语法门禁 = parse 级：edit: 命名空间仅交互态可解析，
+      # headless 编译的 "cannot find variable $edit:" 属预期，豁免
+      elfile=$(mktemp /tmp/jumbit-elvish-XXXX.elv)
+      errfile=$(mktemp /tmp/jumbit-elvish-err-XXXX)
+      "$bin" init elvish $args > "$elfile"
+      rc=0
+      elvish -compileonly "$elfile" 2> "$errfile" || rc=$?
+      if [ $rc -ne 0 ] && grep -q "Parse error" "$errfile"; then
+        echo "✗ elvish 语法错误: $args" >&2
+        cat "$errfile" >&2
+        rm -f "$elfile" "$errfile"
+        exit 1
+      fi
+      rm -f "$elfile" "$errfile"
     fi
   done
 done

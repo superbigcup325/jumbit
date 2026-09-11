@@ -454,6 +454,7 @@ fn run_init(
     "bash" => @tpl.render_bash(cmd, iopts.hook, echo, resolve_symlinks)
     "zsh" => @tpl.render_zsh(cmd, iopts.hook, echo, resolve_symlinks)
     "fish" => @tpl.render_fish(cmd, iopts.hook, echo, resolve_symlinks)
+    "elvish" => @tpl.render_elvish(cmd, iopts.hook, echo, resolve_symlinks)
     other => {
       err_line(errs, "init: 不支持的 shell: \{other}")
       return 2
@@ -586,6 +587,7 @@ async fn run_import(
     Some(data_dir) => data_dir
     None => return 1
   }
+
   let store = match open_store(data_dir, errs) {
     Some(s) => s
     None => return 1
@@ -596,11 +598,13 @@ async fn run_import(
     )
     return 1
   }
+
   let globs = match cfg(@config.exclude_dirs(getenv, getenv("HOME")), errs) {
     Some(globs) => globs
     None => return 1
   }
   // 读数据源：source 为 None 表示无文件来源（atuin），上报定位用 `line N`
+
   let loaded : Result[(Array[@platform.ImportRecord], String?), String] = match
     iopts.plugin {
     "atuin" =>
@@ -649,6 +653,7 @@ async fn run_import(
   let collapse = iopts.plugin == "atuin"
   // 解析 pass：记录流转为带定位条目（空行静默跳过，上游迭代器 continue；
   // 行号占位保留，坏解码行折为 Err 后续按位上报）
+
   let parsed : Array[@core.LocatedDir] = []
   for record in records {
     let location = match source {
@@ -663,12 +668,14 @@ async fn run_import(
         }
     }
   }
+
   let entries = if collapse {
     @core.collapse_consecutive(parsed)
   } else {
     parsed
   }
   // 入库 pass：坏行按 <定位>: <原因> 上报不中止；exclude 命中静默跳过
+
   for entry in entries {
     match entry.result {
       Err(reason) => err_line(errs, "\{entry.location}: \{reason}")
@@ -679,6 +686,7 @@ async fn run_import(
         }
     }
   }
+
   if store.database().is_dirty() {
     store.database().dedup()
     let maxage = match cfg(@config.maxage(getenv), errs) {
@@ -687,6 +695,7 @@ async fn run_import(
     }
     store.database().age(maxage)
   }
+
   finish(store, errs, 0)
 }
 
