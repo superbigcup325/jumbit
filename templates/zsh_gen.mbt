@@ -2,7 +2,7 @@
 // 重命名：zoxide→jumbit、__zoxide_→__jumbit_、_ZO_→_JB_、z#→j#；Windows 分支已丢弃。
 
 ///|
-/// bash 模板渲染（自上游 templates/zsh.txt 转译：zoxide→jumbit、_ZO_→_JB_；勿手改）
+/// zsh 模板渲染（自上游 templates/zsh.txt 转译：zoxide→jumbit、_ZO_→_JB_；勿手改）
 pub fn render_zsh(
   cmd : String?,
   hook : Hook,
