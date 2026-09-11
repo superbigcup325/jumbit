@@ -457,6 +457,8 @@ fn run_init(
     "elvish" => @tpl.render_elvish(cmd, iopts.hook, echo, resolve_symlinks)
     "nushell" => @tpl.render_nushell(cmd, iopts.hook, echo, resolve_symlinks)
     "posix" => @tpl.render_posix(cmd, iopts.hook, echo, resolve_symlinks)
+    "powershell" =>
+      @tpl.render_powershell(cmd, iopts.hook, echo, resolve_symlinks)
     other => {
       err_line(errs, "init: 不支持的 shell: \{other}")
       return 2

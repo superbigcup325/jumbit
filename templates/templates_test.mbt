@@ -129,6 +129,24 @@ test "模板矩阵：hook=pwd/prompt 生成对应钩子，none 不生成" {
     false,
   )
   @debug.assert_eq(prompt_posix.contains("__jumbit_hook"), true)
+  // powershell：none 输出 not configured；prompt/pwd 均定义 __jumbit_hook
+  let none_powershell = @templates.render_powershell(
+    None,
+    HookNone,
+    false,
+    false,
+  )
+  @debug.assert_eq(none_powershell.contains("# -- not configured --"), true)
+  let hook_powershell = @templates.render_powershell(
+    Some("j"),
+    HookPrompt,
+    false,
+    false,
+  )
+  @debug.assert_eq(
+    hook_powershell.contains("function global:__jumbit_hook"),
+    true,
+  )
 }
 
 ///|
