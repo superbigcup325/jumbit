@@ -3,7 +3,7 @@
 ///|
 fn render_all() -> Array[(String, String)] {
   let out : Array[(String, String)] = []
-  let shells = ["bash", "zsh", "fish", "elvish"]
+  let shells = ["bash", "zsh", "fish", "elvish", "nushell"]
   let hooks = [@templates.HookNone, HookPrompt, HookPwd]
   for shell in shells {
     for cmd in [Some("j"), None] {
@@ -15,6 +15,7 @@ fn render_all() -> Array[(String, String)] {
               "zsh" => @templates.render_zsh(cmd, hook, echo, resolve)
               "fish" => @templates.render_fish(cmd, hook, echo, resolve)
               "elvish" => @templates.render_elvish(cmd, hook, echo, resolve)
+              "nushell" => @templates.render_nushell(cmd, hook, echo, resolve)
               _ => "" // 不可达：shells 数组仅三种
             }
             out.push(
@@ -34,7 +35,7 @@ fn render_all() -> Array[(String, String)] {
 ///|
 test "模板矩阵：24 变体 × 4 shell 全部非空且无 zoxide 残留" {
   let all = render_all()
-  @debug.assert_eq(all.length(), 96)
+  @debug.assert_eq(all.length(), 120)
   for pair in all {
     let src = pair.1
     @debug.assert_eq(src.length() > 100, true)
@@ -60,7 +61,11 @@ test "模板矩阵：--no-cmd 不定义 j 命令并输出 not configured" {
     } else if src.contains("# -- not configured --") {
       // fish/elvish 语义：hook=none 时 hook 段输出 not configured（与 cmd 无关，对齐上游）
       let none_not_configured = pair.0.contains("hook=HookNone") &&
-        (pair.0.contains("fish") || pair.0.contains("elvish"))
+        (
+          pair.0.contains("fish") ||
+          pair.0.contains("elvish") ||
+          pair.0.contains("nushell")
+        )
       if !none_not_configured {
         fail("有命令的变体却输出 not configured: \{pair.0}")
       }
@@ -98,6 +103,18 @@ test "模板矩阵：hook=pwd/prompt 生成对应钩子，none 不生成" {
   @debug.assert_eq(pwd_elvish.contains("builtin:after-chdir"), true)
   let none_elvish = @templates.render_elvish(None, HookNone, false, false)
   @debug.assert_eq(none_elvish.contains("# -- not configured --"), true)
+  // nushell：prompt 挂 pre_prompt，pwd 挂 env_change.PWD，none 输出 not configured
+  let prompt_nushell = @templates.render_nushell(
+    Some("j"),
+    HookPrompt,
+    false,
+    false,
+  )
+  @debug.assert_eq(prompt_nushell.contains("hooks.pre_prompt"), true)
+  let pwd_nushell = @templates.render_nushell(Some("j"), HookPwd, false, false)
+  @debug.assert_eq(pwd_nushell.contains("hooks.env_change.PWD"), true)
+  let none_nushell = @templates.render_nushell(None, HookNone, false, false)
+  @debug.assert_eq(none_nushell.contains("# -- not configured --"), true)
 }
 
 ///|

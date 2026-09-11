@@ -303,15 +303,21 @@ fn parse_export(args : Array[String]) -> Command {
 }
 
 ///|
-/// init 参数解析：shell ∈ {bash, zsh, fish, elvish}；--cmd C / --hook pwd|prompt|none / --no-cmd
+/// init 参数解析：shell ∈ {bash, zsh, fish, elvish, nushell}；--cmd C / --hook pwd|prompt|none / --no-cmd
 fn parse_init(args : Array[String]) -> Command {
   if args.is_empty() {
-    return Unknown("init: 缺少 shell 参数（bash/zsh/fish/elvish）")
+    return Unknown(
+      "init: 缺少 shell 参数（bash/zsh/fish/elvish/nushell）",
+    )
   }
   let shell = args[0]
-  if shell != "bash" && shell != "zsh" && shell != "fish" && shell != "elvish" {
+  if shell != "bash" &&
+    shell != "zsh" &&
+    shell != "fish" &&
+    shell != "elvish" &&
+    shell != "nushell" {
     return Unknown(
-      "init: 不支持的 shell: \{shell}（当前支持 bash/zsh/fish/elvish）",
+      "init: 不支持的 shell: \{shell}（当前支持 bash/zsh/fish/elvish/nushell）",
     )
   }
   // 默认对齐上游 cmd.rs：--cmd 默认定义命令（jumbit → "j"），--hook 默认 pwd

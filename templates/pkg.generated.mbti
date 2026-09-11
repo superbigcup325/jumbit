@@ -12,6 +12,8 @@ pub fn render_elvish(String?, Hook, Bool, Bool) -> String
 
 pub fn render_fish(String?, Hook, Bool, Bool) -> String
 
+pub fn render_nushell(String?, Hook, Bool, Bool) -> String
+
 pub fn render_zsh(String?, Hook, Bool, Bool) -> String
 
 // Errors

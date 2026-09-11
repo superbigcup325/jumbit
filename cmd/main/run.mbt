@@ -455,6 +455,7 @@ fn run_init(
     "zsh" => @tpl.render_zsh(cmd, iopts.hook, echo, resolve_symlinks)
     "fish" => @tpl.render_fish(cmd, iopts.hook, echo, resolve_symlinks)
     "elvish" => @tpl.render_elvish(cmd, iopts.hook, echo, resolve_symlinks)
+    "nushell" => @tpl.render_nushell(cmd, iopts.hook, echo, resolve_symlinks)
     other => {
       err_line(errs, "init: 不支持的 shell: \{other}")
       return 2
