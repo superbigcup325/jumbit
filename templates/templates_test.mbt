@@ -3,7 +3,9 @@
 ///|
 fn render_all() -> Array[(String, String)] {
   let out : Array[(String, String)] = []
-  let shells = ["bash", "zsh", "fish", "elvish", "nushell", "posix"]
+  let shells = [
+    "bash", "zsh", "fish", "elvish", "nushell", "posix", "powershell", "tcsh",
+  ]
   let hooks = [@templates.HookNone, HookPrompt, HookPwd]
   for shell in shells {
     for cmd in [Some("j"), None] {
@@ -17,7 +19,10 @@ fn render_all() -> Array[(String, String)] {
               "elvish" => @templates.render_elvish(cmd, hook, echo, resolve)
               "nushell" => @templates.render_nushell(cmd, hook, echo, resolve)
               "posix" => @templates.render_posix(cmd, hook, echo, resolve)
-              _ => "" // 不可达：shells 数组仅三种
+              "powershell" =>
+                @templates.render_powershell(cmd, hook, echo, resolve)
+              "tcsh" => @templates.render_tcsh(cmd, hook, echo, resolve)
+              _ => "" // 不可达：shells 数组仅八种
             }
             out.push(
               (
@@ -34,9 +39,9 @@ fn render_all() -> Array[(String, String)] {
 }
 
 ///|
-test "模板矩阵：24 变体 × 4 shell 全部非空且无 zoxide 残留" {
+test "模板矩阵：24 变体 × 8 shell 全部非空且无 zoxide 残留" {
   let all = render_all()
-  @debug.assert_eq(all.length(), 144)
+  @debug.assert_eq(all.length(), 192)
   for pair in all {
     let src = pair.1
     @debug.assert_eq(src.length() > 100, true)
@@ -66,7 +71,8 @@ test "模板矩阵：--no-cmd 不定义 j 命令并输出 not configured" {
           pair.0.contains("fish") ||
           pair.0.contains("elvish") ||
           pair.0.contains("nushell") ||
-          pair.0.contains("posix")
+          pair.0.contains("posix") ||
+          pair.0.contains("powershell")
         )
       if !none_not_configured {
         fail("有命令的变体却输出 not configured: \{pair.0}")

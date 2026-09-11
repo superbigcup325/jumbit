@@ -24,7 +24,7 @@ if [ "$out" != "$target" ]; then
 fi
 
 echo "== init 模板语法校验（参数矩阵抽样）=="
-for shell in bash zsh fish elvish nushell posix powershell; do
+for shell in bash zsh fish elvish nushell posix powershell tcsh; do
   if ! command -v "$shell" >/dev/null; then
     echo "  跳过 $shell（未安装）"
     continue

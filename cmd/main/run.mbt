@@ -459,6 +459,7 @@ fn run_init(
     "posix" => @tpl.render_posix(cmd, iopts.hook, echo, resolve_symlinks)
     "powershell" =>
       @tpl.render_powershell(cmd, iopts.hook, echo, resolve_symlinks)
+    "tcsh" => @tpl.render_tcsh(cmd, iopts.hook, echo, resolve_symlinks)
     other => {
       err_line(errs, "init: 不支持的 shell: \{other}")
       return 2

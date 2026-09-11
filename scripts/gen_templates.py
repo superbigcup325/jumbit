@@ -465,9 +465,11 @@ def main() -> None:
 
     tpl = open(f"{args.src}/{args.shell}.txt", encoding="utf-8").read()
     code = transpile(tpl, args.shell)
-    # 模板未使用 resolve_symlinks 的 shell（elvish）：参数下划线前缀消 unused 警告
-    if "resolve_symlinks" not in tpl:
-        code = code.replace("resolve_symlinks : Bool,", "_resolve_symlinks : Bool,")
+    # 模板未使用的形参（elvish 不用 resolve_symlinks、tcsh 不用 echo 等）：
+    # 下划线前缀消 unused 警告，调用方按位置传参不受影响
+    for unused in ("resolve_symlinks", "echo"):
+        if re.search(r"\b" + unused + r"\b", tpl) is None:
+            code = code.replace(unused + " : Bool,", "_" + unused + " : Bool,")
     if args.stdout:
         print(code, end="")
     else:
