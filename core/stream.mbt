@@ -26,31 +26,57 @@ pub async fn Database::query_all(
   exists : async (String) -> Bool,
 ) -> Array[Dir] {
   self.sort_by_score(opts.now)
+  // exclude glob 编译一次反复用（全库逐条目过滤，pattern 重复物化是热点）
+  let globs : Array[Array[Char]] = []
+  for pattern in opts.exclude {
+    globs.push(compile_glob(pattern))
+  }
   let out : Array[Dir] = []
   // 倒序遍历：swap_remove 把尾部元素挪到 idx，其一定已被访问过，索引安全
   let len = self.dirs.length()
-  for i in len>..0 {
-    let dir = self.dirs[i]
-    if !filter_by_keywords(opts.keywords, dir.path) {
-      continue
-    }
-    if !filter_base_dir(opts, dir.path) {
-      continue
-    }
-    if !filter_exclude(opts, dir.path) {
-      self.swap_remove(i)
-      continue
-    }
-    if opts.exists && !exists(dir.path) {
-      // TTL 比较在 u64 域（对齐上游 Epoch=u64）：纪元前负 epoch 位型上是
-      // 极大值，不会被懒删除（0.10.0 混沌对拍实测）
-      if dir.last_accessed.reinterpret_as_uint64() <
-        opts.ttl.reinterpret_as_uint64() {
-        self.swap_remove(i)
+  if opts.exists {
+    // exists 路（默认查询）：循环含 await 点，保持原形态
+    for i in len>..0 {
+      let dir = self.dirs[i]
+      if !filter_by_keywords(opts.keywords, dir.path) {
+        continue
       }
-      continue
+      if !filter_base_dir(opts, dir.path) {
+        continue
+      }
+      if !filter_exclude(globs, dir.path) {
+        self.swap_remove(i)
+        continue
+      }
+      if !exists(dir.path) {
+        // TTL 比较在 u64 域（对齐上游 Epoch=u64）：纪元前负 epoch 位型上是
+        // 极大值，不会被懒删除（0.10.0 混沌对拍实测）
+        if dir.last_accessed.reinterpret_as_uint64() <
+          opts.ttl.reinterpret_as_uint64() {
+          self.swap_remove(i)
+        }
+        continue
+      }
+      out.push(dir)
     }
-    out.push(dir)
+  } else {
+    // --all 热路：无 await 点。async 下沉对循环内含 await 点的迭代有
+    // ~8μs/次的固定开销（2026-09-11 变体实验实测：仅此分支之差，26.7 万
+    // 条目 filter 6ms ↔ 2034ms），短路布尔挡不住下沉，必须拆出纯同步循环
+    for i in len>..0 {
+      let dir = self.dirs[i]
+      if !filter_by_keywords(opts.keywords, dir.path) {
+        continue
+      }
+      if !filter_base_dir(opts, dir.path) {
+        continue
+      }
+      if !filter_exclude(globs, dir.path) {
+        self.swap_remove(i)
+        continue
+      }
+      out.push(dir)
+    }
   }
   out
 }
@@ -64,9 +90,9 @@ fn filter_base_dir(opts : StreamOptions, path : String) -> Bool {
 }
 
 ///|
-fn filter_exclude(opts : StreamOptions, path : String) -> Bool {
-  for pattern in opts.exclude {
-    if glob_match(pattern, path) {
+fn filter_exclude(globs : Array[Array[Char]], path : String) -> Bool {
+  for pattern in globs {
+    if glob_match_compiled(pattern, path) {
       return false
     }
   }
