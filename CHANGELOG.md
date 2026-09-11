@@ -4,6 +4,9 @@
 
 ## [Unreleased]
 
+### Added
+- shell 集成模板扩至 9 shell 全量（对齐上游）：新增 elvish / nushell / posix / powershell / tcsh / xonsh，`jumbit init <shell>` 参数矩阵与语法门禁（elvish 编译、nu-check、sh -n、pwsh 解析、tcsh -n、py_compile）全部真机验证
+
 ## [0.1.0] - 2026-09-11
 
 ### Added
