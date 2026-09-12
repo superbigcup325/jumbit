@@ -27,6 +27,8 @@ moon build --release
 # 产物：_build/native/release/build/cmd/main/main.exe，拷进 PATH 即可
 ```
 
+工具链锚定版本：`moon 0.1.20260904`（moonc v0.10.12）——CI 以此钉死可复现构建（`.github/workflows/ci.yml` 的 `MOONBIT_VERSION`），仓库全部闸门在该版本上验证。升级工具链时同步 bump 该常量并重跑全套验证（regression/golden/dataset/chaos/realdata），版本口径以该常量为唯一权威
+
 注：发布到 mooncakes、提供预编译二进制在计划中
 
 ## 快速上手

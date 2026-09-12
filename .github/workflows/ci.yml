@@ -6,10 +6,14 @@ on:
   pull_request:
 
 env:
-  # 工具链版本钉死：cli.moonbitlang.com 不提供历史版本下载（带版本的路径 403），
-  # 用 actions/cache 把安装结果钉在这个常量上实现可复现。
-  # 升级流程 = bump 此常量 → 本地全量验证（check/test/fmt/info + smoke）→ 同步提交。
-  # 本仓库曾因 latest 漂移挂掉：v0.10.12 改名了 strconv.from_str。
+  # 工具链版本钉死（本仓库版本口径的唯一权威，README「安装」节与其呼应）。
+  # 升级流程：
+  #   1. 本地装 latest：curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+  #      （版本化直链亦可：binaries/<版本>/moonbit-linux-x86_64.tar.gz，
+  #       cores/<版本>.tar.gz；target 格式为 linux-x86_64）
+  #   2. moon version 取新版本号 bump 此常量
+  #   3. 全套闸门本地全绿：regression/golden/dataset/chaos/realdata
+  #   4. 同步提交推送，盯 CI（本仓库曾因 latest 漂移挂掉：v0.10.12 改名了 strconv.from_str）
   MOONBIT_VERSION: 0.1.20260904
 
 jobs:
