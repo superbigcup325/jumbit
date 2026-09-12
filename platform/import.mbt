@@ -7,15 +7,35 @@ pub(all) struct ImportRecord {
 } derive(Debug)
 
 ///|
-/// 读插件数据文件并切分为记录（\n 分隔、剥记录尾 \r）。
+/// 逐条回调读插件数据文件（\n 分隔、剥记录尾 \r）。
 /// 按字节切分后逐行解码：坏 UTF-8 只影响所在行（对齐上游逐行 str::from_utf8）。
-pub async fn read_import_lines(
+/// 无记录数组物化——百万行级 import 的热路（行串即抛，峰值只留 db）；
+/// 上游 import.rs::run 本就是惰性迭代器单趟消费，此为结构回归而非优化
+pub async fn for_each_import_line(
   path : String,
-) -> Result[Array[ImportRecord], String] {
+  f : (Int, Result[String, String]) -> Unit,
+) -> Result[Unit, String] {
   let data = @afs.read_file(path) catch {
     err => return Err("could not read \{path}: \{Repr(err)}")
   }
-  Ok(split_records(data.binary(), b'\n', true))
+  for_each_record(data.binary(), b'\n', true, f)
+  Ok(())
+}
+
+///|
+/// 切分为记录数组（行语义与 for_each_import_line 完全一致）：
+/// atuin 折叠路的物化形态 + 行语义冻结器
+pub async fn read_import_lines(
+  path : String,
+) -> Result[Array[ImportRecord], String] {
+  let out : Array[ImportRecord] = []
+  match
+    for_each_import_line(path, fn(line_num, result) {
+      out.push({ line_num, result, })
+    }) {
+    Ok(_) => Ok(out)
+    Err(msg) => Err(msg)
+  }
 }
 
 ///|
@@ -41,19 +61,24 @@ async fn records_from_process(
     _ => return Err("failed to run `\{cmd}`; is it installed and on PATH?")
   }
   let err_text : String = stderr.text() catch { _ => "" }
-  Ok((split_records(stdout.binary(), b'\x00', false), err_text))
+  let out : Array[ImportRecord] = []
+  for_each_record(stdout.binary(), b'\x00', false, fn(line_num, result) {
+    out.push({ line_num, result, })
+  })
+  Ok((out, err_text))
 }
 
 ///|
 /// 按分隔符切字节流：分隔符不保留；strip_cr 时剥记录尾 \r（文件行尾 \r\n）；
 /// 空记录保留占位（行号连续，调用方静默跳过）；末尾不足一条的残余按最后一条计。
-/// 单趟字节扫描（零拷贝视图 + 按行懒解码），不再逐字节物化行数组
-fn split_records(
+/// 单趟字节扫描 + 按行懒解码（零拷贝视图）：分隔符不保留；空记录保留占位。
+/// 回调式消费使 import 热路免于物化 1M 级记录数组
+fn for_each_record(
   bytes : Bytes,
   sep : Byte,
   strip_cr : Bool,
-) -> Array[ImportRecord] {
-  let out : Array[ImportRecord] = []
+  f : (Int, Result[String, String]) -> Unit,
+) -> Unit {
   let n = bytes.length()
   let mut start = 0
   let mut line_num = 0
@@ -61,16 +86,15 @@ fn split_records(
   while i < n {
     if bytes[i] == sep {
       line_num += 1
-      out.push(decode_view(bytes, start, i, line_num, strip_cr))
+      f(line_num, decode_view(bytes, start, i, strip_cr))
       start = i + 1
     }
     i += 1
   }
   if start < n {
     line_num += 1
-    out.push(decode_view(bytes, start, n, line_num, strip_cr))
+    f(line_num, decode_view(bytes, start, n, strip_cr))
   }
-  out
 }
 
 ///|
@@ -86,9 +110,8 @@ fn decode_view(
   bytes : Bytes,
   start : Int,
   end_ : Int,
-  line_num : Int,
   strip_cr : Bool,
-) -> ImportRecord {
+) -> Result[String, String] {
   let mut e = end_
   if strip_cr && e > start && bytes[e - 1] == b'\r' {
     e -= 1
@@ -99,10 +122,10 @@ fn decode_view(
         Some(msg) => "invalid utf-8: \{msg}"
         None => "invalid utf-8"
       }
-      return { line_num, result: Err(reason), }
+      return Err(reason)
     }
   }
-  { line_num, result: Ok(text), }
+  Ok(text)
 }
 
 ///|

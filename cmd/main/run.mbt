@@ -675,94 +675,126 @@ async fn run_import(
     Some(globs) => globs
     None => return 1
   }
-  // 读数据源：source 为 None 表示无文件来源（atuin），上报定位用 `line N`
-
-  let loaded : Result[(Array[@platform.ImportRecord], String?), String] = match
-    iopts.plugin {
-    "atuin" =>
-      match @platform.atuin_history_records() {
-        Ok((records, stderr_text)) => {
-          forward_atuin_stderr(errs, stderr_text)
-          Ok((records, None))
-        }
-        Err(msg) => Err(msg)
-      }
-    "z" => read_import_file(@config.z_data_path(getenv))
-    "fasd" => read_import_file(@config.fasd_data_path(getenv))
-    "zsh-z" => read_import_file(@config.zsh_z_data_path(getenv))
-    "autojump" => read_import_file(@config.autojump_data_path(getenv))
-    // z.lua：主路径缺失回落 fish 变体；双双缺失报主路径（对齐上游 z_lua.rs）
-    "z.lua" =>
-      match read_import_file(@config.zlua_data_path(getenv)) {
-        Ok(found) => Ok(found)
-        Err(_) =>
-          match @config.zlua_fish_path(getenv) {
-            Ok(fish_path) =>
-              if @afs.exists(fish_path) {
-                read_import_file(Ok(fish_path))
-              } else {
-                read_import_file(@config.zlua_data_path(getenv))
-              }
-            Err(msg) => Err(msg)
-          }
-      }
-    other => Err("import: 不支持的插件: \{other}")
-  }
-  let (records, source) = match loaded {
-    Ok((records, source)) => (records, source)
-    Err(msg) => {
-      err_line(errs, msg)
-      return 1
-    }
-  }
+  // 单趟流式处理（对齐上游 import.rs::run 的惰性迭代结构）：逐行
+  // 「Err 行/解析失败 → <定位>: <原因> 上报不中止；Ok → exclude 命中静默跳过、
+  // 直接入库」。atuin 折叠语义需要完整记录序列（六插件唯一带状态者），保持物化
   let parse : (String) -> Result[@core.Dir, String] = match iopts.plugin {
     "autojump" => @core.parse_autojump_line
     "atuin" => @core.parse_atuin_line
     // z / zsh-z / fasd / z.lua 与 z 同格式，共用解析（对齐上游复用 z::Iter）
     _ => @core.parse_z_line
   }
-  // 折叠开关与解析器同源派生（仅 atuin 有连续折叠，六插件中唯一）
-  let collapse = iopts.plugin == "atuin"
-  // 解析 pass：记录流转为带定位条目（空行静默跳过，上游迭代器 continue；
-  // 行号占位保留，坏解码行折为 Err 后续按位上报）。
-  // location 串只对 Err 行构造（成功行下游不读它；百万行级每行拼串是可测开销）
-  let parsed : Array[@core.LocatedDir] = []
-  for record in records {
-    match record.result {
+  // 单行处理内核：空行静默跳过（上游迭代器 continue）；
+  // location 串只对坏行构造（成功行下游不读它；百万行级每行拼串是可测开销）
+  let process_line = fn(
+    source : String?,
+    line_num : Int,
+    line : Result[String, String],
+  ) -> Unit {
+    match line {
       Err(reason) =>
-        parsed.push({
-          location: make_location(source, record.line_num),
-          result: Err(reason),
-        })
-      Ok(line) =>
-        if line != "" {
-          match parse(line) {
-            Ok(dir) => parsed.push({ location: "", result: Ok(dir), })
+        err_line(errs, "\{make_location(source, line_num)}: \{reason}")
+      Ok(l) =>
+        if l != "" {
+          match parse(l) {
+            Ok(dir) =>
+              // _JB_EXCLUDE_DIRS 命中 → 静默跳过（对齐上游 exclude_dirs 过滤）
+              if !glob_hit(globs, dir.path) {
+                store
+                .database()
+                .add_unchecked(dir.path, dir.rank, dir.last_accessed)
+              }
             Err(reason) =>
-              parsed.push({
-                location: make_location(source, record.line_num),
-                result: Err(reason),
-              })
+              err_line(errs, "\{make_location(source, line_num)}: \{reason}")
           }
         }
     }
   }
-
-  let entries = if collapse {
-    @core.collapse_consecutive(parsed)
+  if iopts.plugin == "atuin" {
+    let (records, _) = match @platform.atuin_history_records() {
+      Ok((records, stderr_text)) => {
+        forward_atuin_stderr(errs, stderr_text)
+        let source : String? = None
+        (records, source)
+      }
+      Err(msg) => {
+        err_line(errs, msg)
+        return 1
+      }
+    }
+    let parsed : Array[@core.LocatedDir] = []
+    for record in records {
+      match record.result {
+        Err(reason) =>
+          parsed.push({
+            location: make_location(None, record.line_num),
+            result: Err(reason),
+          })
+        Ok(line) =>
+          if line != "" {
+            match parse(line) {
+              Ok(dir) => parsed.push({ location: "", result: Ok(dir), })
+              Err(reason) =>
+                parsed.push({
+                  location: make_location(None, record.line_num),
+                  result: Err(reason),
+                })
+            }
+          }
+      }
+    }
+    for entry in @core.collapse_consecutive(parsed) {
+      match entry.result {
+        Err(reason) => err_line(errs, "\{entry.location}: \{reason}")
+        Ok(dir) =>
+          if !glob_hit(globs, dir.path) {
+            store
+            .database()
+            .add_unchecked(dir.path, dir.rank, dir.last_accessed)
+          }
+      }
+    }
   } else {
-    parsed
-  }
-  // 入库 pass：坏行按 <定位>: <原因> 上报不中止；exclude 命中静默跳过
-
-  for entry in entries {
-    match entry.result {
-      Err(reason) => err_line(errs, "\{entry.location}: \{reason}")
-      Ok(dir) =>
-        // _JB_EXCLUDE_DIRS 命中 → 静默跳过（对齐上游 exclude_dirs 过滤）
-        if !glob_hit(globs, dir.path) {
-          store.database().add_unchecked(dir.path, dir.rank, dir.last_accessed)
+    // 文件源：逐行回调，行串即抛不物化记录数组；z.lua 主路径缺失回落
+    // fish 变体、双双缺失报主路径（对齐上游 z_lua.rs）
+    let stream_file = async fn(
+      path_res : Result[String, String],
+    ) -> Result[Unit, String] {
+      match path_res {
+        Ok(path) =>
+          @platform.for_each_import_line(path, fn(line_num, line) {
+            process_line(Some(path), line_num, line)
+          })
+        Err(msg) => Err(msg)
+      }
+    }
+    let done = match iopts.plugin {
+      "z" => stream_file(@config.z_data_path(getenv))
+      "fasd" => stream_file(@config.fasd_data_path(getenv))
+      "zsh-z" => stream_file(@config.zsh_z_data_path(getenv))
+      "autojump" => stream_file(@config.autojump_data_path(getenv))
+      "z.lua" =>
+        match stream_file(@config.zlua_data_path(getenv)) {
+          Ok(_) => Ok(())
+          Err(_) =>
+            match @config.zlua_fish_path(getenv) {
+              Ok(fish_path) =>
+                if @afs.exists(fish_path) {
+                  stream_file(Ok(fish_path))
+                } else {
+                  stream_file(@config.zlua_data_path(getenv))
+                }
+              Err(msg) => Err(msg)
+            }
         }
+      other => Err("import: 不支持的插件: \{other}")
+    }
+    match done {
+      Ok(_) => ()
+      Err(msg) => {
+        err_line(errs, msg)
+        return 1
+      }
     }
   }
 
@@ -791,19 +823,4 @@ fn forward_atuin_stderr(errs : Array[String], text : String) -> Unit {
     text
   }
   err_line(errs, t)
-}
-
-///|
-/// 读单个插件数据文件（路径解析失败一并折算为 Err 文案）
-async fn read_import_file(
-  path : Result[String, String],
-) -> Result[(Array[@platform.ImportRecord], String?), String] {
-  let path = match path {
-    Ok(p) => p
-    Err(msg) => return Err(msg)
-  }
-  match @platform.read_import_lines(path) {
-    Ok(records) => Ok((records, Some(path)))
-    Err(msg) => Err(msg)
-  }
 }

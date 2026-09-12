@@ -351,3 +351,50 @@ async test "fzf_select：spawn 失败（不存在/不可执行）→ NotFound" {
   }
   @afs.rmdir(bindir, recursive=true)
 }
+
+///|
+async test "for_each_import_line：与 read_import_lines 逐行一致（行号/剥 \r/空行占位/坏行定位）" {
+  let dir = make_tmp_dir()
+  let path = dir + "/zdata"
+  // 覆盖：尾 \r 剥离、空行占位计行号、无尾随换行的末行、行内坏 UTF-8 只标记该行
+  write_atomic(path, b"/a|1|100\n\n/b|2|200\r\n\xff\xfe\n/c|3|300")
+  let via_cb : Array[(Int, Result[String, String])] = []
+  match for_each_import_line(path, fn(n, r) { via_cb.push((n, r)) }) {
+    Ok(_) => ()
+    Err(e) => fail("\{Repr(e)}")
+  }
+  let records = match read_import_lines(path) {
+    Ok(r) => r
+    Err(e) => fail("\{Repr(e)}")
+  }
+  @debug.assert_eq(via_cb.length(), records.length())
+  for i, (n, r) in via_cb {
+    @debug.assert_eq(n, records[i].line_num)
+    @debug.assert_eq(r, records[i].result)
+  }
+  // 行语义抽验（对齐 split_records 既有语义）：空行占位、坏行 Err 文案
+  @debug.assert_eq(via_cb.length(), 5)
+  @debug.assert_eq(via_cb[1].1, Ok(""))
+  match via_cb[3].1 {
+    Err(msg) => assert_true(msg.has_prefix("invalid utf-8: "))
+    Ok(_) => fail("行 4 应报坏 UTF-8")
+  }
+  @debug.assert_eq(via_cb[4].1, Ok("/c|3|300"))
+  @afs.rmdir(dir, recursive=true)
+}
+
+///|
+async test "for_each_import_line：文件缺失报 could not read（与 read_import_lines 同文案）" {
+  let via_cb = for_each_import_line("/nonexistent-import-file-xyz", fn(_, _) {
+    ()
+  })
+  match via_cb {
+    Err(msg) => assert_true(msg.has_prefix("could not read "))
+    Ok(_) => fail("expected error")
+  }
+  let via_array = read_import_lines("/nonexistent-import-file-xyz")
+  match (via_cb, via_array) {
+    (Err(a), Err(b)) => @debug.assert_eq(a, b)
+    _ => fail("两路错误形态应一致")
+  }
+}
