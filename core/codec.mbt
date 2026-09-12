@@ -20,28 +20,66 @@ pub enum CodecError {
 } derive(Debug)
 
 ///|
+/// UTF-8 编码长度（按标量值计，与 @utf8.encode 输出一致）；预分配用，避免二次编码
+fn utf8_len(s : String) -> Int {
+  let mut n = 0
+  for ch in s {
+    n += if ch < '\u{0080}' {
+      1
+    } else if ch < '\u{0800}' {
+      2
+    } else if ch < '\u{10000}' {
+      3
+    } else {
+      4
+    }
+  }
+  n
+}
+
+///|
 /// 编码（恒写当前版本）：4 字节 LE 版本号 +
-/// 每条目 [u32 LE 路径字节长][UTF-8 路径][f64 LE rank][u64 LE last_accessed][u32 LE note 字节长][UTF-8 note]
+/// 每条目 [u32 LE 路径字节长][UTF-8 路径][f64 LE rank][u64 LE last_accessed][u32 LE note 字节长][UTF-8 note]。
+/// 两趟：先精确算大小预分配（百万条目级逐字节 push 的倍增拷贝是可测开销），再按下标填充
 pub fn encode(dirs : Array[Dir]) -> Bytes {
-  let buf : Array[Byte] = []
-  put_u32(buf, CODEC_VERSION)
+  let mut size = 4
+  for dir in dirs {
+    size += 4 + utf8_len(dir.path) + 8 + 8 + 4
+    match dir.note {
+      Some(text) => size += utf8_len(text)
+      None => ()
+    }
+  }
+  let buf : Array[Byte] = Array::make(size, 0)
+  let mut pos = 0
+  put_u32(buf, pos, CODEC_VERSION)
+  pos += 4
   for dir in dirs {
     let path_bytes = @utf8.encode(dir.path)
-    put_u32(buf, path_bytes.length())
+    put_u32(buf, pos, path_bytes.length())
+    pos += 4
     for b in path_bytes {
-      buf.push(b)
+      buf[pos] = b
+      pos += 1
     }
-    put_u64(buf, dir.rank.reinterpret_as_uint64())
-    put_u64(buf, dir.last_accessed.reinterpret_as_uint64())
+    put_u64(buf, pos, dir.rank.reinterpret_as_uint64())
+    pos += 8
+    put_u64(buf, pos, dir.last_accessed.reinterpret_as_uint64())
+    pos += 8
     match dir.note {
       Some(text) => {
         let note_bytes = @utf8.encode(text)
-        put_u32(buf, note_bytes.length())
+        put_u32(buf, pos, note_bytes.length())
+        pos += 4
         for b in note_bytes {
-          buf.push(b)
+          buf[pos] = b
+          pos += 1
         }
       }
-      None => put_u32(buf, 0)
+      None => {
+        put_u32(buf, pos, 0)
+        pos += 4
+      }
     }
   }
   Bytes::from_array(buf)
@@ -118,18 +156,18 @@ pub fn decode(bytes : Bytes) -> Result[Array[Dir], CodecError] {
 }
 
 ///|
-/// u32 小端写入
-fn put_u32(buf : Array[Byte], v : Int) -> Unit {
+/// u32 小端写入（预分配缓冲按下标填）
+fn put_u32(buf : Array[Byte], pos : Int, v : Int) -> Unit {
   for k in 0..<4 {
-    buf.push(((v >> (8 * k)) & 0xFF).to_byte())
+    buf[pos + k] = ((v >> (8 * k)) & 0xFF).to_byte()
   }
 }
 
 ///|
-/// u64 小端写入
-fn put_u64(buf : Array[Byte], v : UInt64) -> Unit {
+/// u64 小端写入（预分配缓冲按下标填）
+fn put_u64(buf : Array[Byte], pos : Int, v : UInt64) -> Unit {
   for k in 0..<8 {
-    buf.push(((v >> (8 * k)) & 255UL).to_int().to_byte())
+    buf[pos + k] = ((v >> (8 * k)) & 255UL).to_int().to_byte()
   }
 }
 

@@ -11,10 +11,13 @@
 /// last_accessed 为非负整数（上游 u64，负数拒为坏行），rank 任意浮点（可为负）。
 /// 注意：不做 trim——空白属于路径的一部分（上游原样保留）。
 pub fn parse_z_line(line : String) -> Result[Dir, String] {
-  let bad = Err("invalid entry: \{line}")
+  // 坏行消息惰性构造：成功路（绝大多数行）不再为每行预分配错误串
+  fn bad() -> Result[Dir, String] {
+    Err("invalid entry: \{line}")
+  }
   let p1 = match line.rev_find("|") {
     Some(i) => i
-    None => return bad
+    None => return bad()
   }
   // 上游按 u64 解析（0..=2^64-1，前导 + 合法，溢出/负数拒为坏行）；位模式
   // 经 i64 字段原样保存（u64::MAX 即 i64 的 -1），下游 score/dedup 已按
@@ -22,16 +25,16 @@ pub fn parse_z_line(line : String) -> Result[Dir, String] {
   let la_str = line[p1 + 1:]
   let la_body = if la_str.has_prefix("+") { la_str[1:] } else { la_str }
   let last_accessed : UInt64 = @string.parse_uint64(la_body) catch {
-    _ => return bad
+    _ => return bad()
   }
   let head = line[0:p1]
   let p2 = match head.rev_find("|") {
     Some(i) => i
-    None => return bad
+    None => return bad()
   }
   let rank = match parse_f64(head[p2 + 1:]) {
     Ok(v) => v
-    Err(_) => return bad
+    Err(_) => return bad()
   }
   Ok({
     path: head[0:p2].to_owned(),
