@@ -7,6 +7,9 @@
 ### Added
 - shell 集成模板扩至 9 shell 全量（对齐上游）：新增 elvish / nushell / posix / powershell / tcsh / xonsh，`jumbit init <shell>` 参数矩阵与语法门禁（elvish 编译、nu-check、sh -n、pwsh 解析、tcsh -n、py_compile）全部真机验证
 
+### Changed
+- import/query 内存与分配优化（行为与输出字节面不变）：坏行消息与行定位串惰性构造、db 编码预分配、--tsv 输出流式化、stderr 批量写——百万行 import 峰值内存 499→425MB、耗时 2.29→1.72s，--tsv 全量输出峰值 217→85MB
+
 ### Fixed
 - `query --interactive` 对齐上游 zoxide 0.10.0（伪 fzf 探针矩阵实测）：选中输出不再额外追加换行（此前 `println` 多出一个）；fzf 返回短于 7 字节的 selection 改走错误路 `could not read selection from fzf`（exit 1，此前输出空行且 exit 0）；fzf 异常退出码从原样透传改为上游语义表——2 报 `fzf returned an error`、128..=254 与信号杀死报 `fzf was terminated`、其余（3..=127、255）报 `fzf returned an unknown error`，均 exit 1；130（用户中断）静默透传不变
 - fzf 候选投喂在 fzf 提前退出时不再因 Broken pipe 中断命令（对齐上游 write 的 BrokenPipe → wait 处理：静默停止投喂）
