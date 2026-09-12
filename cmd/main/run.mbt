@@ -12,6 +12,66 @@ fn err_line(errs : Array[String], msg : String) -> Unit {
 }
 
 ///|
+/// 无换行 stdout 输出（对齐上游 print! 语义）；写失败吞掉
+/// （对齐 main 对 stderr 写失败的处理）
+async fn print_stdout(s : String) -> Unit {
+  @stdio.stdout.write(s) catch {
+    _ => ()
+  }
+}
+
+///|
+/// query --interactive 的 fzf 结果 → 退出码/文案映射（纯逻辑，wbtest 直测；
+/// 进程面由 platform 伪 fzf E2E 与 dataset_check D9 对拍覆盖）。
+/// stdout 片段收集进 outs 由调用侧落盘（收集式同 errs：moon test 进程内
+/// 直写 stdout 会与 test driver 事件协议串扰）。
+/// 输出对齐上游 print!：不追加换行（fzf 自身输出带尾换行）；--score 输出
+/// 整行，否则剥掉 7 字符得分前缀（对齐上游 selection.get(7..)，len==7 →
+/// 空串原样输出）；len<7 上游走错误路（探针 2026-09-13：exit 1 +
+/// "could not read selection from fzf"）。退出码表：0 成功 / 1 无选择
+/// （上游报 "no match found"，jumbit 静默——取消语义，README 注明）/
+/// 2 与 128..=254 与信号杀死与 3..=127、255 均 exit 1 带对应文案 /
+/// 130 静默透传 130
+fn finish_interactive(
+  selection : Result[String, @platform.FzfError],
+  score : Bool,
+  errs : Array[String],
+  outs : Array[String],
+) -> Int {
+  match selection {
+    Ok(s) => {
+      if score {
+        outs.push(s)
+      } else if s.length() >= 7 {
+        outs.push(s[7:].to_owned())
+      } else {
+        err_line(errs, "could not read selection from fzf")
+        return 1
+      }
+      0
+    }
+    Err(@platform.NotFound) => {
+      err_line(errs, "could not find fzf, is it installed?")
+      1
+    }
+    Err(@platform.NoMatch) => 1
+    Err(@platform.ReturnedAnError) => {
+      err_line(errs, "fzf returned an error")
+      1
+    }
+    Err(@platform.Interrupted) => 130
+    Err(@platform.Terminated) => {
+      err_line(errs, "fzf was terminated")
+      1
+    }
+    Err(@platform.UnknownExit(_)) => {
+      err_line(errs, "fzf returned an unknown error")
+      1
+    }
+  }
+}
+
+///|
 /// 配置解析步骤的统一出口：Err 文案写入 errs 后返回 None，调用方以
 /// `match { None => return 1 }` 提前退出。各子命令保留各自的解析顺序
 /// （对齐上游：add 先读配置再开库，query/import 先开库）
@@ -329,25 +389,17 @@ async fn run_query(
     }
     0
   } else if qopts.interactive {
-    match @platform.fzf_select(remaining, now, @config.fzf_opts(getenv)) {
-      Ok(selection) => {
-        // --score 输出整行（得分\t路径）；否则剥掉 7 字符得分前缀（对齐上游）
-        if qopts.score {
-          println(selection)
-        } else if selection.length() > 7 {
-          println(selection[7:].to_owned())
-        } else {
-          println("")
-        }
-        0
-      }
-      Err(@platform.NotFound) => {
-        err_line(errs, "could not find fzf, is it installed?")
-        1
-      }
-      Err(@platform.NoMatch) => 1
-      Err(@platform.Exit(c)) => c
+    let outs : Array[String] = []
+    let code = finish_interactive(
+      @platform.fzf_select(remaining, now, @config.fzf_opts(getenv)),
+      qopts.score,
+      errs,
+      outs,
+    )
+    for s in outs {
+      print_stdout(s)
     }
+    code
   } else {
     println(render(remaining[0], now, qopts.score, " "))
     0

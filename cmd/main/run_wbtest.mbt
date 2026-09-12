@@ -844,3 +844,80 @@ test "take_limit：None 不截断、取排序后前 n 条、0=空、超界取全
   @debug.assert_eq(take_limit(dirs, Some(0)).length(), 0)
   @debug.assert_eq(take_limit(dirs, Some(99)).length(), 3)
 }
+
+///|
+test "finish_interactive：fzf 结果映射表（上游探针矩阵 2026-09-13 实测）" {
+  // 选中：剥 7 字符得分前缀后原样输出（含 fzf 尾换行，不追加），exit 0
+  let o1 : Array[String] = []
+  let e1 : Array[String] = []
+  @debug.assert_eq(
+    finish_interactive(Ok("  40.0\t/picked\n"), false, e1, o1),
+    0,
+  )
+  @debug.assert_eq(o1, ["/picked\n"])
+  @debug.assert_eq(e1.length(), 0)
+  // --score：整行输出
+  let o2 : Array[String] = []
+  let e2 : Array[String] = []
+  @debug.assert_eq(finish_interactive(Ok("  40.0\t/picked\n"), true, e2, o2), 0)
+  @debug.assert_eq(o2, ["  40.0\t/picked\n"])
+  @debug.assert_eq(e2.length(), 0)
+  // len==7：上游 get(7..) = Some("")，空串原样输出 exit 0
+  let o3 : Array[String] = []
+  let e3 : Array[String] = []
+  @debug.assert_eq(finish_interactive(Ok("1234567"), false, e3, o3), 0)
+  @debug.assert_eq(o3, [""])
+  @debug.assert_eq(e3.length(), 0)
+  // len<7：上游错误路，无输出
+  let o4 : Array[String] = []
+  let e4 : Array[String] = []
+  @debug.assert_eq(finish_interactive(Ok("abc\n"), false, e4, o4), 1)
+  @debug.assert_eq(o4.length(), 0)
+  @debug.assert_eq(e4[0], "could not read selection from fzf")
+  // NotFound
+  let o5 : Array[String] = []
+  let e5 : Array[String] = []
+  @debug.assert_eq(
+    finish_interactive(Err(@platform.NotFound), false, e5, o5),
+    1,
+  )
+  @debug.assert_eq(e5[0], "could not find fzf, is it installed?")
+  @debug.assert_eq(o5.length(), 0)
+  // NoMatch：静默 exit 1（与上游的差异，README 注明）
+  let o6 : Array[String] = []
+  let e6 : Array[String] = []
+  @debug.assert_eq(finish_interactive(Err(@platform.NoMatch), false, e6, o6), 1)
+  @debug.assert_eq(e6.length(), 0)
+  @debug.assert_eq(o6.length(), 0)
+  // fzf 自身错误族
+  let o7 : Array[String] = []
+  let e7 : Array[String] = []
+  @debug.assert_eq(
+    finish_interactive(Err(@platform.ReturnedAnError), false, e7, o7),
+    1,
+  )
+  @debug.assert_eq(e7[0], "fzf returned an error")
+  let o8 : Array[String] = []
+  let e8 : Array[String] = []
+  @debug.assert_eq(
+    finish_interactive(Err(@platform.Terminated), false, e8, o8),
+    1,
+  )
+  @debug.assert_eq(e8[0], "fzf was terminated")
+  let o9 : Array[String] = []
+  let e9 : Array[String] = []
+  @debug.assert_eq(
+    finish_interactive(Err(@platform.UnknownExit(42)), false, e9, o9),
+    1,
+  )
+  @debug.assert_eq(e9[0], "fzf returned an unknown error")
+  // 用户中断：静默透传 130
+  let o10 : Array[String] = []
+  let e10 : Array[String] = []
+  @debug.assert_eq(
+    finish_interactive(Err(@platform.Interrupted), false, e10, o10),
+    130,
+  )
+  @debug.assert_eq(e10.length(), 0)
+  @debug.assert_eq(o10.length(), 0)
+}

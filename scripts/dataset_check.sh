@@ -26,6 +26,7 @@ need() { command -v "$1" >/dev/null || { echo "✗ 缺依赖: $1" >&2; exit 2; }
 }
 need zoxide
 need python3
+zo_bin=$(command -v zoxide)
 [ -x "$bin" ] || { echo "✗ 缺 $bin（先 moon build --release）" >&2; exit 2; }
 
 tmp=$(mktemp -d /tmp/jumbit-ds-XXXX)
@@ -151,6 +152,65 @@ run_case "D3-atuin"  atuin  "$tmp/atuin.txt" "PATH=$tmp/fakebin:$PATH"
 run_case "D5-aging"  z      "$tmp/z.txt" "_Z_DATA=$tmp/z.txt _JB_MAXAGE=50 _ZO_MAXAGE=50"
 # D6: merge（二次导入合并；先无 --merge 直灌空库，再 --merge 合并一遍）
 run_case "D6-merge"  z      "$tmp/z.txt" "_Z_DATA=$tmp/z.txt" "--merge"
+
+# D9: query --interactive（伪 fzf 探针矩阵，裁判=上游 zoxide 0.10.0）。
+# stdout 逐字节 + 退出码对拍；stderr 仅在双侧均应静默的 case 比较
+# （上游错误文案带 "zoxide: " 前缀，且 fzf 取消文案不同——jumbit 静默
+# exit 1，README「与 zoxide 的差异」注明）。
+# 伪 fzf 用隔离 PATH（目录里只有伪 fzf 或为空）——真 fzf 需要 TTY，
+# 隔离目录同时天然绕开。
+echo "== D9-fzf：query --interactive 交互对拍 =="
+mkdir -p "$tmp/fzf-jd" "$tmp/fzf-zd" "$tmp/fzfbin-empty"
+printf '/fzfa|1.0|0\n/fzfb|2.0|0\n' > "$tmp/fzf-z.txt"
+env _JB_DATA_DIR="$tmp/fzf-jd" _Z_DATA="$tmp/fzf-z.txt" "$bin" import z >/dev/null 2>&1
+env _ZO_DATA_DIR="$tmp/fzf-zd" _Z_DATA="$tmp/fzf-z.txt" zoxide import z >/dev/null 2>&1
+
+# fzf_case <场景名> <伪fzf脚本体（空=目录无 fzf）> [附加flag] [silent]
+fzf_case() {
+  local name="$1" body="$2" extra="${3:-}" silent="${4:-}"
+  local bindir="$tmp/fzfbin-$name"
+  mkdir -p "$bindir"
+  if [ -n "$body" ]; then
+    printf '#!/bin/sh\n%s\n' "$body" > "$bindir/fzf"
+    chmod +x "$bindir/fzf"
+  fi
+  env _JB_DATA_DIR="$tmp/fzf-jd" PATH="$bindir" "$bin" \
+    query --interactive $extra --all \
+    >"$tmp/fzf-jb-$name.out" 2>"$tmp/fzf-jb-$name.err"
+  local jc=$?
+  # 上游以绝对路径调用：隔离 PATH 只放伪 fzf（真 fzf 需要 TTY，隔离同时绕开）
+  env _ZO_DATA_DIR="$tmp/fzf-zd" PATH="$bindir" "$zo_bin" \
+    query --interactive $extra \
+    >"$tmp/fzf-zo-$name.out" 2>"$tmp/fzf-zo-$name.err"
+  local zc=$?
+  local ok=1 why=""
+  [ "$jc" != "$zc" ] && { ok=0; why="$why 退出码($jc!=$zc)"; }
+  cmp -s "$tmp/fzf-jb-$name.out" "$tmp/fzf-zo-$name.out" || { ok=0; why="$why stdout分歧"; }
+  if [ "$silent" = "silent" ]; then
+    cmp -s "$tmp/fzf-jb-$name.err" "$tmp/fzf-zo-$name.err" || { ok=0; why="$why stderr分歧"; }
+  fi
+  if [ "$ok" = 1 ]; then
+    echo "✓ $name"
+    pass=$((pass + 1))
+  else
+    echo "✗ $name →$why"
+    fail=$((fail + 1))
+    failed+=("$name")
+    echo "  jb(rc=$jc) out=$(cat "$tmp/fzf-jb-$name.out" | head -1) err=$(head -1 "$tmp/fzf-jb-$name.err")"
+    echo "  zo(rc=$zc) out=$(cat "$tmp/fzf-zo-$name.out" | head -1) err=$(head -1 "$tmp/fzf-zo-$name.err")"
+  fi
+}
+fzf_case D9-pick       'printf "  40.0\t/picked\n"' ""        silent
+fzf_case D9-pick-score 'printf "  40.0\t/picked\n"' "--score" silent
+fzf_case D9-nopick     'exit 1'
+fzf_case D9-exit2      'exit 2'
+fzf_case D9-exit42     'exit 42'
+fzf_case D9-exit130    'exit 130' "" silent
+fzf_case D9-exit200    'exit 200'
+fzf_case D9-exit255    'exit 255'
+fzf_case D9-short4     'printf "abc\n"'
+fzf_case D9-len7       'printf "1234567"' ""        silent
+fzf_case D9-absent     ''
 
 echo "== 结果：$pass 通过 / $fail 失败 =="
 if [ "$fail" -gt 0 ]; then

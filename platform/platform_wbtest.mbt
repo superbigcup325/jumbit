@@ -206,3 +206,148 @@ async test "records_from_process：命令不存在报可读错误" {
     Ok(_) => fail("expected error")
   }
 }
+
+///|
+test "map_fzf_exit：上游 wait 退出码表（伪 fzf 探针矩阵 2026-09-13 实测）" {
+  @debug.assert_eq(map_fzf_exit(0), None)
+  @debug.assert_eq(map_fzf_exit(1), Some(NoMatch))
+  @debug.assert_eq(map_fzf_exit(2), Some(ReturnedAnError))
+  @debug.assert_eq(map_fzf_exit(130), Some(Interrupted))
+  // 信号杀死：@process wait 返回 -signal
+  @debug.assert_eq(map_fzf_exit(-9), Some(Terminated))
+  // 128..=254：被终止族
+  @debug.assert_eq(map_fzf_exit(128), Some(Terminated))
+  @debug.assert_eq(map_fzf_exit(200), Some(Terminated))
+  @debug.assert_eq(map_fzf_exit(254), Some(Terminated))
+  // 3..=127 与 255：未知错误族
+  @debug.assert_eq(map_fzf_exit(3), Some(UnknownExit(3)))
+  @debug.assert_eq(map_fzf_exit(42), Some(UnknownExit(42)))
+  @debug.assert_eq(map_fzf_exit(127), Some(UnknownExit(127)))
+  @debug.assert_eq(map_fzf_exit(255), Some(UnknownExit(255)))
+}
+
+///|
+/// 两个候选：rank 1/2、last_accessed=now → score ×4 档 → "   4.0" / "   8.0"
+fn fzf_hits() -> Array[@core.Dir] {
+  [
+    { path: "/a", rank: 1.0, last_accessed: 1000L, note: None, },
+    { path: "/b", rank: 2.0, last_accessed: 1000L, note: None, },
+  ]
+}
+
+///|
+/// 伪 fzf 基建：fzf 本体是只写一次的 wrapper（source 同目录 fzf-body），
+/// 各 case 只改写 body——wrapper 从不重写、body 从不被 exec，
+/// 结构性规避「重写正被 exec 的文件」的 ETXTBSY 竞态
+async fn make_fake_fzf(bindir : String) -> String {
+  let fake = bindir + "/fzf"
+  write_atomic(
+    fake,
+    @utf8.encode("#!/bin/sh\n. \"$(dirname \"$0\")/fzf-body\"\n"),
+  )
+  @afs.chmod(fake, 0o755)
+  fake
+}
+
+///|
+async fn write_fake_fzf_body(bindir : String, body : String) -> Unit {
+  write_atomic(bindir + "/fzf-body", @utf8.encode(body))
+}
+
+///|
+async test "fzf_select：选中回传原样 stdout，候选按 score\\tpath\\0 投喂" {
+  let bindir = make_tmp_dir()
+  let fake = make_fake_fzf(bindir)
+  let dump = bindir + "/stdin-dump"
+  write_fake_fzf_body(bindir, "cat > \{dump}\nprintf '  40.0\\t/picked\\n'\n")
+  let out = match fzf_select_with(fake, fzf_hits(), 1000L, None) {
+    Ok(s) => s
+    Err(e) => fail("\{Repr(e)}")
+  }
+  @debug.assert_eq(out, "  40.0\t/picked\n")
+  // 候选格式锁定：6.1f 得分 + \t + 路径 + NUL，按 hits 顺序
+  let dumped = @afs.read_file(dump).text()
+  @debug.assert_eq(dumped, "   4.0\t/a\u{0000}   8.0\t/b\u{0000}")
+  @afs.rmdir(bindir, recursive=true)
+}
+
+///|
+async test "fzf_select：FZF_DEFAULT_OPTS 仅在 fzf_opts 传入时注入" {
+  let hits = fzf_hits()
+  // Some → extra_env 注入
+  let bindir = make_tmp_dir()
+  let fake = make_fake_fzf(bindir)
+  let dump = bindir + "/opts-dump"
+  write_fake_fzf_body(
+    bindir,
+    "printf '%s' \"$FZF_DEFAULT_OPTS\" > \{dump}\nprintf '  40.0\\t/picked\\n'\n",
+  )
+  match fzf_select_with(fake, hits, 1000L, Some("--border")) {
+    Ok(_) => ()
+    Err(e) => fail("\{Repr(e)}")
+  }
+  @debug.assert_eq(@afs.read_file(dump).text(), "--border")
+  @afs.rmdir(bindir, recursive=true)
+  // None → 不注入，fzf 侧视变量为未设置
+  let bindir2 = make_tmp_dir()
+  let fake2 = make_fake_fzf(bindir2)
+  let dump2 = bindir2 + "/opts-dump"
+  write_fake_fzf_body(
+    bindir2,
+    "printf '%s' \"${FZF_DEFAULT_OPTS-UNSET}\" > \{dump2}\nprintf '  40.0\\t/picked\\n'\n",
+  )
+  match fzf_select_with(fake2, hits, 1000L, None) {
+    Ok(_) => ()
+    Err(e) => fail("\{Repr(e)}")
+  }
+  @debug.assert_eq(@afs.read_file(dump2).text(), "UNSET")
+  @afs.rmdir(bindir2, recursive=true)
+}
+
+///|
+async test "fzf_select：退出码矩阵 → FzfError（上游探针表）" {
+  let bindir = make_tmp_dir()
+  let fake = make_fake_fzf(bindir)
+  let expect_err = async fn(body : String, expected : FzfError) -> Unit {
+    write_fake_fzf_body(bindir, body)
+    match fzf_select_with(fake, fzf_hits(), 1000L, None) {
+      Err(e) =>
+        match (e, expected) {
+          (NoMatch, NoMatch) => ()
+          (ReturnedAnError, ReturnedAnError) => ()
+          (Interrupted, Interrupted) => ()
+          (Terminated, Terminated) => ()
+          (UnknownExit(a), UnknownExit(b)) => @debug.assert_eq(a, b)
+          (l, r) => fail("expect \{Repr(r)} got \{Repr(l)}")
+        }
+      Ok(s) => fail("expected error, got \{s}")
+    }
+  }
+  expect_err("exit 1\n", NoMatch)
+  expect_err("exit 2\n", ReturnedAnError)
+  expect_err("exit 130\n", Interrupted)
+  expect_err("exit 42\n", UnknownExit(42))
+  expect_err("exit 255\n", UnknownExit(255))
+  expect_err("exit 200\n", Terminated)
+  expect_err("kill -9 $$\n", Terminated)
+  @afs.rmdir(bindir, recursive=true)
+}
+
+///|
+async test "fzf_select：spawn 失败（不存在/不可执行）→ NotFound" {
+  let bindir = make_tmp_dir()
+  // 路径不存在
+  match fzf_select_with(bindir + "/no-such-fzf", fzf_hits(), 1000L, None) {
+    Err(NotFound) => ()
+    other => fail("\{Repr(other)}")
+  }
+  // 不可执行（上游区分 "could not launch fzf"，绑定不暴露错误类别，
+  // 合并为 NotFound——README 注明；文件名带 noexec 以区分 spawn 调试点）
+  let fake = bindir + "/fzf-noexec"
+  write_atomic(fake, @utf8.encode("#!/bin/sh\nprintf 'x\\n'\n"))
+  match fzf_select_with(fake, fzf_hits(), 1000L, None) {
+    Err(NotFound) => ()
+    other => fail("\{Repr(other)}")
+  }
+  @afs.rmdir(bindir, recursive=true)
+}

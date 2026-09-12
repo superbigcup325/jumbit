@@ -20,11 +20,14 @@ pub async fn write_atomic(String, Bytes) -> Unit
 // Errors
 
 // Types and methods
-pub enum FzfError {
+pub(all) enum FzfError {
   NotFound
   NoMatch
-  Exit(Int)
-} derive(@debug.Debug)
+  ReturnedAnError
+  Interrupted
+  Terminated
+  UnknownExit(Int)
+} derive(Eq, @debug.Debug)
 
 pub(all) struct ImportRecord {
   line_num : Int
