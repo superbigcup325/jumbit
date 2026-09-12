@@ -1,5 +1,7 @@
 # jumbit
 
+<a href="README_EN.md">English</a> | 简体中文
+
 a MoonBit rewrite of [zoxide](https://github.com/ajeetdsouza/zoxide): jump to directories in a few keystrokes.
 
 [![CI](https://github.com/superbigcup325/jumbit/actions/workflows/ci.yml/badge.svg)](https://github.com/superbigcup325/jumbit/actions/workflows/ci.yml)
