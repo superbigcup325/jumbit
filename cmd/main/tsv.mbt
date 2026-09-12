@@ -13,24 +13,16 @@ fn tsv_number(v : Double) -> String {
 }
 
 ///|
-/// 单行多行 TSV 文本（末行不带换行，调用方 println 收尾）：空数组出空串
-fn render_tsv(
-  dirs : Array[@core.Dir],
-  now : Int64,
-  matched_by : String,
-) -> String {
+/// 单行 TSV（path\tscore\tlast_accessed\tmatched_by）。
+/// 命令行走本函数流式输出；整体拼装的 render_tsv 在 tsv_wbtest 作形状冻结器
+fn tsv_row(d : @core.Dir, now : Int64, matched_by : String) -> String {
   let out : StringBuilder = StringBuilder()
-  for i, d in dirs {
-    if i > 0 {
-      out.write_char('\n')
-    }
-    out.write_string(d.path)
-    out.write_char('\t')
-    out.write_string(tsv_number(d.score(now)))
-    out.write_char('\t')
-    out.write_string(d.last_accessed.to_string())
-    out.write_char('\t')
-    out.write_string(matched_by)
-  }
+  out.write_string(d.path)
+  out.write_char('\t')
+  out.write_string(tsv_number(d.score(now)))
+  out.write_char('\t')
+  out.write_string(d.last_accessed.to_string())
+  out.write_char('\t')
+  out.write_string(matched_by)
   out.to_string()
 }

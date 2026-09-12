@@ -46,8 +46,26 @@ fn double_short(v : Double) -> String {
 }
 
 ///|
+/// 单条 JSON 对象（{path, score, last_accessed, matched_by}）
+fn json_row(d : @core.Dir, now : Int64, matched_by : String) -> String {
+  let out : StringBuilder = StringBuilder()
+  out.write_string("{\"path\":\"")
+  out.write_string(json_escape(d.path))
+  out.write_string("\",\"score\":")
+  out.write_string(json_number(d.score(now)))
+  out.write_string(",\"last_accessed\":")
+  out.write_string(d.last_accessed.to_string())
+  out.write_string(",\"matched_by\":\"")
+  out.write_string(matched_by)
+  out.write_string("\"}")
+  out.to_string()
+}
+
+///|
 /// 单行 JSON 数组：每条 {path, score, last_accessed, matched_by}。
-/// matched_by ∈ exact/fuzzy（fuzzy 由模糊兜底路接通，提交前恒 exact）
+/// matched_by ∈ exact/fuzzy（fuzzy 由模糊兜底路接通，提交前恒 exact）。
+/// 保持整体物化：单行契约（无内嵌换行）使流式冲刷必须用无尾换行写，
+/// 与 moon test 的 stdout 事件协议冲突（见 docs/perf-import-optimization.md）
 fn render_json(
   dirs : Array[@core.Dir],
   now : Int64,
@@ -59,15 +77,7 @@ fn render_json(
     if i > 0 {
       out.write_string(",")
     }
-    out.write_string("{\"path\":\"")
-    out.write_string(json_escape(d.path))
-    out.write_string("\",\"score\":")
-    out.write_string(json_number(d.score(now)))
-    out.write_string(",\"last_accessed\":")
-    out.write_string(d.last_accessed.to_string())
-    out.write_string(",\"matched_by\":\"")
-    out.write_string(matched_by)
-    out.write_string("\"}")
+    out.write_string(json_row(d, now, matched_by))
   }
   out.write_string("]")
   out.to_string()

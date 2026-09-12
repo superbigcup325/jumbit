@@ -378,14 +378,16 @@ async fn run_query(
     }
     1
   } else if qopts.json {
-    // agent 通道：单行 JSON 数组（含全部匹配与 matched_by 证据字段）
+    // agent 通道：单行 JSON 数组（含全部匹配与 matched_by 证据字段）。
+    // 整体物化：单行契约的无换行写与 moon test stdout 协议冲突，tsv 才流式
     println(render_json(take_limit(remaining, qopts.limit), now, matched_by))
     0
   } else if qopts.tsv {
-    // agent 通道：无表头 Tab 分隔行（--limit 0 → 不输出任何行，head -0 语义）
+    // agent 通道：无表头 Tab 分隔行（--limit 0 → 不输出任何行，head -0 语义）。
+    // 逐行 println：字节面 = 各行 \n 连接 + 末尾换行，与原整体物化版一致
     let shown = take_limit(remaining, qopts.limit)
-    if shown.length() > 0 {
-      println(render_tsv(shown, now, matched_by))
+    for d in shown {
+      println(tsv_row(d, now, matched_by))
     }
     0
   } else if qopts.interactive {
@@ -635,6 +637,18 @@ fn md_cell(text : String) -> String {
 ///|
 /// import（对齐上游 cmd/import.rs + import/run）：
 /// 空库直灌 / --merge 合并进非空库；坏行按 `<来源>:<行号>: <原因>` 上报不中止；
+
+///|
+/// 坏行定位前缀（`<来源>:<行号>`；atuin 无文件来源时为 `line N`）。
+/// 只对坏行调用——成功行不构造定位串
+fn make_location(source : String?, line_num : Int) -> String {
+  match source {
+    Some(path) => "\{path}:\{line_num}"
+    None => "line \{line_num}"
+  }
+}
+
+///|
 /// 结束后 dedup + age(maxage) 再落盘。atuin 走子进程，其余插件读数据文件。
 async fn run_import(
   iopts : @cli.ImportOptions,
@@ -710,19 +724,26 @@ async fn run_import(
   // 折叠开关与解析器同源派生（仅 atuin 有连续折叠，六插件中唯一）
   let collapse = iopts.plugin == "atuin"
   // 解析 pass：记录流转为带定位条目（空行静默跳过，上游迭代器 continue；
-  // 行号占位保留，坏解码行折为 Err 后续按位上报）
-
+  // 行号占位保留，坏解码行折为 Err 后续按位上报）。
+  // location 串只对 Err 行构造（成功行下游不读它；百万行级每行拼串是可测开销）
   let parsed : Array[@core.LocatedDir] = []
   for record in records {
-    let location = match source {
-      Some(path) => "\{path}:\{record.line_num}"
-      None => "line \{record.line_num}"
-    }
     match record.result {
-      Err(reason) => parsed.push({ location, result: Err(reason), })
+      Err(reason) =>
+        parsed.push({
+          location: make_location(source, record.line_num),
+          result: Err(reason),
+        })
       Ok(line) =>
         if line != "" {
-          parsed.push({ location, result: parse(line), })
+          match parse(line) {
+            Ok(dir) => parsed.push({ location: "", result: Ok(dir), })
+            Err(reason) =>
+              parsed.push({
+                location: make_location(source, record.line_num),
+                result: Err(reason),
+              })
+          }
         }
     }
   }

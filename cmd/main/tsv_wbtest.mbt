@@ -8,6 +8,24 @@ fn tsv_dir(p : String, r : Double, la : Int64) -> @core.Dir {
 }
 
 ///|
+/// 整体拼装（末行不带换行，空数组出空串）——生产路已改 tsv_row 流式，
+/// 此包装保留作多行形状的字节级冻结器
+fn render_tsv(
+  dirs : Array[@core.Dir],
+  now : Int64,
+  matched_by : String,
+) -> String {
+  let out : StringBuilder = StringBuilder()
+  for i, d in dirs {
+    if i > 0 {
+      out.write_char('\n')
+    }
+    out.write_string(tsv_row(d, now, matched_by))
+  }
+  out.to_string()
+}
+
+///|
 test "render_tsv：空数组出空串" {
   @debug.assert_eq(render_tsv([], 10000000L, "exact"), "")
 }
