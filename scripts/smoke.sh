@@ -82,6 +82,51 @@ type __jumbit_z >/dev/null && type __jumbit_zi >/dev/null && type j >/dev/null |
   exit 1
 }
 
+echo "== 真实调用形态：PATH 裸名 + 相对路径 + hook 全链路 =="
+# hook 模板以 \command jumbit 裸名（PATH 查找）调用二进制；本脚本其余段落
+# 全走含 / 的完整路径，探测不到裸名分支——argv[0]「含 / 才剥」的旧启发式
+# 曾让裸名调用集体报「未知命令」exit 2 且 hook 静默失败。此处把二进制以
+# jumbit 名装入临时 PATH 前缀，按真实形态覆盖三种 argv[0]。
+rdata=$(mktemp -d "${TMPDIR:-/tmp}/jumbit-real-XXXX")
+rtgt=$(mktemp -d "${TMPDIR:-/tmp}/jumbit-real-tgt-XXXX")
+rfrom=$(mktemp -d "${TMPDIR:-/tmp}/jumbit-real-src-XXXX")
+rbin=$(mktemp -d "${TMPDIR:-/tmp}/jumbit-real-bin-XXXX")
+cp "$bin" "$rbin/jumbit"
+
+PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" jumbit add -- "$rtgt" ||
+  { echo "✗ PATH 裸名 add 失败（argv[0] 剥除回归）" >&2; exit 1; }
+out=$(PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" jumbit query)
+if [ "$out" != "$rtgt" ]; then
+  echo "✗ 裸名 query 输出 [$out] ≠ [$rtgt]" >&2
+  exit 1
+fi
+PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" jumbit status >/dev/null ||
+  { echo "✗ PATH 裸名 status 失败" >&2; exit 1; }
+( cd "$rbin" && _JB_DATA_DIR="$rdata" ./jumbit add -- "$rtgt" >/dev/null ) ||
+  { echo "✗ 相对路径 ./jumbit 调用失败" >&2; exit 1; }
+
+# hook 全链路：非交互 bash 不触发 PROMPT_COMMAND，手动调 __jumbit_hook；
+# -o history 过 [[ -o history ]] 门；j <关键词> 走裸名 query + cd
+hookscript=$(mktemp /tmp/jumbit-hook-XXXX.sh)
+cat > "$hookscript" <<'EOF'
+set -e -o history
+eval "$(jumbit init bash --cmd j)"
+cd "$JUMBIT_HOOK_FROM"
+__jumbit_hook
+j "$JUMBIT_HOOK_KW"
+if [ "$PWD" != "$JUMBIT_HOOK_TO" ]; then
+  echo "✗ j 落点 [$PWD] ≠ [$JUMBIT_HOOK_TO]" >&2
+  exit 1
+fi
+EOF
+PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" JUMBIT_HOOK_FROM="$rfrom" \
+  JUMBIT_HOOK_TO="$rtgt" JUMBIT_HOOK_KW=real-tgt \
+  bash --noprofile --norc "$hookscript" ||
+  { echo "✗ bash hook 全链路失败" >&2; exit 1; }
+PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" jumbit query --all --list | grep -qF -- "$rfrom" ||
+  { echo "✗ hook add 未入库（缺 $rfrom）" >&2; exit 1; }
+rm -rf "$rdata" "$rtgt" "$rfrom" "$rbin" "$hookscript"
+
 echo "== remove 后 query 无结果 =="
 _JB_DATA_DIR="$data" "$bin" remove -- "$target"
 if _JB_DATA_DIR="$data" "$bin" query 2>/dev/null; then
