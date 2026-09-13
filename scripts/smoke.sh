@@ -105,12 +105,14 @@ PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" jumbit status >/dev/null ||
 ( cd "$rbin" && _JB_DATA_DIR="$rdata" ./jumbit add -- "$rtgt" >/dev/null ) ||
   { echo "✗ 相对路径 ./jumbit 调用失败" >&2; exit 1; }
 
-# hook 全链路：非交互 bash 不触发 PROMPT_COMMAND，手动调 __jumbit_hook；
-# -o history 过 [[ -o history ]] 门；j <关键词> 走裸名 query + cd
-hookscript=$(mktemp /tmp/jumbit-hook-XXXX.sh)
-cat > "$hookscript" <<'EOF'
-set -e -o history
-eval "$(jumbit init bash --cmd j)"
+# hook 全链路：各 shell 真实 source init 并驱动钩子，j 命令走裸名 query + cd。
+# 非交互态差异：bash/zsh 的 PROMPT_COMMAND/precmd 仅交互态自动触发，手动调
+# __jumbit_hook；fish 的 --on-variable PWD 事件脚本态也触发，仍显式调一次。
+# --noprofile --norc / --no-rcs / --no-config 过各自的用户配置。
+hook_posix=$(mktemp /tmp/jumbit-hook-XXXX.sh)
+cat > "$hook_posix" <<'EOF'
+set -e
+eval "$(jumbit init "$JUMBIT_HOOK_SHELL" --cmd j)"
 cd "$JUMBIT_HOOK_FROM"
 __jumbit_hook
 j "$JUMBIT_HOOK_KW"
@@ -119,13 +121,45 @@ if [ "$PWD" != "$JUMBIT_HOOK_TO" ]; then
   exit 1
 fi
 EOF
-PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" JUMBIT_HOOK_FROM="$rfrom" \
-  JUMBIT_HOOK_TO="$rtgt" JUMBIT_HOOK_KW=real-tgt \
-  bash --noprofile --norc "$hookscript" ||
-  { echo "✗ bash hook 全链路失败" >&2; exit 1; }
+hook_fish=$(mktemp /tmp/jumbit-hook-XXXX.fish)
+cat > "$hook_fish" <<'EOF'
+# fish 4+ 的 --no-config 隐含 private 模式，模板钩子按设计跳过 private 会话；
+# 清除以模拟「无用户配置的普通会话」
+set -e fish_private_mode
+jumbit init fish --cmd j | source
+or exit 1
+cd $JUMBIT_HOOK_FROM
+__jumbit_hook
+or exit 1
+j $JUMBIT_HOOK_KW
+or exit 1
+if [ "$PWD" != "$JUMBIT_HOOK_TO" ]
+    echo "✗ j 落点 [$PWD] ≠ [$JUMBIT_HOOK_TO]" >&2
+    exit 1
+end
+EOF
+for shell in bash zsh; do
+  if ! command -v "$shell" >/dev/null; then
+    echo "  跳过 $shell hook 链路（未安装）"
+    continue
+  fi
+  if [ "$shell" = bash ]; then rcflags=(--noprofile --norc); else rcflags=(--no-rcs); fi
+  PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" JUMBIT_HOOK_SHELL="$shell" \
+    JUMBIT_HOOK_FROM="$rfrom" JUMBIT_HOOK_TO="$rtgt" JUMBIT_HOOK_KW=real-tgt \
+    "$shell" "${rcflags[@]}" "$hook_posix" ||
+    { echo "✗ $shell hook 全链路失败" >&2; exit 1; }
+done
+if command -v fish >/dev/null; then
+  PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" \
+    JUMBIT_HOOK_FROM="$rfrom" JUMBIT_HOOK_TO="$rtgt" JUMBIT_HOOK_KW=real-tgt \
+    fish --no-config "$hook_fish" ||
+    { echo "✗ fish hook 全链路失败" >&2; exit 1; }
+else
+  echo "  跳过 fish hook 链路（未安装）"
+fi
 PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" jumbit query --all --list | grep -qF -- "$rfrom" ||
   { echo "✗ hook add 未入库（缺 $rfrom）" >&2; exit 1; }
-rm -rf "$rdata" "$rtgt" "$rfrom" "$rbin" "$hookscript"
+rm -rf "$rdata" "$rtgt" "$rfrom" "$rbin" "$hook_posix" "$hook_fish"
 
 echo "== remove 后 query 无结果 =="
 _JB_DATA_DIR="$data" "$bin" remove -- "$target"
