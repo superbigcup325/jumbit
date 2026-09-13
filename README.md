@@ -81,6 +81,8 @@ ji               # fzf 交互式跳转
 
 参数：`--cmd C` 自定义命令名（默认 `j`，如 `--cmd=cd`）、`--hook pwd|prompt|none` 选择记录触发方式（默认 `pwd`）、`--no-cmd` 只生成内部函数
 
+> 测试覆盖口径：bash / zsh / fish 的 hook 链路在 CI 中真跑（source init 输出、驱动钩子、断言落点与入库）；其余六模板为上游同源转译，仅做语法门禁校验，未做 headless 全链路真测，发现问题请提 issue
+
 ## 面向 agent
 
 jumbit 的目录记忆不只喂给 shell，也喂给 coding agent。三条通道：

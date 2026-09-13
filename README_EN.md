@@ -81,6 +81,8 @@ ji               # interactive jump with fzf
 
 Options: `--cmd C` renames the command (default `j`, e.g. `--cmd=cd`), `--hook pwd|prompt|none` selects the recording trigger (default `pwd`), `--no-cmd` emits internal functions only
 
+> Test coverage note: the bash / zsh / fish hook chains are exercised for real in CI (sourcing the init output, driving the hook, asserting the landing directory and database write); the other six templates are transpiled from upstream and only pass syntax checks — no headless end-to-end runs. Please open an issue if anything misbehaves
+
 ## For agents
 
 jumbit's directory memory feeds coding agents as well as shells. Three channels:
