@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- `status`：数据库自检命令（jumbit 扩展，上游无）——默认快查输出数据文件路径/大小/实际格式版本（读自文件头）/条目数/标注数/`_JB_MAXAGE` 现值；`--check` 显式触发 O(N) 存在性扫描并追加 `存在 K/N`；`--json` 输出键序固定的单行对象（agent 通道）；库损坏退出码 1 并报 `数据文件损坏: <原因>`，空库（无 db.zo）按零值报告。human 面与 JSON 面已入 golden 冻结（含随机数据目录路径的归一化）
 - shell 集成模板扩至 9 shell 全量（对齐上游）：新增 elvish / nushell / posix / powershell / tcsh / xonsh，`jumbit init <shell>` 参数矩阵与语法门禁（elvish 编译、nu-check、sh -n、pwsh 解析、tcsh -n、py_compile）全部真机验证
 
 ### Changed

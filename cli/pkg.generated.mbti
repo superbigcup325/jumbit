@@ -29,6 +29,7 @@ pub(all) enum Command {
   Import(ImportOptions)
   Describe(DescribeOptions)
   Export(ExportOptions)
+  Status(StatusOptions)
   Help
   Unknown(String)
   Invalid(String)
@@ -66,6 +67,11 @@ pub(all) struct QueryOptions {
   mut fuzzy : Bool
   mut limit : Int?
   mut tsv : Bool
+} derive(Eq, @debug.Debug)
+
+pub(all) struct StatusOptions {
+  mut json : Bool
+  mut check : Bool
 } derive(Eq, @debug.Debug)
 
 // Type aliases

@@ -78,10 +78,25 @@ if [ "$mode" = update ]; then
   }
 fi
 
+# gs <case名> <命令...>：status 用例专用——status 输出含数据文件绝对路径
+# （位于随机 mktemp 目录），比对前归一化为 @JUMBIT_TMP@，两种模式同规则
+gs() {
+  local case="$1"
+  shift
+  local outdir="$tmp"
+  if [ "$mode" = update ]; then
+    outdir="$golden"
+  fi
+  "$bin" "$@" >"$outdir/$case.out" 2>"$outdir/$case.err"
+  echo $? >"$outdir/$case.code"
+  sed -i "s|$tmp|@JUMBIT_TMP@|g" "$outdir/$case.out" "$outdir/$case.err"
+}
+
 # --- 空库行为 ---
 g json-empty-db query --json --all
 g list-empty-db query --list --score
 g miss-with-kw query --json --all zzznope
+gs status-empty status
 
 # --- 导入（坏行零、静默退出 0；插件数据文件走 _Z_DATA，import 不收路径参数）---
 export _Z_DATA="$tmp/dataset.z"
@@ -119,6 +134,12 @@ g describe-note-newline describe /golden/gamma --note "a
 b"
 g describe-missing describe /golden/nope
 
+# --- status（jumbit 扩展；13 条 / 2 标注为确定态；--check 下 /golden/** 永
+#     不存在 → 存在 0/13 恒定）---
+gs status-full status
+gs status-json status --json
+gs status-check status --check
+
 # --- exists 过滤 + TTL 懒删除（改库，放最后并冻结前后状态）---
 g json-exists-filtered query --json beta
 g text-exists-empty query --list --score
@@ -130,6 +151,11 @@ g limit-zero query --json --all --limit 0
 g limit-mutex query --limit 2
 g limit-invalid-value query --json --all --limit abc
 g limit-negative query --json --all --limit -1
+
+# --- status 损坏库（独立库目录，exit 1 + stderr）---
+mkdir -p "$tmp/db-corrupt"
+printf 'garbage-not-a-db' > "$tmp/db-corrupt/db.zo"
+_JB_DATA_DIR="$tmp/db-corrupt" gs status-corrupt status
 
 if [ "$mode" = update ]; then
   echo "== golden 已重生成至 $golden/（请 git diff 人工审查后冻结）=="
@@ -154,7 +180,8 @@ for case in json-empty-db list-empty-db miss-with-kw import-quiet \
   agents-table describe-clear agents-after-clear describe-note-newline \
   describe-missing json-exists-filtered text-exists-empty json-after-lazy \
   json-limit-2 limit-zero limit-mutex limit-invalid-value limit-negative \
-  tsv-all tsv-limit-2 tsv-mutex-json tsv-mutex-interactive; do
+  tsv-all tsv-limit-2 tsv-mutex-json tsv-mutex-interactive \
+  status-empty status-full status-json status-check status-corrupt; do
   local_ok=1
   for ext in out err code; do
     [ "$(cmp_case "$case" "$ext")" = 1 ] || local_ok=0

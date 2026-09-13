@@ -53,6 +53,14 @@ pub(all) struct ExportOptions {
 } derive(Debug, Eq)
 
 ///|
+/// status 的选项（jumbit 扩展）：--json 单行 JSON 对象；--check 显式触发
+/// O(N) 存在性扫描（默认快查不做文件系统遍历）
+pub(all) struct StatusOptions {
+  mut json : Bool
+  mut check : Bool
+} derive(Debug, Eq)
+
+///|
 pub(all) enum Command {
   Add(AddOptions)
   Query(QueryOptions)
@@ -61,6 +69,7 @@ pub(all) enum Command {
   Import(ImportOptions)
   Describe(DescribeOptions)
   Export(ExportOptions)
+  Status(StatusOptions)
   Help
   Unknown(String)
   /// 参数值语义错误（flag 组合冲突/值非法）：文案原样上报，不带「未知命令」前缀
@@ -85,6 +94,7 @@ pub fn parse(args : Array[String]) -> Command {
     "import" => parse_import(rest)
     "describe" => parse_describe(rest)
     "export" => parse_export(rest)
+    "status" => parse_status(rest)
     "help" | "--help" | "-h" => Help
     other => Unknown(other)
   }
@@ -303,6 +313,26 @@ fn parse_export(args : Array[String]) -> Command {
 }
 
 ///|
+/// status 参数解析（jumbit 扩展）：--json / --check，无位置参数
+fn parse_status(args : Array[String]) -> Command {
+  let opts : StatusOptions = { json: false, check: false, }
+  let mut bad : String? = None
+  for a in args {
+    if a == "--json" {
+      opts.json = true
+    } else if a == "--check" {
+      opts.check = true
+    } else {
+      bad = Some(a)
+    }
+  }
+  match bad {
+    Some(flag) => Unknown(flag)
+    None => Status(opts)
+  }
+}
+
+///|
 /// init 参数解析：shell ∈ {bash, zsh, fish, elvish, nushell, posix, powershell, tcsh, xonsh}；--cmd C / --hook pwd|prompt|none / --no-cmd
 fn parse_init(args : Array[String]) -> Command {
   if args.is_empty() {
@@ -447,6 +477,7 @@ pub fn usage() -> String {
   "  jumbit describe <path> [--note text]     查看/设置人工标注（--note \"\" 清除，jumbit 扩展）\n" +
   "  jumbit export --agents                   输出项目地图 Markdown（贴进 AGENTS.md，jumbit 扩展）\n" +
   "    plugin ∈ atuin/autojump/fasd/z/z.lua/zsh-z（坏行逐条上报不中止）\n" +
+  "  jumbit status [--json] [--check]         数据库自检：条目/标注/版本/阈值（--check 扫存在性，--json 给 agent，jumbit 扩展）\n" +
   "  jumbit help                             显示本帮助\n\n" +
   "环境变量：\n" +
   "  _JB_DATA_DIR                            数据目录（默认 $HOME/.local/share/jumbit，须绝对路径）\n" +

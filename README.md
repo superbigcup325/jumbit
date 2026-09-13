@@ -62,6 +62,7 @@ jumbit query --list --limit 5        # 只输出前 5 条（列表型输出通�
 jumbit query --fuzzy blog            # 精确零命中时按组件子串兜底（jumbit 扩展）
 jumbit describe ~/projects/backend --note "后端服务"   # 人工标注（jumbit 扩展）
 jumbit export --agents               # 项目地图 Markdown（jumbit 扩展）
+jumbit status --json                 # 数据库自检：条目/标注/版本/阈值（jumbit 扩展）
 jumbit remove ~/projects/backend     # 从数据库移除
 jumbit help
 ```
@@ -270,7 +271,7 @@ j backend api   # api 落在路径末组件，backend 在其左侧消耗
 - fzf 交互通道（`query --interactive`）：选中/`--score` 输出与退出码对齐上游（伪 fzf 探针矩阵逐字节对拍）；文案差异两处——fzf 取消（其退出码 1）jumbit 静默退出 1，上游报 `no match found`；fzf 自身异常的提示为英文原文且无 `zoxide: ` 前缀。另 spawn 失败不区分「未安装」与「无法启动」（上游区分，进程绑定不暴露错误类别），统一报 `could not find fzf, is it installed?`
 - 未移植：`edit` 子命令
 - 已知问题（与上游 0.10.0 一致）：非 finite rank 毒库——`import` 接受 `inf`/`nan` 字面量与溢出饱和为 inf 的大数作 rank，`add --score` 同样接受；随后老化遇 `total=inf` 因子归零、库内其余条目被清出，遇 `total=NaN` 老化永久停摆，全程退出码 0 无告警。上游修复 [ajeetdsouza/zoxide#1280](https://github.com/ajeetdsouza/zoxide/pull/1280) 未合并，合并后跟进
-- 扩展（上游无）：`query --json`（单行 JSON 数组，含 `matched_by` 证据字段）、`query --tsv`（无表头 Tab 分隔行 `path\tscore\tlast_accessed\tmatched_by`，列序与 `--json` 键序一致；path 原样不转义——路径含 tab 时该行列数歧义，属已知限制；score 为最短表示，NaN/±Infinity 出 `NaN`/`Infinity`/`-Infinity` 原文而非 JSON 的 `null`）、`query --limit <n>`（`--list`/`--json`/`--tsv` 输出的前 n 条截断，`--limit 0` 为空输出、退出码 0；重复出现后者覆盖）、`query --fuzzy`（仅精确匹配零命中时启用，各关键词为某路径组件的子串即命中——不限末组件、无序且允许同组件，大小写归一同主路仅 ASCII）、`describe`（条目人工标注，随库持久化）、`export --agents`（项目地图）
+- 扩展（上游无）：`query --json`（单行 JSON 数组，含 `matched_by` 证据字段）、`query --tsv`（无表头 Tab 分隔行 `path\tscore\tlast_accessed\tmatched_by`，列序与 `--json` 键序一致；path 原样不转义——路径含 tab 时该行列数歧义，属已知限制；score 为最短表示，NaN/±Infinity 出 `NaN`/`Infinity`/`-Infinity` 原文而非 JSON 的 `null`）、`query --limit <n>`（`--list`/`--json`/`--tsv` 输出的前 n 条截断，`--limit 0` 为空输出、退出码 0；重复出现后者覆盖）、`query --fuzzy`（仅精确匹配零命中时启用，各关键词为某路径组件的子串即命中——不限末组件、无序且允许同组件，大小写归一同主路仅 ASCII）、`describe`（条目人工标注，随库持久化）、`export --agents`（项目地图）与 `status`（数据库自检：数据文件/大小/格式版本/条目数/标注数/老化阈值，`--json` 单行对象；`--check` 显式触发 O(N) 存在性扫描并报 `存在 K/N`；库损坏退出码 1）
 
 ## 许可证
 

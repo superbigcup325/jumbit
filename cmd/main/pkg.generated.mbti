@@ -1,12 +1,17 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "superbigcup325/jumbit/cmd/main"
 
+import {
+  "moonbitlang/core/debug",
+}
+
 // Values
 pub async fn run(Array[String], (String) -> String?, Array[String]) -> Int
 
 // Errors
 
 // Types and methods
+type DbStatus derive(@debug.Debug)
 
 // Type aliases
 
