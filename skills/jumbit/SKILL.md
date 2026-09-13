@@ -43,6 +43,22 @@ jumbit query --json --limit 5 backend
   written verbatim (a path containing a tab is ambiguous — treat TSV as best-effort)
 - `jumbit query --list` lists all entries, `--score` prefixes each line with the score
 
+## Exit codes & troubleshooting
+
+Exit codes are the decision surface, identical across subcommands: `0` = result/success
+(note: `query --list` exits 0 on empty output too), `1` = no match or runtime failure
+(**"not found" is not a malfunction** — read stderr), `2` = usage error (stderr points
+to `jumbit help`), `130` = fzf user interrupt (`--interactive` only).
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| A new directory is not found | Hook not installed, or never `cd`ed into | `jumbit add <dir>`; check the `init` eval line in the rc file |
+| Result path no longer exists | Default queries filter nonexistent paths and lazily delete stale ones | `--all` to bypass |
+| Fuzzy hit trustworthiness | — | `matched_by` in `--json`: `exact` = act, `fuzzy` = verify first |
+| import refuses to run | Database non-empty | `--merge` |
+| `could not find fzf` | fzf not installed | Install fzf or use non-interactive query |
+| Where is the data | Default `$HOME/.local/share/jumbit/db.zo` | `_JB_DATA_DIR` (absolute path) |
+
 ## Record directories
 
 ```bash

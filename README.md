@@ -117,6 +117,56 @@ jumbit export --agents >> AGENTS.md
 | /home/you/projects/backend-api | 后端服务 |
 ```
 
+**退出码**（agent 决策面；全部命令通用）：
+
+| 退出码 | 含义 |
+|---|---|
+| 0 | 有结果或成功；注意 `query --list` 空结果也是 0（静默，对齐上游） |
+| 1 | 无结果或运行失败——**是「没查到」不是故障**，读 stderr 区分 |
+| 2 | 用法错误（未知命令 / flag 互斥 / 缺必选参数），stderr 提示 `jumbit help` |
+| 130 | fzf 用户中断（仅 `--interactive`），静默透传 |
+
+**故障速查**：
+
+| 症状 | 原因 | 处置 |
+|---|---|---|
+| 新目录查不到 | hook 未装，或该目录从未 cd 过 | `jumbit add <目录>`；检查 `eval "$(jumbit init bash)"` 是否在 rc 文件 |
+| 结果路径已不存在 | 默认查询做存在性过滤并懒删陈旧条目 | 确要绕过用 `--all` |
+| fuzzy 命中能不能信 | 看 `--json`/`--tsv` 的 `matched_by` | `exact` 可直接行动，`fuzzy` 先核对再动 |
+| import 拒绝执行 | 库非空 | 加 `--merge` |
+| `could not find fzf` | fzf 未安装 | 安装 fzf 或改用非交互查询 |
+| 数据文件在哪 | 默认 `$HOME/.local/share/jumbit/db.zo` | `_JB_DATA_DIR` 重定向（须绝对路径） |
+
+**注册为 tool**（工具注册型 agent 的 JSON schema 草案；skill 加载型用仓库 `skills/jumbit/SKILL.md`）：
+
+```json
+{
+  "name": "jumbit_query",
+  "description": "Resolve a directory from the user's frecency-ranked directory history. Prefer this over guessing paths or running find. Exit code 1 means no match, not failure.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "keywords": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "One or more keywords; the last anchors the final path component"
+      },
+      "fuzzy": {
+        "type": "boolean",
+        "description": "Substring fallback when exact matching misses"
+      },
+      "limit": {
+        "type": "integer",
+        "description": "Cap rows returned to control context size"
+      }
+    },
+    "required": ["keywords"]
+  }
+}
+```
+
+命令面映射：`jumbit query --json [--fuzzy] [--limit N] <keywords...>`，解析 stdout 单行 JSON，按 `matched_by` 决定信任级别
+
 ## 与其他工具集成
 
 jumbit 的目录记忆经 CLI 面供给其他工具消费，以下配置均经真机验证（sesh 2.29 / yazi 26.9）
@@ -197,6 +247,8 @@ j backend api   # api 落在路径末组件，backend 在其左侧消耗
 
 **查询流**：按得分降序 → 关键词过滤 → glob 排除（命中即懒删）→ 存在性检查；不存在的目录超过 3 个月未访问，则在查询时懒删除
 
+百万行规模对拍基准与方法学见 [BENCHMARKS.md](BENCHMARKS.md)（裁判=上游真二进制，位级一致性随表）
+
 ## 环境变量
 
 | 变量 | 作用 | 默认 |
@@ -218,7 +270,7 @@ j backend api   # api 落在路径末组件，backend 在其左侧消耗
 - fzf 交互通道（`query --interactive`）：选中/`--score` 输出与退出码对齐上游（伪 fzf 探针矩阵逐字节对拍）；文案差异两处——fzf 取消（其退出码 1）jumbit 静默退出 1，上游报 `no match found`；fzf 自身异常的提示为英文原文且无 `zoxide: ` 前缀。另 spawn 失败不区分「未安装」与「无法启动」（上游区分，进程绑定不暴露错误类别），统一报 `could not find fzf, is it installed?`
 - 未移植：`edit` 子命令
 - 已知问题（与上游 0.10.0 一致）：非 finite rank 毒库——`import` 接受 `inf`/`nan` 字面量与溢出饱和为 inf 的大数作 rank，`add --score` 同样接受；随后老化遇 `total=inf` 因子归零、库内其余条目被清出，遇 `total=NaN` 老化永久停摆，全程退出码 0 无告警。上游修复 [ajeetdsouza/zoxide#1280](https://github.com/ajeetdsouza/zoxide/pull/1280) 未合并，合并后跟进
-- 扩展（上游无）：`query --json`（单行 JSON 数组，含 `matched_by` 证据字段）、`query --tsv`（无表头 Tab 分隔行 `path\tscore\tlast_accessed\tmatched_by`，列序与 `--json` 键序一致；path 原样不转义——路径含 tab 时该行列数歧义，属已知限制；score 为最短表示，NaN/±Infinity 出 `NaN`/`Infinity`/`-Infinity` 原文而非 JSON 的 `null`）、`query --limit <n>`（`--list`/`--json`/`--tsv` 输出的前 n 条截断，`--limit 0` 为空输出、退出码 0；重复出现后者覆盖）、`query --fuzzy`（仅精确匹配零命中时启用，各关键词为某路径组件的子串即命中——不限末组件、无序且允许同组件，大小写归一同主路仅 ASCII）、`describe`（条目人工标注，随库持久化）与 `export --agents`（项目地图）
+- 扩展（上游无）：`query --json`（单行 JSON 数组，含 `matched_by` 证据字段）、`query --tsv`（无表头 Tab 分隔行 `path\tscore\tlast_accessed\tmatched_by`，列序与 `--json` 键序一致；path 原样不转义——路径含 tab 时该行列数歧义，属已知限制；score 为最短表示，NaN/±Infinity 出 `NaN`/`Infinity`/`-Infinity` 原文而非 JSON 的 `null`）、`query --limit <n>`（`--list`/`--json`/`--tsv` 输出的前 n 条截断，`--limit 0` 为空输出、退出码 0；重复出现后者覆盖）、`query --fuzzy`（仅精确匹配零命中时启用，各关键词为某路径组件的子串即命中——不限末组件、无序且允许同组件，大小写归一同主路仅 ASCII）、`describe`（条目人工标注，随库持久化）、`export --agents`（项目地图）
 
 ## 许可证
 

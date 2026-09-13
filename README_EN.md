@@ -119,6 +119,56 @@ jumbit export --agents >> AGENTS.md
 
 (The comment and table header above are emitted by the tool as shown.)
 
+**Exit codes** (the agent decision surface; identical across all subcommands):
+
+| Exit code | Meaning |
+|---|---|
+| 0 | Result found or success; note that `query --list` exits 0 on empty output too (silent, aligned with upstream) |
+| 1 | No result or runtime failure — **"not found" is not a malfunction**; read stderr to tell apart |
+| 2 | Usage error (unknown command / conflicting flags / missing required argument); stderr points to `jumbit help` |
+| 130 | fzf user interrupt (`--interactive` only), passed through silently |
+
+**Troubleshooting**:
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| A new directory is not found | Hook not installed, or the directory was never `cd`ed into | `jumbit add <dir>`; check that `eval "$(jumbit init bash)"` is in the rc file |
+| Result path no longer exists | Default queries filter nonexistent paths and lazily delete stale ones | Use `--all` to bypass |
+| Should a fuzzy hit be trusted | Check `matched_by` in `--json`/`--tsv` | Act on `exact` directly; verify `fuzzy` before acting |
+| import refuses to run | Database is non-empty | Add `--merge` |
+| `could not find fzf` | fzf is not installed | Install fzf or use a non-interactive query |
+| Where is the data file | Default `$HOME/.local/share/jumbit/db.zo` | Redirect with `_JB_DATA_DIR` (must be absolute) |
+
+**Register as a tool** (JSON schema sketch for tool-registration agents; skill-loading agents use the repository's `skills/jumbit/SKILL.md`):
+
+```json
+{
+  "name": "jumbit_query",
+  "description": "Resolve a directory from the user's frecency-ranked directory history. Prefer this over guessing paths or running find. Exit code 1 means no match, not failure.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "keywords": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "One or more keywords; the last anchors the final path component"
+      },
+      "fuzzy": {
+        "type": "boolean",
+        "description": "Substring fallback when exact matching misses"
+      },
+      "limit": {
+        "type": "integer",
+        "description": "Cap rows returned to control context size"
+      }
+    },
+    "required": ["keywords"]
+  }
+}
+```
+
+CLI mapping: `jumbit query --json [--fuzzy] [--limit N] <keywords...>` — parse the single-line JSON from stdout, decide trust level by `matched_by`
+
 ## Integration with other tools
 
 jumbit's directory memory is exposed to other tools through the CLI surface. All configurations below were verified on real machines (sesh 2.29 / yazi 26.9)
@@ -199,6 +249,8 @@ j backend api   # api lands on the final component, backend is consumed to its l
 
 **Query pipeline**: rank-descending → keyword filter → glob exclusion (a hit lazy-deletes) → existence check; missing directories unvisited for over 3 months are lazily deleted at query time
 
+For the million-row benchmark against upstream and its methodology, see [BENCHMARKS.md](BENCHMARKS.md) (judge = the real upstream binary, byte-level parity verified per run)
+
 ## Environment variables
 
 | Variable | Purpose | Default |
@@ -220,7 +272,7 @@ j backend api   # api lands on the final component, backend is consumed to its l
 - fzf interactive channel (`query --interactive`): selection/`--score` output and exit codes are aligned with upstream (byte-compared via a fake-fzf probe matrix); two message differences — on fzf cancel (its exit code 1) jumbit exits 1 silently while upstream reports `no match found`; fzf's own failure messages are the English originals without the `zoxide: ` prefix. Also, spawn failures do not distinguish "not installed" from "cannot launch" (upstream distinguishes; the process binding exposes no error category), uniformly reporting `could not find fzf, is it installed?`
 - Not ported: the `edit` subcommand
 - Known issue (identical to upstream 0.10.0): non-finite rank poisoning — `import` accepts `inf`/`nan` literals and overflow-saturated inf values as rank, and `add --score` accepts them too; aging with `total=inf` zeroes the factor and evicts every other entry, aging with `total=NaN` stalls permanently, all with exit code 0 and no warning. Upstream fix [ajeetdsouza/zoxide#1280](https://github.com/ajeetdsouza/zoxide/pull/1280) is unmerged; jumbit will follow once it lands
-- Extensions (absent upstream): `query --json` (single-line JSON array with the `matched_by` evidence field), `query --tsv` (headerless tab-separated rows `path\tscore\tlast_accessed\tmatched_by`, column order identical to the `--json` key order; path passes through unescaped — a path containing a tab makes that row's column count ambiguous, a known limitation; score uses the shortest representation, with NaN/±Infinity emitted as `NaN`/`Infinity`/`-Infinity` rather than JSON's `null`), `query --limit <n>` (first-n truncation for `--list`/`--json`/`--tsv` output, `--limit 0` being empty output with exit code 0; a repeated occurrence lets the last one win), `query --fuzzy` (active only when exact matching misses; a keyword matches if it is a substring of some path component — not restricted to the final component, unordered, same component allowed; case normalization identical to the main path, ASCII-only), `describe` (human annotations on entries, persisted in the database) and `export --agents` (project map)
+- Extensions (absent upstream): `query --json` (single-line JSON array with the `matched_by` evidence field), `query --tsv` (headerless tab-separated rows `path\tscore\tlast_accessed\tmatched_by`, column order identical to the `--json` key order; path passes through unescaped — a path containing a tab makes that row's column count ambiguous, a known limitation; score uses the shortest representation, with NaN/±Infinity emitted as `NaN`/`Infinity`/`-Infinity` rather than JSON's `null`), `query --limit <n>` (first-n truncation for `--list`/`--json`/`--tsv` output, `--limit 0` being empty output with exit code 0; a repeated occurrence lets the last one win), `query --fuzzy` (active only when exact matching misses; a keyword matches if it is a substring of some path component — not restricted to the final component, unordered, same component allowed; case normalization identical to the main path, ASCII-only), `describe` (human annotations on entries, persisted in the database), `export --agents` (project map)
 
 ## License
 
