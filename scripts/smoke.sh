@@ -112,6 +112,8 @@ PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" jumbit status >/dev/null ||
 hook_posix=$(mktemp /tmp/jumbit-hook-XXXX.sh)
 cat > "$hook_posix" <<'EOF'
 set -e
+# bash 钩子有 [[ -o history ]] 门，非交互态默认关——先打开（zsh 钩子无此门）
+if [ -n "$BASH_VERSION" ]; then set -o history; fi
 eval "$(jumbit init "$JUMBIT_HOOK_SHELL" --cmd j)"
 cd "$JUMBIT_HOOK_FROM"
 __jumbit_hook
@@ -148,17 +150,20 @@ for shell in bash zsh; do
     JUMBIT_HOOK_FROM="$rfrom" JUMBIT_HOOK_TO="$rtgt" JUMBIT_HOOK_KW=real-tgt \
     "$shell" "${rcflags[@]}" "$hook_posix" ||
     { echo "✗ $shell hook 全链路失败" >&2; exit 1; }
+  # 逐 shell 断言入库：CI 可能只装一个 shell，不能让别的 shell 掩盖漏 add
+  PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" jumbit query --all --list | grep -qF -- "$rfrom" ||
+    { echo "✗ $shell hook add 未入库（缺 $rfrom）" >&2; exit 1; }
 done
 if command -v fish >/dev/null; then
   PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" \
     JUMBIT_HOOK_FROM="$rfrom" JUMBIT_HOOK_TO="$rtgt" JUMBIT_HOOK_KW=real-tgt \
     fish --no-config "$hook_fish" ||
     { echo "✗ fish hook 全链路失败" >&2; exit 1; }
+  PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" jumbit query --all --list | grep -qF -- "$rfrom" ||
+    { echo "✗ fish hook add 未入库（缺 $rfrom）" >&2; exit 1; }
 else
   echo "  跳过 fish hook 链路（未安装）"
 fi
-PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" jumbit query --all --list | grep -qF -- "$rfrom" ||
-  { echo "✗ hook add 未入库（缺 $rfrom）" >&2; exit 1; }
 rm -rf "$rdata" "$rtgt" "$rfrom" "$rbin" "$hook_posix" "$hook_fish"
 
 echo "== remove 后 query 无结果 =="
