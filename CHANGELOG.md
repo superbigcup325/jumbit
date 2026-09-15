@@ -9,6 +9,7 @@
 - shell 集成模板扩至 9 shell 全量（对齐上游）：新增 elvish / nushell / posix / powershell / tcsh / xonsh，`jumbit init <shell>` 参数矩阵与语法门禁（elvish 编译、nu-check、sh -n、pwsh 解析、tcsh -n、py_compile）全部真机验证
 
 ### Changed
+- help 环境变量表补 `_JB_FZF_OPTS`（透传给 fzf 的自定义参数）——README 环境变量表早有记载、`jumbit help` 输出漏列
 - import/query 内存与分配优化（行为与输出字节面不变）：坏行消息与行定位串惰性构造、db 编码预分配、--tsv 输出流式化、stderr 批量写、import 改单趟流式（对齐上游 import.rs::run 惰性迭代结构，六插件文件源逐行回调解析+入库，atuin 折叠保持物化）——百万行 import 峰值内存 499→203MB、耗时 2.29→1.62s，--tsv 全量输出峰值 217→85MB
 
 ### Fixed

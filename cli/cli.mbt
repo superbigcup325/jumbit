@@ -615,6 +615,7 @@ pub fn usage() -> String {
   "  _JB_DATA_DIR                            数据目录（默认 $HOME/.local/share/jumbit，须绝对路径）\n" +
   "  _JB_ECHO=1                              add 时回显记录的目录\n" +
   "  _JB_EXCLUDE_DIRS                        冒号分隔的 glob 列表，命中即从库中移除\n" +
+  "  _JB_FZF_OPTS                            透传给 fzf 的自定义参数\n" +
   "  _JB_RESOLVE_SYMLINKS=1                  add 时解析符号链接（查询时反向不跟随）\n" +
   "  _JB_MAXAGE=N                            数据库总分老化阈值（默认 10000）\n" +
   "import 读取各插件标准数据文件，可经 _Z_DATA/_FASD_DATA/ZSHZ_DATA/_ZL_DATA/XDG_DATA_HOME 定位"
