@@ -111,6 +111,50 @@ fn parse_double_opt(s : String) -> Double? {
 }
 
 ///|
+/// `--flag=value` 等号形式剥离（对齐上游 clap 双形态）：`--` 前缀且名部
+/// 非 `--` 的 token 切首个 `=`，返回 (名部, 值部)；其余原样返回 None。
+/// 值部可含 `=`、可为空串；`--=x` 不是 flag，交还坏参路
+fn split_eq_flag(token : String) -> (String, String)? {
+  if !token.has_prefix("--") {
+    return None
+  }
+  match token.split_once("=") {
+    Some((name, value)) => {
+      let name = name.to_owned()
+      if name == "--" {
+        None
+      } else {
+        Some((name, value.to_owned()))
+      }
+    }
+    None => None
+  }
+}
+
+///|
+/// flag 匹配：空格形式 token 等名，或等号形式名部等名
+fn eq_flag_match(raw : String, pair : (String, String)?, name : String) -> Bool {
+  if raw == name {
+    return true
+  }
+  match pair {
+    Some((flag, _)) => flag == name
+    None => false
+  }
+}
+
+///|
+/// --hook 值 → Hook 枚举（空格/等号两形态共用的取值校验）
+fn parse_hook(v : String) -> @tpl.Hook? {
+  match v {
+    "pwd" => Some(@tpl.HookPwd)
+    "prompt" => Some(@tpl.HookPrompt)
+    "none" => Some(@tpl.HookNone)
+    _ => None
+  }
+}
+
+///|
 /// add 参数解析：可选一次 `--score <n>`；裸 `--` 剥离后全部为路径
 fn parse_add(args : Array[String]) -> Command {
   let opts : AddOptions = { paths: [], score: 1.0, }
@@ -119,23 +163,36 @@ fn parse_add(args : Array[String]) -> Command {
   let n = args.length()
   let mut i = 0
   while i < n {
-    let a = args[i]
-    if !escaped && a == "--" {
-      escaped = true
-    } else if !escaped && a == "--score" {
-      if i + 1 < n {
-        match parse_double_opt(args[i + 1]) {
-          Some(v) => opts.score = v
-          None => bad = Some("--score 必须是数字: \{args[i + 1]}")
-        }
-        i += 1
-      } else {
-        bad = Some("--score 缺少数值参数")
-      }
-    } else if !escaped && a.has_prefix("-") && a != "-" {
-      bad = Some(a)
+    let raw = args[i]
+    let pair : (String, String)? = if !escaped {
+      split_eq_flag(raw)
     } else {
-      opts.paths.push(a)
+      None
+    }
+    if !escaped && raw == "--" {
+      escaped = true
+    } else if !escaped && eq_flag_match(raw, pair, "--score") {
+      match pair {
+        Some((_, value)) =>
+          match parse_double_opt(value) {
+            Some(v) => opts.score = v
+            None => bad = Some("--score 必须是数字: \{value}")
+          }
+        None =>
+          if i + 1 < n {
+            match parse_double_opt(args[i + 1]) {
+              Some(v) => opts.score = v
+              None => bad = Some("--score 必须是数字: \{args[i + 1]}")
+            }
+            i += 1
+          } else {
+            bad = Some("--score 缺少数值参数")
+          }
+      }
+    } else if !escaped && raw.has_prefix("-") && raw != "-" {
+      bad = Some(raw)
+    } else {
+      opts.paths.push(raw)
     }
     i += 1
   }
@@ -167,11 +224,34 @@ fn parse_query(args : Array[String]) -> Command {
   let n = args.length()
   let mut i = 0
   while i < n {
-    let a = args[i]
-    if !escaped && a == "--" {
+    let raw = args[i]
+    let pair : (String, String)? = if !escaped {
+      split_eq_flag(raw)
+    } else {
+      None
+    }
+    // 等号形式只认带值 flag；布尔/未知 flag 的等号形式报原文归 Unknown
+    match pair {
+      Some((name, _)) =>
+        if name != "--limit" && name != "--exclude" {
+          bad = Some(raw)
+          i += 1
+          continue
+        }
+      None => ()
+    }
+    let name = match pair {
+      Some((n, _)) => n
+      None => raw
+    }
+    let eq_val : String? = match pair {
+      Some((_, value)) => Some(value)
+      None => None
+    }
+    if !escaped && raw == "--" {
       escaped = true
     } else if !escaped {
-      match a {
+      match name {
         "--all" => opts.all = true
         "--list" => opts.list = true
         "--score" => opts.score = true
@@ -180,32 +260,44 @@ fn parse_query(args : Array[String]) -> Command {
         "--fuzzy" => opts.fuzzy = true
         "--tsv" => opts.tsv = true
         "--limit" =>
-          // 带值 flag（模式照 --exclude）；值非法归 Invalid，重复出现后者覆盖
-          if i + 1 < n {
-            match parse_limit_value(args[i + 1]) {
-              Ok(v) => opts.limit = Some(v)
-              Err(msg) => invalid = Some(msg)
-            }
-            i += 1
-          } else {
-            invalid = Some("--limit 缺少非负整数参数")
+          // 值非法归 Invalid，重复出现后者覆盖
+          match eq_val {
+            Some(value) =>
+              match parse_limit_value(value) {
+                Ok(v) => opts.limit = Some(v)
+                Err(msg) => invalid = Some(msg)
+              }
+            None =>
+              if i + 1 < n {
+                match parse_limit_value(args[i + 1]) {
+                  Ok(v) => opts.limit = Some(v)
+                  Err(msg) => invalid = Some(msg)
+                }
+                i += 1
+              } else {
+                invalid = Some("--limit 缺少非负整数参数")
+              }
           }
         "--exclude" =>
-          if i + 1 < n {
-            opts.exclude = Some(args[i + 1])
-            i += 1
-          } else {
-            bad = Some("--exclude 缺少路径参数")
+          match eq_val {
+            Some(value) => opts.exclude = Some(value)
+            None =>
+              if i + 1 < n {
+                opts.exclude = Some(args[i + 1])
+                i += 1
+              } else {
+                bad = Some("--exclude 缺少路径参数")
+              }
           }
         s =>
           if s.has_prefix("-") && s != "-" {
-            bad = Some(s)
+            bad = Some(raw)
           } else {
-            opts.keywords.push(s)
+            opts.keywords.push(raw)
           }
       }
     } else {
-      opts.keywords.push(a)
+      opts.keywords.push(raw)
     }
     i += 1
   }
@@ -257,20 +349,29 @@ fn parse_describe(args : Array[String]) -> Command {
   let n = args.length()
   let mut i = 0
   while i < n {
-    let a = args[i]
-    if a == "--note" {
-      if i + 1 < n {
-        note = Some(args[i + 1])
-        i += 1
-      } else {
-        bad = Some("--note 缺少标注文本")
+    let raw = args[i]
+    let pair = split_eq_flag(raw)
+    let eq_val : String? = match pair {
+      Some((_, value)) => Some(value)
+      None => None
+    }
+    if eq_flag_match(raw, pair, "--note") {
+      match eq_val {
+        Some(value) => note = Some(value)
+        None =>
+          if i + 1 < n {
+            note = Some(args[i + 1])
+            i += 1
+          } else {
+            bad = Some("--note 缺少标注文本")
+          }
       }
-    } else if a.has_prefix("-") && a != "-" {
-      bad = Some(a)
+    } else if raw.has_prefix("-") && raw != "-" {
+      bad = Some(raw)
     } else if path is None {
-      path = Some(a)
+      path = Some(raw)
     } else {
-      bad = Some(a)
+      bad = Some(raw)
     }
     i += 1
   }
@@ -365,26 +466,57 @@ fn parse_init(args : Array[String]) -> Command {
   let n = args.length()
   let mut i = 1
   while i < n {
-    match args[i] {
+    let raw = args[i]
+    let pair = split_eq_flag(raw)
+    // 等号形式只认带值 flag；--no-cmd/未知 flag 的等号形式报原文归 Unknown
+    match pair {
+      Some((name, _)) =>
+        if name != "--cmd" && name != "--hook" {
+          bad = Some(raw)
+          i += 1
+          continue
+        }
+      None => ()
+    }
+    let name = match pair {
+      Some((n, _)) => n
+      None => raw
+    }
+    let eq_val : String? = match pair {
+      Some((_, value)) => Some(value)
+      None => None
+    }
+    match name {
       "--no-cmd" => opts.no_cmd = true
       "--cmd" =>
-        if i + 1 < n {
-          opts.cmd = Some(args[i + 1])
-          i += 1
-        } else {
-          bad = Some("--cmd 缺少命令名参数")
+        match eq_val {
+          Some(value) => opts.cmd = Some(value)
+          None =>
+            if i + 1 < n {
+              opts.cmd = Some(args[i + 1])
+              i += 1
+            } else {
+              bad = Some("--cmd 缺少命令名参数")
+            }
         }
       "--hook" =>
-        if i + 1 < n {
-          match args[i + 1] {
-            "pwd" => opts.hook = @tpl.HookPwd
-            "prompt" => opts.hook = @tpl.HookPrompt
-            "none" => opts.hook = @tpl.HookNone
-            v => bad = Some("--hook 仅支持 pwd/prompt/none: \{v}")
-          }
-          i += 1
-        } else {
-          bad = Some("--hook 缺少参数")
+        match eq_val {
+          Some(value) =>
+            match parse_hook(value) {
+              Some(h) => opts.hook = h
+              None => bad = Some("--hook 仅支持 pwd/prompt/none: \{value}")
+            }
+          None =>
+            if i + 1 < n {
+              match parse_hook(args[i + 1]) {
+                Some(h) => opts.hook = h
+                None =>
+                  bad = Some("--hook 仅支持 pwd/prompt/none: \{args[i + 1]}")
+              }
+              i += 1
+            } else {
+              bad = Some("--hook 缺少参数")
+            }
         }
       s => bad = Some(s)
     }

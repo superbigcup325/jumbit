@@ -1022,3 +1022,38 @@ async test "status：空库 / 有库 / 损坏库 / --check 的退出码与 stder
   cleanup_test_dir(data)
   cleanup_test_dir(dir1)
 }
+
+///|
+async test "等号形式 --flag=value 端到端（clap 双形态对齐）" {
+  let data = make_test_dir("eq-data")
+  let target = make_test_dir("eq-target")
+  let errs : Array[String] = []
+  // init --cmd= （README 记载的写法，此前实际被拒 exit 2）
+  @debug.assert_eq(run(["init", "bash", "--cmd=zj"], env_with(data), errs), 0)
+  // add --score= / describe --note=
+  @debug.assert_eq(run(["add", "--score=2.5", target], env_with(data), errs), 0)
+  @debug.assert_eq(
+    run(["describe", target, "--note=后端"], env_with(data), errs),
+    0,
+  )
+  // query --exclude= / --limit=
+  @debug.assert_eq(
+    run(["query", "--all", "--list", "--limit=1"], env_with(data), errs),
+    0,
+  )
+  @debug.assert_eq(
+    run(
+      ["query", "--all", "--list", "--exclude=/nonexistent-x"],
+      env_with(data),
+      errs,
+    ),
+    0,
+  )
+  // 值非法 → Invalid 退出码 2
+  @debug.assert_eq(
+    run(["query", "--list", "--limit=x"], env_with(data), errs),
+    2,
+  )
+  cleanup_test_dir(data)
+  cleanup_test_dir(target)
+}
