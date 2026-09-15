@@ -220,14 +220,14 @@ yj() {
 jumbit import <plugin>
 ```
 
-| 插件 | 命令 | 数据文件探测 |
-|---|---|---|
-| atuin | `jumbit import atuin` | 经 `atuin history list` 子进程读取 |
-| autojump | `jumbit import autojump` | `$XDG_DATA_HOME/autojump/autojump.txt`，默认 `~/.local/share/autojump/autojump.txt` |
-| fasd | `jumbit import fasd` | `$_FASD_DATA`，否则 `~/.fasd` |
-| z | `jumbit import z` | `$_Z_DATA`，否则 `~/.z` |
-| z.lua | `jumbit import z.lua` | `$_ZL_DATA`，否则 `~/.zlua`；主路径缺失回落 `zlua/zlua.txt` |
-| zsh-z | `jumbit import zsh-z` | `$ZSHZ_DATA`，否则同 z |
+| 插件 | 命令 | 数据文件探测 | 数据格式 |
+|---|---|---|---|
+| atuin | `jumbit import atuin` | 经 `atuin history list` 子进程读取 | `YYYY-MM-DD HH:MM:SS<TAB>path`（子进程输出） |
+| autojump | `jumbit import autojump` | `$XDG_DATA_HOME/autojump/autojump.txt`，默认 `~/.local/share/autojump/autojump.txt` | `rank<TAB>path`（rank 过 sigmoid 归一，对齐上游） |
+| fasd | `jumbit import fasd` | `$_FASD_DATA`，否则 `~/.fasd` | `path\|rank\|timestamp` |
+| z | `jumbit import z` | `$_Z_DATA`，否则 `~/.z` | `path\|rank\|timestamp` |
+| z.lua | `jumbit import z.lua` | `$_ZL_DATA`，否则 `~/.zlua`；主路径缺失回落 `zlua/zlua.txt` | `path\|rank\|timestamp`（与 z 同解析器，对齐上游） |
+| zsh-z | `jumbit import zsh-z` | `$ZSHZ_DATA`，否则同 z | `path\|rank\|timestamp` |
 
 注：数据库非空时须加 `--merge` 合并导入（如 `jumbit import --merge z`）；坏行逐条上报、不中止导入
 
