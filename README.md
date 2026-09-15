@@ -229,6 +229,8 @@ jumbit import <plugin>
 
 注：数据库非空时须加 `--merge` 合并导入（如 `jumbit import --merge z`）；坏行逐条上报、不中止导入
 
+注：atuin 经子进程 `atuin history list` 读取，其退出码不检查（对齐上游）——atuin 自身报错时得到空结果且 exit 0，成败以 stderr 为准
+
 ## 工作原理
 
 **frecency 排序**。每条记录是 `path / rank / last_accessed` 三字段，得分 = rank（累计访问权重）× 时间衰减系数，系数按 `last_accessed` 距今分档：
