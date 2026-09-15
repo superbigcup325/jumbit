@@ -67,6 +67,8 @@ jumbit remove ~/projects/backend     # 从数据库移除
 jumbit help
 ```
 
+注：带值 flag（`--score` / `--exclude` / `--limit`）重复出现时后者覆盖
+
 ## shell 集成
 
 ```bash
