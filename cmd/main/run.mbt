@@ -394,7 +394,7 @@ async fn run_query(
   } else if qopts.interactive {
     let outs : Array[String] = []
     let code = finish_interactive(
-      @platform.fzf_select(remaining, now, @config.fzf_opts(getenv)),
+      @platform.fzf_select(remaining, now, @config.fzf_opts(getenv), getenv),
       qopts.score,
       errs,
       outs,

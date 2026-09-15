@@ -260,7 +260,7 @@ async test "fzf_select：选中回传原样 stdout，候选按 score\\tpath\\0 �
   let fake = make_fake_fzf(bindir)
   let dump = bindir + "/stdin-dump"
   write_fake_fzf_body(bindir, "cat > \{dump}\nprintf '  40.0\\t/picked\\n'\n")
-  let out = match fzf_select_with(fake, fzf_hits(), 1000L, None) {
+  let out = match fzf_select_with(fake, fzf_hits(), 1000L, None, env_none) {
     Ok(s) => s
     Err(e) => fail("\{Repr(e)}")
   }
@@ -282,7 +282,7 @@ async test "fzf_select：FZF_DEFAULT_OPTS 仅在 fzf_opts 传入时注入" {
     bindir,
     "printf '%s' \"$FZF_DEFAULT_OPTS\" > \{dump}\nprintf '  40.0\\t/picked\\n'\n",
   )
-  match fzf_select_with(fake, hits, 1000L, Some("--border")) {
+  match fzf_select_with(fake, hits, 1000L, Some("--border"), env_none) {
     Ok(_) => ()
     Err(e) => fail("\{Repr(e)}")
   }
@@ -296,7 +296,7 @@ async test "fzf_select：FZF_DEFAULT_OPTS 仅在 fzf_opts 传入时注入" {
     bindir2,
     "printf '%s' \"${FZF_DEFAULT_OPTS-UNSET}\" > \{dump2}\nprintf '  40.0\\t/picked\\n'\n",
   )
-  match fzf_select_with(fake2, hits, 1000L, None) {
+  match fzf_select_with(fake2, hits, 1000L, None, env_none) {
     Ok(_) => ()
     Err(e) => fail("\{Repr(e)}")
   }
@@ -310,7 +310,7 @@ async test "fzf_select：退出码矩阵 → FzfError（上游探针表）" {
   let fake = make_fake_fzf(bindir)
   let expect_err = async fn(body : String, expected : FzfError) -> Unit {
     write_fake_fzf_body(bindir, body)
-    match fzf_select_with(fake, fzf_hits(), 1000L, None) {
+    match fzf_select_with(fake, fzf_hits(), 1000L, None, env_none) {
       Err(e) =>
         match (e, expected) {
           (NoMatch, NoMatch) => ()
@@ -337,7 +337,8 @@ async test "fzf_select：退出码矩阵 → FzfError（上游探针表）" {
 async test "fzf_select：spawn 失败（不存在/不可执行）→ NotFound" {
   let bindir = make_tmp_dir()
   // 路径不存在
-  match fzf_select_with(bindir + "/no-such-fzf", fzf_hits(), 1000L, None) {
+  match
+    fzf_select_with(bindir + "/no-such-fzf", fzf_hits(), 1000L, None, env_none) {
     Err(NotFound) => ()
     other => fail("\{Repr(other)}")
   }
@@ -345,7 +346,7 @@ async test "fzf_select：spawn 失败（不存在/不可执行）→ NotFound" {
   // 合并为 NotFound——README 注明；文件名带 noexec 以区分 spawn 调试点）
   let fake = bindir + "/fzf-noexec"
   write_atomic(fake, @utf8.encode("#!/bin/sh\nprintf 'x\\n'\n"))
-  match fzf_select_with(fake, fzf_hits(), 1000L, None) {
+  match fzf_select_with(fake, fzf_hits(), 1000L, None, env_none) {
     Err(NotFound) => ()
     other => fail("\{Repr(other)}")
   }
@@ -397,4 +398,58 @@ async test "for_each_import_line：文件缺失报 could not read（与 read_imp
     (Err(a), Err(b)) => @debug.assert_eq(a, b)
     _ => fail("两路错误形态应一致")
   }
+}
+
+///|
+/// 环境读取桩：仅 PATH 可注入（裸名解析预检的测试面）
+fn env_path_only(path : String) -> (String) -> String? {
+  fn(key : String) -> String? { if key == "PATH" { Some(path) } else { None } }
+}
+
+///|
+fn env_none(key : String) -> String? {
+  ignore(key)
+  None
+}
+
+///|
+async test "fzf_select：裸名沿 PATH 解析——不可执行候选被跳过，选中首个可执行者" {
+  let noexec_dir = make_tmp_dir()
+  let good_dir = make_tmp_dir()
+  // 第一候选：同名但不可执行（黑盒实测：旧码把这种 PATH 命中直接交给
+  // spawn，exec 失败走 wait 退出码路报 "fzf returned an error"，
+  // 违背「spawn 失败统一 NotFound」口径）
+  write_atomic(noexec_dir + "/fzf", @utf8.encode("#!/bin/sh\nprintf 'x\\n'\n"))
+  // 第二候选：可执行伪 fzf，回传固定选中行
+  let _fake = make_fake_fzf(good_dir)
+  write_fake_fzf_body(good_dir, "printf '  40.0\\t/picked\\n'\n")
+  let get = env_path_only("\{noexec_dir}:\{good_dir}")
+  let out = match fzf_select_with("fzf", fzf_hits(), 1000L, None, get) {
+    Ok(s) => s
+    Err(e) => fail("\{Repr(e)}")
+  }
+  @debug.assert_eq(out, "  40.0\t/picked\n")
+  @afs.rmdir(noexec_dir, recursive=true)
+  @afs.rmdir(good_dir, recursive=true)
+}
+
+///|
+async test "fzf_select：裸名 PATH 无可执行候选 → NotFound" {
+  let noexec_dir = make_tmp_dir()
+  // 不可执行普通文件
+  write_atomic(noexec_dir + "/fzf", @utf8.encode("#!/bin/sh\nexit 0\n"))
+  let get1 = env_path_only(noexec_dir)
+  match fzf_select_with("fzf", fzf_hits(), 1000L, None, get1) {
+    Err(NotFound) => ()
+    other => fail("\{Repr(other)}")
+  }
+  // 目录即便自带 x 位也不是可执行目标（can_execute 对目录放行，须 kind 排除）
+  @afs.remove(noexec_dir + "/fzf")
+  @afs.mkdir(noexec_dir + "/fzf", recursive=true)
+  @afs.chmod(noexec_dir + "/fzf", 0o755)
+  match fzf_select_with("fzf", fzf_hits(), 1000L, None, get1) {
+    Err(NotFound) => ()
+    other => fail("\{Repr(other)}")
+  }
+  @afs.rmdir(noexec_dir, recursive=true)
 }

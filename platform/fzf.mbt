@@ -40,12 +40,54 @@ fn map_fzf_exit(code : Int) -> FzfError? {
 ///|
 /// fzf 交互选择：候选按 "6.1f 得分\t路径\0" 写入 stdin，返回 fzf 打印的选中行。
 /// fzf_opts 非 None 时经 FZF_DEFAULT_OPTS 透传（对齐上游 _ZO_FZF_OPTS）。
+/// get 为环境读取入口（裸名 PATH 预解析用）
 pub async fn fzf_select(
   hits : Array[@core.Dir],
   now : Int64,
   fzf_opts : String?,
+  get : (String) -> String?,
 ) -> Result[String, FzfError] {
-  fzf_select_with("fzf", hits, now, fzf_opts)
+  fzf_select_with("fzf", hits, now, fzf_opts, get)
+}
+
+///|
+/// spawn 前置解析：带 `/` 的路径直接查；裸名沿 PATH 找首个可执行普通文件。
+/// 必须在 spawn 前裁定——@process 绑定只对「解析即失败」（绝对路径不存在/
+/// 不可执行）抛错转 NotFound，PATH 搜索语义下的 exec 失败走 wait 退出码路
+/// （黑盒实测报 "fzf returned an error"，2026-09-15 复现），无法事后分类
+async fn resolve_program(
+  program : String,
+  get : (String) -> String?,
+) -> String? {
+  if program.contains("/") {
+    return if is_executable_file(program) { Some(program) } else { None }
+  }
+  let path_env = match get("PATH") {
+    Some(p) => p
+    // PATH 缺失按空表处理 → NotFound（found nothing to execute）
+    None => return None
+  }
+  for dir in path_env.split(":") {
+    let dir = dir.to_owned()
+    // 空项的「当前目录」历史语义不参与解析
+    if dir == "" {
+      continue
+    }
+    let candidate = dir + "/" + program
+    if is_executable_file(candidate) {
+      return Some(candidate)
+    }
+  }
+  None
+}
+
+///|
+/// 可执行普通文件判定：kind 须 Regular——目录自带 x 位是穿越位，
+/// can_execute 对目录同样放行，须文件类型先行排除；kind 查询本身抛错
+/// （不存在/权限）视同不可执行
+async fn is_executable_file(path : String) -> Bool {
+  (@afs.kind(path) catch { _ => Unknown }) is Regular &&
+  (@afs.can_execute(path) catch { _ => false })
 }
 
 ///|
@@ -56,7 +98,12 @@ async fn fzf_select_with(
   hits : Array[@core.Dir],
   now : Int64,
   fzf_opts : String?,
+  get : (String) -> String?,
 ) -> Result[String, FzfError] {
+  let resolved = match resolve_program(program, get) {
+    Some(p) => p
+    None => return Err(NotFound)
+  }
   let args = [
     "--delimiter=\t", "--nth=2", "--read0", "--exact", "--no-sort", "--cycle", "--keep-right",
     "--border=sharp", "--height=45%", "--info=inline", "--layout=reverse", "--tabstop=1",
@@ -75,7 +122,7 @@ async fn fzf_select_with(
     }
     let proc = @process.spawn(
       group,
-      program,
+      resolved,
       args,
       stdin=stdin_r,
       stdout=stdout_w,
