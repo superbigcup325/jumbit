@@ -55,7 +55,7 @@ jumbit add --score 3.5 ~/projects    # 指定本次增量权重
 jumbit query backend                 # 输出匹配的最高分目录
 jumbit query --list --score          # 全部匹配，按得分降序带分数前缀
 jumbit query --interactive           # fzf 交互选择
-jumbit query --all --exclude ~/tmp   # 跳过存在性检查 / 排除指定目录
+jumbit query --all --exclude ~/tmp   # 跳过存在性检查 / 排除指定目录（精确路径，glob 走 _JB_EXCLUDE_DIRS）
 jumbit query --json                  # 单行 JSON 数组输出全部匹配（agent 通道）
 jumbit query --tsv                   # Tab 分隔数据行（agent 通道，jumbit 扩展）
 jumbit query --list --limit 5        # 只输出前 5 条（列表型输出通用，jumbit 扩展）
@@ -260,7 +260,7 @@ j backend api   # api 落在路径末组件，backend 在其左侧消耗
 |---|---|---|
 | `_JB_DATA_DIR` | 数据目录（须绝对路径） | `$HOME/.local/share/jumbit` |
 | `_JB_ECHO=1` | add 时回显记录的目录 | 关 |
-| `_JB_EXCLUDE_DIRS` | 冒号分隔的 glob，命中的目录不入库 | home 目录本身 |
+| `_JB_EXCLUDE_DIRS` | 冒号分隔的 glob：add 时拦截写入，查询时命中懒删出库 | home 目录本身 |
 | `_JB_FZF_OPTS` | 透传给 fzf 的自定义参数 | 内置参数组 |
 | `_JB_MAXAGE` | 数据库总分老化阈值 | 10000 |
 | `_JB_RESOLVE_SYMLINKS=1` | add 时解析符号链接 | 关 |
@@ -270,7 +270,7 @@ j backend api   # api 落在路径末组件，backend 在其左侧消耗
 - 持久化格式为自定义二进制（版本号 + 长度前缀条目），与上游 `db.zo` **不互通**；v2 起条目带 note 标注（jumbit 扩展），旧 v1 库免迁移兼容读
 - 环境变量前缀 `_ZO_*` → `_JB_*`，两者可共存
 - 关键词大小写归一仅限 ASCII（上游为 Unicode 全量）
-- glob 排除不支持 `{a,b}` 括号展开；`**` 按两个 `*` 处理、不跨分隔符（上游 glob crate 的 `**` 为递归通配）；`*`/`?`/`[...]` 语义对齐
+- `_JB_EXCLUDE_DIRS` 的 glob 排除不支持 `{a,b}` 括号展开；`**` 按两个 `*` 处理、不跨分隔符（上游 glob crate 的 `**` 为递归通配）；`*`/`?`/`[...]` 语义对齐；`query --exclude` 为精确路径过滤、不做 glob（对齐上游）
 - 仅支持 Linux；fzf 预览窗口的平台定制未实现（import 的 autojump/z.lua 路径探测同按 Linux 语义）
 - fzf 交互通道（`query --interactive`）：选中/`--score` 输出与退出码对齐上游（伪 fzf 探针矩阵逐字节对拍）；文案差异两处——fzf 取消（其退出码 1）jumbit 静默退出 1，上游报 `no match found`；fzf 自身异常的提示为英文原文且无 `zoxide: ` 前缀。另 spawn 失败不区分「未安装」与「无法启动」（上游区分，进程绑定不暴露错误类别），统一报 `could not find fzf, is it installed?`
 - 未移植：`edit` 子命令
