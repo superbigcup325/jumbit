@@ -453,3 +453,32 @@ async test "fzf_select：裸名 PATH 无可执行候选 → NotFound" {
   }
   @afs.rmdir(noexec_dir, recursive=true)
 }
+
+///|
+test "codec_error_message：经真实 decode 产物冻结文案（pub enum 只读，不直接构造）" {
+  let corrupted = match @core.decode(b"") {
+    Err(e) => e
+    Ok(_) => fail("unexpected ok")
+  }
+  @debug.assert_eq(Codec(corrupted).message(), "无法解析")
+  let bad_version = match @core.decode(@utf8.encode("garbage-not-a-db")) {
+    Err(e) => e
+    Ok(_) => fail("unexpected ok")
+  }
+  @debug.assert_eq(
+    Codec(bad_version).message(),
+    "格式版本不受支持: 1651663207",
+  )
+}
+
+///|
+test "os_error_message：ENOENT 短语 + (os error N) 后缀，非 OSError 兜底 Repr" {
+  @debug.assert_eq(
+    os_error_message(@os_error.OSError(2, context="test")),
+    "No such file or directory (os error 2)",
+  )
+  @debug.assert_eq(
+    os_error_message(@os_error.OSError(17, context="test")),
+    "File exists (os error 17)",
+  )
+}

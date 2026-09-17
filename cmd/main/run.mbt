@@ -95,7 +95,7 @@ async fn open_store(
   match @platform.load(data_dir) {
     Ok(s) => Some(s)
     Err(err) => {
-      err_line(errs, "打开数据库失败: \{Repr(err)}")
+      err_line(errs, "打开数据库失败: \{err.message()}")
       None
     }
   }
@@ -111,7 +111,7 @@ async fn finish(
   match store.save() {
     Ok(_) => code
     Err(err) => {
-      err_line(errs, "保存数据库失败: \{Repr(err)}")
+      err_line(errs, "保存数据库失败: \{err.message()}")
       1
     }
   }
@@ -236,7 +236,11 @@ async fn run_add(
     let resolved = if resolve_symlinks {
       @afs.realpath(resolved) catch {
         err => {
-          err_line(errs, "解析路径失败: \{resolved} (\{Repr(err)})")
+          // os_error_message 自带 (os error N) 后缀，用冒号拼接避免括号嵌套
+          err_line(
+            errs,
+            "解析路径失败: \{resolved}: \{@platform.os_error_message(err)}",
+          )
           return 1
         }
       }
@@ -880,7 +884,10 @@ async fn run_status(
   let (file_size, format_version, dirs) = if @afs.exists(db_path) {
     let data = @afs.read_file(db_path) catch {
       err => {
-        err_line(errs, "无法读取数据文件: \{Repr(err)}")
+        err_line(
+          errs,
+          "无法读取数据文件: \{@platform.os_error_message(err)}",
+        )
         return 1
       }
     }
@@ -893,7 +900,10 @@ async fn run_status(
     match @core.decode(bytes) {
       Ok(dirs) => (bytes.length(), Some(version), dirs)
       Err(e) => {
-        err_line(errs, "数据文件损坏: \{Repr(e)}")
+        err_line(
+          errs,
+          "数据文件损坏: \{@platform.codec_error_message(e)}",
+        )
         return 1
       }
     }

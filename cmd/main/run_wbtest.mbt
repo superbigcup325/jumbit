@@ -1057,3 +1057,53 @@ async test "等号形式 --flag=value 端到端（clap 双形态对齐）" {
   cleanup_test_dir(data)
   cleanup_test_dir(target)
 }
+
+///|
+async test "save 失败：数据目录不可写 → 清晰文案 exit 1（Repr 不再外泄）" {
+  let data = make_test_dir("save-ro")
+  let target = make_test_dir("save-ro-t")
+  let errs : Array[String] = []
+  @debug.assert_eq(run(["add", target], env_with(data), errs), 0)
+  @afs.chmod(data, 0o555)
+  let errs2 : Array[String] = []
+  @debug.assert_eq(run(["add", target], env_with(data), errs2), 1)
+  @debug.assert_eq(
+    errs2[0],
+    "保存数据库失败: 读写失败: Permission denied (os error 13)",
+  )
+  @afs.chmod(data, 0o755)
+  cleanup_test_dir(data)
+  cleanup_test_dir(target)
+}
+
+///|
+async test "status：db.zo 不可读 → 无法读取数据文件 + exit 1（Repr 不再外泄）" {
+  let data = make_test_dir("status-noread")
+  let target = make_test_dir("status-noread-t")
+  let errs : Array[String] = []
+  @debug.assert_eq(run(["add", target], env_with(data), errs), 0)
+  @afs.chmod(data + "/db.zo", 0o000)
+  let errs2 : Array[String] = []
+  @debug.assert_eq(run(["status"], env_with(data), errs2), 1)
+  @debug.assert_eq(
+    errs2[0],
+    "无法读取数据文件: Permission denied (os error 13)",
+  )
+  @afs.chmod(data + "/db.zo", 0o644)
+  cleanup_test_dir(data)
+  cleanup_test_dir(target)
+}
+
+///|
+async test "add _JB_RESOLVE_SYMLINKS=1：自环符号链接 → 解析路径失败 + exit 1（ELOOP 走数字后缀）" {
+  let data = make_test_dir("loop-data")
+  let dir = make_test_dir("loop-link")
+  let loop_path = dir + "/loop"
+  @afs.symlink(target=loop_path, loop_path)
+  let env = env_map([("_JB_DATA_DIR", data), ("_JB_RESOLVE_SYMLINKS", "1")])
+  let errs : Array[String] = []
+  @debug.assert_eq(run(["add", loop_path], env, errs), 1)
+  @debug.assert_eq(errs[0], "解析路径失败: \{loop_path}: (os error 40)")
+  cleanup_test_dir(data)
+  cleanup_test_dir(dir)
+}

@@ -16,7 +16,7 @@ pub async fn for_each_import_line(
   f : (Int, Result[String, String]) -> Unit,
 ) -> Result[Unit, String] {
   let data = @afs.read_file(path) catch {
-    err => return Err("could not read \{path}: \{Repr(err)}")
+    err => return Err("could not read \{path}: \{os_error_message(err)}")
   }
   for_each_record(data.binary(), b'\n', true, f)
   Ok(())

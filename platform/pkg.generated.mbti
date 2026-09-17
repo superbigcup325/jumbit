@@ -9,11 +9,15 @@ import {
 // Values
 pub async fn atuin_history_records() -> Result[(Array[ImportRecord], String), String]
 
+pub fn codec_error_message(@core.CodecError) -> String
+
 pub async fn for_each_import_line(String, (Int, Result[String, String]) -> Unit) -> Result[Unit, String]
 
 pub async fn fzf_select(Array[@core.Dir], Int64, String?, (String) -> String?) -> Result[String, FzfError]
 
 pub async fn load(String) -> Result[Store, StoreError]
+
+pub fn os_error_message(Error) -> String
 
 pub async fn read_import_lines(String) -> Result[Array[ImportRecord], String]
 
@@ -47,6 +51,7 @@ pub enum StoreError {
   Io(String)
   Codec(@core.CodecError)
 } derive(@debug.Debug)
+pub fn StoreError::message(Self) -> String
 
 // Type aliases
 
