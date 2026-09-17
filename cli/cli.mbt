@@ -70,6 +70,8 @@ pub(all) enum Command {
   Describe(DescribeOptions)
   Export(ExportOptions)
   Status(StatusOptions)
+  /// stdio MCP 服务器（jumbit 扩展，上游无）
+  Mcp
   Help
   Unknown(String)
   /// 参数值语义错误（flag 组合冲突/值非法）：文案原样上报，不带「未知命令」前缀
@@ -95,6 +97,7 @@ pub fn parse(args : Array[String]) -> Command {
     "describe" => parse_describe(rest)
     "export" => parse_export(rest)
     "status" => parse_status(rest)
+    "mcp" => parse_mcp(rest)
     "help" | "--help" | "-h" => Help
     other => Unknown(other)
   }
@@ -192,6 +195,7 @@ pub fn usage() -> String {
   "  jumbit export --agents                   输出项目地图 Markdown（贴进 AGENTS.md，jumbit 扩展）\n" +
   "    plugin ∈ atuin/autojump/fasd/z/z.lua/zsh-z（坏行逐条上报不中止）\n" +
   "  jumbit status [--json] [--check]         数据库自检：条目/标注/版本/阈值（--check 扫存在性，--json 给 agent，jumbit 扩展）\n" +
+  "  jumbit mcp                              启动 stdio MCP 服务器（agent 通道，tool：jumbit_query / jumbit_export_agents，jumbit 扩展）\n" +
   "  jumbit help                             显示本帮助\n\n" +
   "环境变量：\n" +
   "  _JB_DATA_DIR                            数据目录（默认 $HOME/.local/share/jumbit，须绝对路径）\n" +

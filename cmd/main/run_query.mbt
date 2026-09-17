@@ -6,6 +6,18 @@ async fn run_query(
   getenv : (String) -> String?,
   errs : Array[String],
 ) -> Int {
+  query_exec(qopts, getenv, errs, fn(s) { println(s) })
+}
+
+///|
+/// query 执行内核：stdout 行经 emit 回调写出（CLI 直连 println；MCP 工具路
+/// 收集进 content，同字节的行串）。交互路的 fzf 直写（print_stdout）不经 emit
+async fn query_exec(
+  qopts : @cli.QueryOptions,
+  getenv : (String) -> String?,
+  errs : Array[String],
+  emit : (String) -> Unit,
+) -> Int {
   let data_dir = match cfg(@config.data_dir(getenv), errs) {
     Some(data_dir) => data_dir
     None => return 1
@@ -55,7 +67,7 @@ async fn run_query(
     // --list 空结果静默、退出码 0（对齐上游 query_list：不进 no match 错误路）
     let shown = take_limit(remaining, qopts.limit)
     for d in shown {
-      println(render(d, now, qopts.score, " "))
+      emit(render(d, now, qopts.score, " "))
     }
     0
   } else if remaining.is_empty() {
@@ -72,14 +84,14 @@ async fn run_query(
   } else if qopts.json {
     // agent 通道：单行 JSON 数组（含全部匹配与 matched_by 证据字段）。
     // 整体物化：单行契约的无换行写与 moon test stdout 协议冲突，tsv 才流式
-    println(render_json(take_limit(remaining, qopts.limit), now, matched_by))
+    emit(render_json(take_limit(remaining, qopts.limit), now, matched_by))
     0
   } else if qopts.tsv {
     // agent 通道：无表头 Tab 分隔行（--limit 0 → 不输出任何行，head -0 语义）。
-    // 逐行 println：字节面 = 各行 \n 连接 + 末尾换行，与原整体物化版一致
+    // 逐行写：字节面 = 各行 \n 连接 + 末尾换行，与原整体物化版一致
     let shown = take_limit(remaining, qopts.limit)
     for d in shown {
-      println(tsv_row(d, now, matched_by))
+      emit(tsv_row(d, now, matched_by))
     }
     0
   } else if qopts.interactive {
@@ -95,7 +107,7 @@ async fn run_query(
     }
     code
   } else {
-    println(render(remaining[0], now, qopts.score, " "))
+    emit(render(remaining[0], now, qopts.score, " "))
     0
   }
   finish(store, errs, code)

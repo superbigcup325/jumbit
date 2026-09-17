@@ -30,6 +30,7 @@ pub(all) enum Command {
   Describe(DescribeOptions)
   Export(ExportOptions)
   Status(StatusOptions)
+  Mcp
   Help
   Unknown(String)
   Invalid(String)

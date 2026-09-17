@@ -76,3 +76,8 @@ jobs:
       # 人工核验后的 golden 即裁判；runner 自带 python3，release 二进制已构建
       - name: Golden check (scripts/golden_check.sh)
         run: bash scripts/golden_check.sh
+
+      # MCP 协议面冻结：stdio 会话固定消息序列逐字节比对（信封/工具目录/
+      # 错误码），protocol 层的字节确定性不靠肉眼
+      - name: MCP protocol check (scripts/mcp_check.sh)
+        run: bash scripts/mcp_check.sh

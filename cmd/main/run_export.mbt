@@ -3,9 +3,21 @@
 /// 「项目地图」，可直接追加进 AGENTS.md 供 coding agent 认识工作区。
 /// 不做存在性检查（离线视图）；路径/标注中的 `|` 转义保表格完整
 async fn run_export(
+  eopts : @cli.ExportOptions,
+  getenv : (String) -> String?,
+  errs : Array[String],
+) -> Int {
+  export_exec(eopts, getenv, errs, fn(s) { println(s) })
+}
+
+///|
+/// export 执行内核：输出行经 emit 回调写出（CLI 直连 println；MCP 工具路
+/// 收集进 content，同字节的行串）
+async fn export_exec(
   _eopts : @cli.ExportOptions,
   getenv : (String) -> String?,
   errs : Array[String],
+  emit : (String) -> Unit,
 ) -> Int {
   let data_dir = match cfg(@config.data_dir(getenv), errs) {
     Some(data_dir) => data_dir
@@ -26,11 +38,11 @@ async fn run_export(
   // frecency 降序
   let ranked = @core.Database::from_dirs(noted)
   ranked.sort_by_score(current_second())
-  println(
+  emit(
     "<!-- jumbit export --agents：项目地图，按常用度（frecency）降序 -->",
   )
-  println("| 路径 | 说明 |")
-  println("|---|---|")
+  emit("| 路径 | 说明 |")
+  emit("|---|---|")
   let dirs = ranked.all()
   for i in dirs.length()>..0 {
     let d = dirs[i]
@@ -38,7 +50,7 @@ async fn run_export(
       Some(t) => t
       None => ""
     }
-    println("| \{md_cell(d.path)} | \{md_cell(note)} |")
+    emit("| \{md_cell(d.path)} | \{md_cell(note)} |")
   }
   finish(store, errs, 0)
 }

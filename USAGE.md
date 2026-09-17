@@ -23,6 +23,7 @@ jumbit import <plugin> [--merge]        从其他工具导入历史数据（plug
 jumbit describe <path> [--note text]    查看/设置人工标注（--note "" 清除，jumbit 扩展）
 jumbit export --agents                  输出项目地图 Markdown（jumbit 扩展）
 jumbit status [--json] [--check]        数据库自检：条目/标注/版本/阈值（--check 扫存在性，jumbit 扩展）
+jumbit mcp                              启动 stdio MCP 服务器（agent 通道，jumbit 扩展，见「面向 agent」）
 jumbit help                             显示帮助
 ```
 
@@ -69,7 +70,7 @@ ji               # fzf 交互式跳转（需安装 fzf）
 
 ## 面向 agent
 
-jumbit 的目录记忆不只喂给 shell，也喂给 coding agent。三条通道：
+jumbit 的目录记忆不只喂给 shell，也喂给 coding agent。四条通道：
 
 **机器可读查询**：`query --json` / `--tsv` 供 agent 脚本解析，`--limit N` 截断返回条数、控制上下文开销：
 
@@ -135,6 +136,31 @@ jumbit export --agents >> AGENTS.md
 ```
 
 命令面映射：`jumbit query --json [--fuzzy] [--limit N] <keywords...>`，解析 stdout 单行 JSON，按 `matched_by` 决定信任级别
+
+**MCP 服务器**：`jumbit mcp` 起 stdio MCP 服务器（Model Context Protocol，stdio transport），上一节的 tool 注册对 MCP 客户端是自动的——客户端从 `tools/list` 拿 schema，无需手工注册。Claude Code 一行接入：
+
+```bash
+claude mcp add jumbit -- jumbit mcp
+```
+
+其他 MCP 客户端用等价 JSON 配置：
+
+```json
+{
+  "mcpServers": {
+    "jumbit": {
+      "command": "jumbit",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+- 两个 tool：`jumbit_query`（`keywords`/`fuzzy`/`limit`，返回与 `query --json` 同源同形的单行 JSON 数组）、`jumbit_export_agents`（无参，返回项目地图 Markdown）
+- `initialize` 应答带 server instructions（何时用 jumbit 的短叙事，客户端注入模型 system prompt）；协议版本支持 2024-11-05 / 2025-03-26 / 2025-06-18，协商规则=支持则回显、否则回 2025-06-18
+- newline-delimited JSON-RPC 2.0，stdout 只承载协议消息（日志无）；客户端关闭 stdin 即正常退出（exit 0）
+- 错误划分对齐同类实现（atuin mcp）：未知工具/参数非法走协议层 -32602；miss 等执行失败走结果内 `isError: true`，文案与 CLI stderr 同源（「没查到」不是故障）
+- 协议字节面由 `scripts/mcp_check.sh` 冻结（CI 步骤），真 client 兼容性经官方 TypeScript SDK 实测
 
 ## 与其他工具集成
 

@@ -14,13 +14,13 @@ A MoonBit rewrite of [zoxide](https://github.com/ajeetdsouza/zoxide): jump to di
 
 zoxide turns "the places you have cd-ed through" into "one keyword and you are back" via frecency (frequency × time decay) — a staple of the modern shell. jumbit rewrites these long-proven semantics from scratch in MoonBit (a 2026-09 MoonBit hackathon project): no upstream code is carried over, and behavior is aligned item by item with zoxide 0.10.0 — decay factors, keyword matching, aging, exit codes, the fzf channel — backed by million-row, byte-level parity runs against the real upstream binary ([BENCHMARKS.md](BENCHMARKS.md))
 
-On that foundation, jumbit extends directory memory beyond the shell: coding agents are the new "heavy cd users", and jumbit gives them three channels — machine-readable queries, human annotations, and a project map — so an agent opening the workspace immediately knows the directory layout and purpose
+On that foundation, jumbit extends directory memory beyond the shell: coding agents are the new "heavy cd users", and jumbit gives them machine-readable queries, human annotations, a project map, and an MCP server — so an agent opening the workspace immediately knows the directory layout and purpose
 
 ## Features
 
 - **Keyword jumping**: `j backend`, `j backend api` — frecency-ranked; the last keyword anchors the final path component, the rest are consumed right-to-left (semantics aligned with upstream)
 - **9-shell integration**: nine templates including bash / zsh / fish; directories are recorded on cd, `j`/`ji` (fzf interactive) and completion work out of the box
-- **Three agent channels**: byte-stable `--json`/`--tsv` output (with the `matched_by` evidence field), `describe` human annotations persisted in the database, `export --agents` project-map Markdown
+- **Agent channels**: byte-stable `--json`/`--tsv` output (with the `matched_by` evidence field), `describe` human annotations persisted in the database, `export --agents` project-map Markdown, and `jumbit mcp` — a stdio MCP server exposing the `jumbit_query`/`jumbit_export_agents` tools plus server instructions (verified against the official SDK client)
 - **History migration**: one-command import from z / zsh-z / z.lua / autojump / fasd / atuin — direct pour into an empty database, `--merge` otherwise, bad rows never abort the run
 - **Tool ecosystem**: sesh (tmux session manager) can swap its frecency backend wholesale; yazi becomes a directory-memory collector through a wrapper function
 - **Data self-check**: `status` shows the database at a glance (entries/notes/format version/aging threshold), `--json` for scripts

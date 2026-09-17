@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- `mcp`：stdio MCP 服务器（jumbit 扩展，上游无）——newline-delimited JSON-RPC 2.0（MCP stdio transport，版本协商支持 2024-11-05/2025-03-26/2025-06-18：支持则回显否则回 2025-06-18）；两个 tool：`jumbit_query`（keywords/fuzzy/limit，执行层与 `query --json` 同源同字节）与 `jumbit_export_agents`（同 `export --agents`）；`initialize` 应答带 server instructions（何时用 jumbit 的短叙事）；错误划分对齐同类实现（atuin mcp）：未知工具/参数形态非法走协议层 -32602，miss 等执行失败走结果内 `isError: true`（文案与 CLI stderr 同源）；通知一律不响应，客户端关闭 stdin 正常退出 0。协议字节由 `scripts/mcp_check.sh` 冻结（CI 新步骤），真 client 兼容性经官方 TypeScript SDK 实测（握手/tools/list/双工具调用/错误划分）
 - `status`：数据库自检命令（jumbit 扩展，上游无）——默认快查输出数据文件路径/大小/实际格式版本（读自文件头）/条目数/标注数/`_JB_MAXAGE` 现值；`--check` 显式触发 O(N) 存在性扫描并追加 `存在 K/N`；`--json` 输出键序固定的单行对象（agent 通道）；库损坏退出码 1 并报 `数据文件损坏: <原因>`，空库（无 db.zo）按零值报告。human 面与 JSON 面已入 golden 冻结（含随机数据目录路径的归一化）
 - shell 集成模板扩至 9 shell 全量（对齐上游）：新增 elvish / nushell / posix / powershell / tcsh / xonsh，`jumbit init <shell>` 参数矩阵与语法门禁（elvish 编译、nu-check、sh -n、pwsh 解析、tcsh -n、py_compile）全部真机验证
 

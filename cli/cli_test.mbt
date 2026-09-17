@@ -158,3 +158,10 @@ test "parse：等号形式边界与原有行为不回退" {
     @cli.Add(add_opts(paths=["--score=1", "/a"])),
   )
 }
+
+///|
+test "parse：mcp 无参数；多余参数/flag 归 Unknown" {
+  @debug.assert_eq(@cli.parse(["mcp"]), @cli.Mcp)
+  @debug.assert_eq(@cli.parse(["mcp", "extra"]), @cli.Unknown("extra"))
+  @debug.assert_eq(@cli.parse(["mcp", "--json"]), @cli.Unknown("--json"))
+}
