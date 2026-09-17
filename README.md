@@ -27,7 +27,7 @@ zoxide 用 frecency（频次 × 时间衰减）把「cd 过的地方」变成「
 
 ## 安装
 
-从源码构建（需 [MoonBit 工具链](https://www.moonbitlang.com/)，锚定 `moon 0.1.20260904`，CI 以此钉死可复现构建）：
+从源码构建（需 [MoonBit 工具链](https://www.moonbitlang.com/)，锚定 `moon 0.1.20260915`，CI 以此钉死可复现构建）：
 
 ```bash
 git clone https://github.com/superbigcup325/jumbit && cd jumbit

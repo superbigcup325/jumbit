@@ -116,7 +116,7 @@ fn decode_view(
   if strip_cr && e > start && bytes[e - 1] == b'\r' {
     e -= 1
   }
-  let text : String = @utf8.decode(bytes.view(start~, end=e)) catch {
+  let text : String = @utf8.decode(bytes.exact_view(start~, end=e)) catch {
     _ => {
       let reason = match utf8_error(bytes, start, e) {
         Some(msg) => "invalid utf-8: \{msg}"

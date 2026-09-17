@@ -112,7 +112,9 @@ pub fn decode(bytes : Bytes) -> Result[Array[Dir], CodecError] {
     if path_len < 0 || path_len > len - pos {
       return Err(CorruptedData)
     }
-    let path : String = @utf8.decode(bytes.view(start=pos, end=pos + path_len)) catch {
+    let path : String = @utf8.decode(
+      bytes.exact_view(start=pos, end=pos + path_len),
+    ) catch {
       _ => return Err(CorruptedData)
     }
     pos += path_len
@@ -142,7 +144,7 @@ pub fn decode(bytes : Bytes) -> Result[Array[Dir], CodecError] {
         None
       } else {
         let text : String = @utf8.decode(
-          bytes.view(start=pos, end=pos + note_len),
+          bytes.exact_view(start=pos, end=pos + note_len),
         ) catch {
           _ => return Err(CorruptedData)
         }

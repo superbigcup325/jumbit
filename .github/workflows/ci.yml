@@ -14,7 +14,7 @@ env:
   #   2. moon version 取新版本号 bump 此常量
   #   3. 全套闸门本地全绿：regression/golden/dataset/chaos/realdata
   #   4. 同步提交推送，盯 CI（本仓库曾因 latest 漂移挂掉：v0.10.12 改名了 strconv.from_str）
-  MOONBIT_VERSION: 0.1.20260904
+  MOONBIT_VERSION: 0.1.20260915
 
 jobs:
   test:

@@ -2,7 +2,6 @@ import {
   "moonbitlang/async",
   "moonbitlang/async/fs" @afs,
   "moonbitlang/async/stdio",
-  "moonbitlang/core/debug",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
   "moonbitlang/x/sys",
@@ -15,6 +14,7 @@ import {
 }
 
 import {
+  "moonbitlang/core/debug",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/string",
 } for "wbtest"

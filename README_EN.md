@@ -27,7 +27,7 @@ On that foundation, jumbit extends directory memory beyond the shell: coding age
 
 ## Install
 
-Build from source (requires the [MoonBit toolchain](https://www.moonbitlang.com/), anchored at `moon 0.1.20260904`; CI pins this version for reproducible builds):
+Build from source (requires the [MoonBit toolchain](https://www.moonbitlang.com/), anchored at `moon 0.1.20260915`; CI pins this version for reproducible builds):
 
 ```bash
 git clone https://github.com/superbigcup325/jumbit && cd jumbit
