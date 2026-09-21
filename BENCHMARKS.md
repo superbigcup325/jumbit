@@ -2,7 +2,7 @@
 
 jumbit 与上游 zoxide 的百万行规模对拍基准。裁判是上游真二进制（zoxide 0.10.0），数据集固定种子可复现，所有场景位级一致性随表给出
 
-> **English summary.** jumbit vs upstream zoxide 0.10.0 on a 1M-line synthetic z-format dataset (300k unique paths, fixed seed). Judge = the real upstream binary; byte-level parity is verified per run (entry count, import stderr, database file). jumbit is 2.5–4.6x slower in wall time and ~2x in peak memory at this scale — the margin analysis below explains where the time goes and why. Real-world directories hold hundreds to thousands of entries, two to three orders of magnitude below this stress dataset
+> **English summary.** jumbit vs upstream zoxide 0.10.0 on a 1M-line synthetic z-format dataset (300k unique paths, fixed seed). Judge = the real upstream binary; byte-level parity is verified per run (entry count, import stderr, database file). jumbit is 2.5–4.6x slower in wall time and ~2x in peak memory at this scale; the margin analysis below explains where the time goes and why. Real-world directories hold hundreds to thousands of entries, two to three orders of magnitude below this stress dataset
 
 ## 方法学
 
@@ -10,7 +10,7 @@ jumbit 与上游 zoxide 的百万行规模对拍基准。裁判是上游真二�
 |---|---|
 | 硬件 | Intel i5-12500H（12th Gen，16 线程）/ 15 GiB / x86_64 |
 | 系统 | CachyOS，kernel 7.2.4-3-cachyos |
-| jumbit | release 构建，工具链 moon 0.1.20260904（与 ci.yml `MOONBIT_VERSION` 一致） |
+| jumbit | release 构建，工具链 moon 0.1.20260904（数据采集时点的 ci.yml 锚定版本） |
 | 裁判 | zoxide 0.10.0（PATH 真二进制，非 mock） |
 | 数据集 | z 格式 1,000,000 行 / 300,000 唯一路径 / 43,822,540 字节（`scripts/gen_dataset.py`，seed=20260908，Zipf 访问分布 + 时间衰减 + 边界行 + 确定性坏行） |
 | 环境压脚 | `_JB_MAXAGE`/`_ZO_MAXAGE` = u32::MAX（压住老化削库；1M 行 rank 累计远超默认阈值，不压则两侧同样清库） |
@@ -26,7 +26,7 @@ jumbit 与上游 zoxide 的百万行规模对拍基准。裁判是上游真二�
 | import z（1M 行全量导入） | 1.654s / 203.0 MB | 0.357s / 101.2 MB | 4.63x |
 | query --list --score --all（全量输出） | 0.344s / 85.2 MB | 0.136s / 41.8 MB | 2.53x |
 | query 关键词（单结果） | 0.075s / 85.2 MB | 0.024s / 41.8 MB | 3.12x |
-| query --tsv --all（jumbit 扩展，上游无对应） | 0.151s / 85.1 MB | — | — |
+| query --tsv --all（jumbit 扩展，上游无对应） | 0.151s / 85.1 MB | 无 | 无 |
 
 位级一致性（每轮 perf_check 校验）：
 
@@ -48,7 +48,7 @@ swap_remove。读取段已是单趟流式（对齐上游 import.rs::run 的惰�
 从 499MB 压到 203MB（-59%）；query 侧 85MB 与上游 42MB 的差距同源
 
 **规模感**：这是压力测试集。真实目录库是几百到几千条，比数据集小 2-3 个数量级，
-全场景都在毫秒级——选型不应以本表为依据，表的价值在可复现与位级一致性证明
+全场景都在毫秒级，选型不应以本表为依据，表的价值在可复现与位级一致性证明
 
 **jumbit 的差异面不在速度**：`--json`/`--tsv`/`--limit`/`--fuzzy`/`describe`/
 `export --agents`/`status` 是上游没有的通道（agent/脚本消费面），本表仅确认这些

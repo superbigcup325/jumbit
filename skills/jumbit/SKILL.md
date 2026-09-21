@@ -6,7 +6,7 @@ description: Use when finding a project directory by a partial or fuzzy name ("t
 # Directory recall with jumbit
 
 jumbit keeps a frecency-ranked history of the user's directories (a MoonBit rewrite of
-zoxide, independent database). When the user refers to a project loosely, ask jumbit —
+zoxide, independent database). When the user refers to a project loosely, ask jumbit;
 do not guess paths or shell out to `find`.
 
 If `jumbit` is not on `PATH`, fall back to asking the user for the path.
@@ -37,24 +37,24 @@ jumbit query --json --limit 5 backend
 ```
 
 - Single-line JSON array, key order fixed: `path, score, last_accessed, matched_by`
-- `matched_by` is evidence: `exact` (keyword match) or `fuzzy` (`--fuzzy` fallback) —
+- `matched_by` is evidence: `exact` (keyword match) or `fuzzy` (`--fuzzy` fallback):
   trust `exact` hits, double-check `fuzzy` ones before acting
 - `jumbit query --tsv` emits headerless tab-separated rows, same column order; paths are
-  written verbatim (a path containing a tab is ambiguous — treat TSV as best-effort)
+  written verbatim (a path containing a tab is ambiguous; treat TSV as best-effort)
 - `jumbit query --list` lists all entries, `--score` prefixes each line with the score
 
 ## Exit codes & troubleshooting
 
 Exit codes are the decision surface, identical across subcommands: `0` = result/success
 (note: `query --list` exits 0 on empty output too), `1` = no match or runtime failure
-(**"not found" is not a malfunction** — read stderr), `2` = usage error (stderr points
+(**"not found" is not a malfunction**; read stderr), `2` = usage error (stderr points
 to `jumbit help`), `130` = fzf user interrupt (`--interactive` only).
 
 | Symptom | Cause | Fix |
 |---|---|---|
 | A new directory is not found | Hook not installed, or never `cd`ed into | `jumbit add <dir>`; check the `init` eval line in the rc file |
 | Result path no longer exists | Default queries filter nonexistent paths and lazily delete stale ones | `--all` to bypass |
-| Fuzzy hit trustworthiness | — | `matched_by` in `--json`: `exact` = act, `fuzzy` = verify first |
+| Fuzzy hit trustworthiness | n/a | `matched_by` in `--json`: `exact` = act, `fuzzy` = verify first |
 | import refuses to run | Database non-empty | `--merge` |
 | `could not find fzf` | fzf not installed | Install fzf or use non-interactive query |
 | Where is the data | Default `$HOME/.local/share/jumbit/db.zo` | `_JB_DATA_DIR` (absolute path) |
@@ -86,14 +86,14 @@ claude mcp add jumbit -- jumbit mcp
 ```
 
 For MCP-native clients, `jumbit mcp` runs a stdio MCP server exposing the same data as two
-tools: `jumbit_query` (keywords/fuzzy/limit — same JSON shape and semantics as
+tools: `jumbit_query` (keywords/fuzzy/limit, same JSON shape and semantics as
 `query --json`) and `jumbit_export_agents` (the project map). The initialize response
 carries server instructions describing when to reach for jumbit. A miss is reported as a
-result with `isError: true` — a normal outcome, not a protocol error.
+result with `isError: true`, a normal outcome, not a protocol error.
 
 ## Notes
 
-- The database is jumbit's own format — it does not read zoxide's db. Check availability
+- The database is jumbit's own format; it does not read zoxide's db. Check availability
   with `command -v jumbit`, and never try to parse zoxide's `db.zo`.
 - Isolate runs (tests, sandboxes) with `_JB_DATA_DIR=/some/dir`.
 - See `jumbit help` for the full command surface.

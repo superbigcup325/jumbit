@@ -5,22 +5,22 @@
 ## [Unreleased]
 
 ### Added
-- `mcp`：stdio MCP 服务器（jumbit 扩展，上游无）——newline-delimited JSON-RPC 2.0（MCP stdio transport，版本协商支持 2024-11-05/2025-03-26/2025-06-18：支持则回显否则回 2025-06-18）；两个 tool：`jumbit_query`（keywords/fuzzy/limit，执行层与 `query --json` 同源同字节）与 `jumbit_export_agents`（同 `export --agents`）；`initialize` 应答带 server instructions（何时用 jumbit 的短叙事）；错误划分对齐同类实现（atuin mcp）：未知工具/参数形态非法走协议层 -32602，miss 等执行失败走结果内 `isError: true`（文案与 CLI stderr 同源）；通知一律不响应，客户端关闭 stdin 正常退出 0。协议字节由 `scripts/mcp_check.sh` 冻结（CI 新步骤），真 client 兼容性经官方 TypeScript SDK 实测（握手/tools/list/双工具调用/错误划分）
-- `status`：数据库自检命令（jumbit 扩展，上游无）——默认快查输出数据文件路径/大小/实际格式版本（读自文件头）/条目数/标注数/`_JB_MAXAGE` 现值；`--check` 显式触发 O(N) 存在性扫描并追加 `存在 K/N`；`--json` 输出键序固定的单行对象（agent 通道）；库损坏退出码 1 并报 `数据文件损坏: <原因>`，空库（无 db.zo）按零值报告。human 面与 JSON 面已入 golden 冻结（含随机数据目录路径的归一化）
+- `mcp`：stdio MCP 服务器（jumbit 扩展，上游无）：newline-delimited JSON-RPC 2.0（MCP stdio transport，版本协商支持 2024-11-05/2025-03-26/2025-06-18：支持则回显否则回 2025-06-18）；两个 tool：`jumbit_query`（keywords/fuzzy/limit，执行层与 `query --json` 同源同字节）与 `jumbit_export_agents`（同 `export --agents`）；`initialize` 应答带 server instructions（何时用 jumbit 的短叙事）；错误划分对齐同类实现（atuin mcp）：未知工具/参数形态非法走协议层 -32602，miss 等执行失败走结果内 `isError: true`（文案与 CLI stderr 同源）；通知一律不响应，客户端关闭 stdin 正常退出 0。协议字节由 `scripts/mcp_check.sh` 冻结（CI 新步骤），真 client 兼容性经官方 TypeScript SDK 实测（握手/tools/list/双工具调用/错误划分）
+- `status`：数据库自检命令（jumbit 扩展，上游无）：默认快查输出数据文件路径/大小/实际格式版本（读自文件头）/条目数/标注数/`_JB_MAXAGE` 现值；`--check` 显式触发 O(N) 存在性扫描并追加 `存在 K/N`；`--json` 输出键序固定的单行对象（agent 通道）；库损坏退出码 1 并报 `数据文件损坏: <原因>`，空库（无 db.zo）按零值报告。human 面与 JSON 面已入 golden 冻结（含随机数据目录路径的归一化）
 - shell 集成模板扩至 9 shell 全量（对齐上游）：新增 elvish / nushell / posix / powershell / tcsh / xonsh，`jumbit init <shell>` 参数矩阵与语法门禁（elvish 编译、nu-check、sh -n、pwsh 解析、tcsh -n、py_compile）全部真机验证
 
 ### Changed
 - 工具链锚定升级 `0.1.20260904` → `0.1.20260915`（moonc v0.10.13）：`bytes.view` 迁移 `exact_view`（严格切片改名，语义零变化）；新版 unused_package lint（主块 import 只按主代码判定）下测试用依赖归位 `for "test"`/`for "wbtest"` 块（cli/cmd/main/core/platform/templates 五包），删除全仓无使用的 `moonbitlang/async/io` 导入；dataset/chaos/realdata/golden/mcp 字节面全绿，性能同量级
-- help 环境变量表补 `_JB_FZF_OPTS`（透传给 fzf 的自定义参数）——README 环境变量表早有记载、`jumbit help` 输出漏列
-- import/query 内存与分配优化（行为与输出字节面不变）：坏行消息与行定位串惰性构造、db 编码预分配、--tsv 输出流式化、stderr 批量写、import 改单趟流式（对齐上游 import.rs::run 惰性迭代结构，六插件文件源逐行回调解析+入库，atuin 折叠保持物化）——百万行 import 峰值内存 499→203MB、耗时 2.29→1.62s，--tsv 全量输出峰值 217→85MB
+- help 环境变量表补 `_JB_FZF_OPTS`（透传给 fzf 的自定义参数）：README 环境变量表早有记载、`jumbit help` 输出漏列
+- import/query 内存与分配优化（行为与输出字节面不变）：坏行消息与行定位串惰性构造、db 编码预分配、--tsv 输出流式化、stderr 批量写、import 改单趟流式（对齐上游 import.rs::run 惰性迭代结构，六插件文件源逐行回调解析+入库，atuin 折叠保持物化）：百万行 import 峰值内存 499→203MB、耗时 2.29→1.62s，--tsv 全量输出峰值 217→85MB
 
 ### Fixed
-- 用户面错误文案清理，Debug 枚举名与 Repr 结构不再外泄：`could not read <path>: <errno 短语> (os error N)`（原 `<@os_error.OSError: …>` 调试结构）、`数据文件损坏: <中文短句>`（原 `UnsupportedVersion(1651663207)` 等枚举名）、`打开数据库失败: <中文短句>`（原 `Codec(CorruptedData)`）；重审补齐同族残留——save 失败 `保存数据库失败: 读写失败: …`、`_JB_RESOLVE_SYMLINKS` realpath 失败 `解析路径失败: <path>: …`、status 读文件失败 `无法读取数据文件: …`（errno 短语走 OSError 公开谓词覆盖 ENOENT/EACCES/ENOTDIR/EEXIST，其余保 `(os error N)` 数字后缀——`errno_to_string` 标注 alert_internal 不可用）；golden status-corrupt.err 同步冻结
-- `query --interactive` 的 fzf 定位改为 spawn 前沿 PATH 预解析（取首个「普通文件 + 可执行」候选）：裸名命中不可执行文件或同名目录时，旧实现把 exec 失败留给子进程 wait 退出码路，报 `fzf returned an error` 且伴随子进程 stderr 泄漏（黑盒实测 `inappropriate ioctl for device`），违背「spawn 失败统一报 `could not find fzf, is it installed?`」口径——现统一归 NotFound（exit 1）；不可执行候选在前时跳过并选中后续可执行者
+- 用户面错误文案清理，Debug 枚举名与 Repr 结构不再外泄：`could not read <path>: <errno 短语> (os error N)`（原 `<@os_error.OSError: …>` 调试结构）、`数据文件损坏: <中文短句>`（原 `UnsupportedVersion(1651663207)` 等枚举名）、`打开数据库失败: <中文短句>`（原 `Codec(CorruptedData)`）；重审补齐同族残留：save 失败 `保存数据库失败: 读写失败: …`、`_JB_RESOLVE_SYMLINKS` realpath 失败 `解析路径失败: <path>: …`、status 读文件失败 `无法读取数据文件: …`（errno 短语走 OSError 公开谓词覆盖 ENOENT/EACCES/ENOTDIR/EEXIST，其余保 `(os error N)` 数字后缀，`errno_to_string` 标注 alert_internal 不可用）；golden status-corrupt.err 同步冻结
+- `query --interactive` 的 fzf 定位改为 spawn 前沿 PATH 预解析（取首个「普通文件 + 可执行」候选）：裸名命中不可执行文件或同名目录时，旧实现把 exec 失败留给子进程 wait 退出码路，报 `fzf returned an error` 且伴随子进程 stderr 泄漏（黑盒实测 `inappropriate ioctl for device`），违背「spawn 失败统一报 `could not find fzf, is it installed?`」口径，现统一归 NotFound（exit 1）；不可执行候选在前时跳过并选中后续可执行者
 - CLI 解析支持 `--flag=value` 等号形式（对齐上游 clap 双形态）：`init --cmd=`/`--hook=`、`query --exclude=`/`--limit=`、`add --score=`、`describe --note=`。此前 README 记载的 `--cmd=cd` 写法实际被拒（exit 2「未知命令」）；布尔/未知 flag 的等号形式维持报原文 exit 2，`--` 之后不拆分
-- `query --interactive` 对齐上游 zoxide 0.10.0（伪 fzf 探针矩阵实测）：选中输出不再额外追加换行（此前 `println` 多出一个）；fzf 返回短于 7 字节的 selection 改走错误路 `could not read selection from fzf`（exit 1，此前输出空行且 exit 0）；fzf 异常退出码从原样透传改为上游语义表——2 报 `fzf returned an error`、128..=254 与信号杀死报 `fzf was terminated`、其余（3..=127、255）报 `fzf returned an unknown error`，均 exit 1；130（用户中断）静默透传不变
+- `query --interactive` 对齐上游 zoxide 0.10.0（伪 fzf 探针矩阵实测）：选中输出不再额外追加换行（此前 `println` 多出一个）；fzf 返回短于 7 字节的 selection 改走错误路 `could not read selection from fzf`（exit 1，此前输出空行且 exit 0）；fzf 异常退出码从原样透传改为上游语义表：2 报 `fzf returned an error`、128..=254 与信号杀死报 `fzf was terminated`、其余（3..=127、255）报 `fzf returned an unknown error`，均 exit 1；130（用户中断）静默透传不变
 - fzf 候选投喂在 fzf 提前退出时不再因 Broken pipe 中断命令（对齐上游 write 的 BrokenPipe → wait 处理：静默停止投喂）
-- shell 经 PATH 裸名调用报「未知命令: jumbit」：argv[0] 处理从「含 `/` 才剥」改为无条件剥（对齐上游 clap「首参即 bin_name」约定）。原启发式基于「moon run 不传程序名」的假设，实测钉死工具链（moon 0.1.20260904）下 moon run native/wasm 均传 exe/wasm 路径、OS 直跑传裸名或完整路径——所有启动路径 argv[0] 皆为程序名；旧逻辑在 bash/zsh/fish 裸名调用下把程序名当子命令报错（exit 2），hook 自动记录随之静默失败
+- shell 经 PATH 裸名调用报「未知命令: jumbit」：argv[0] 处理从「含 `/` 才剥」改为无条件剥（对齐上游 clap「首参即 bin_name」约定）。原启发式基于「moon run 不传程序名」的假设，实测钉死工具链（moon 0.1.20260904）下 moon run native/wasm 均传 exe/wasm 路径、OS 直跑传裸名或完整路径，所有启动路径 argv[0] 皆为程序名；旧逻辑在 bash/zsh/fish 裸名调用下把程序名当子命令报错（exit 2），hook 自动记录随之静默失败
 
 ## [0.1.0] - 2026-09-11
 
@@ -30,7 +30,7 @@
 - `query --json`：单行 JSON 数组输出全部匹配（path/score/last_accessed/matched_by），面向脚本与 agent 的结构化通道，与 `--interactive` 互斥
 - `query --tsv`：无表头 Tab 分隔数据行（`path\tscore\tlast_accessed\tmatched_by`，列序同 `--json` 键序），path 原样不转义；NaN/±Infinity 出 `NaN`/`Infinity`/`-Infinity` 原文；与 `--json`/`--interactive` 互斥，`--list` 组合时 `--list` 胜出（既有先例）
 - `query --limit <n>`：`--list`/`--json`/`--tsv` 列表型输出的统一截断，取排序后前 n 条；`--limit 0` 为空输出加退出码 0，不触发无匹配错误路；与单结果路、`--interactive` 组合报参数错误
-- `query --fuzzy`：精确匹配零命中时的兜底路——各关键词（ASCII 归一）为某路径组件的子串即命中，不限末组件、无序且允许同组件；`--json` 的 `matched_by` 出 `exact`/`fuzzy` 双值标注证据来源
+- `query --fuzzy`：精确匹配零命中时的兜底路：各关键词（ASCII 归一）为某路径组件的子串即命中，不限末组件、无序且允许同组件；`--json` 的 `matched_by` 出 `exact`/`fuzzy` 双值标注证据来源
 - `import <plugin>`：从其他工具导入历史数据，支持 `atuin`/`autojump`/`fasd`/`z`/`z.lua`/`zsh-z`（对齐上游 cmd/import.rs + import/ 六模块）
   - 空库直灌、非空库须 `--merge`（可位于插件名前后，上游 global flag 语义）
   - 数据文件按各插件标准约定自动探测（`_Z_DATA`/`_FASD_DATA`/`ZSHZ_DATA`/`_ZL_DATA`/`XDG_DATA_HOME`）；z.lua 主路径缺失回落 fish 变体路径；atuin 经 `atuin history list --print0` 子进程读取

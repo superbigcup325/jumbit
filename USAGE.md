@@ -105,7 +105,7 @@ jumbit export --agents >> AGENTS.md
 | /home/you/projects/backend-api | 后端服务 |
 ```
 
-**退出码与报错**：agent 决策面——0 有结果或成功；1 无结果或运行失败（「没查到」不是故障，读 stderr 区分）；2 用法错误；130 fzf 用户中断。全表与 stderr 文案对照见 [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+**退出码与报错**：agent 决策面，0 有结果或成功；1 无结果或运行失败（「没查到」不是故障，读 stderr 区分）；2 用法错误；130 fzf 用户中断。全表与 stderr 文案对照见 [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 
 **注册为 tool**（工具注册型 agent 的 JSON schema 草案；skill 加载型用仓库 `skills/jumbit/SKILL.md`）：
 
@@ -137,7 +137,7 @@ jumbit export --agents >> AGENTS.md
 
 命令面映射：`jumbit query --json [--fuzzy] [--limit N] <keywords...>`，解析 stdout 单行 JSON，按 `matched_by` 决定信任级别
 
-**MCP 服务器**：`jumbit mcp` 起 stdio MCP 服务器（Model Context Protocol，stdio transport），上一节的 tool 注册对 MCP 客户端是自动的——客户端从 `tools/list` 拿 schema，无需手工注册。Claude Code 一行接入：
+**MCP 服务器**：`jumbit mcp` 起 stdio MCP 服务器（Model Context Protocol，stdio transport），上一节的 tool 注册对 MCP 客户端是自动的：客户端从 `tools/list` 拿 schema，无需手工注册。Claude Code 一行接入：
 
 ```bash
 claude mcp add jumbit -- jumbit mcp
@@ -178,7 +178,7 @@ add_command = "jumbit add {}"
 remove_command = "jumbit remove {}"
 ```
 
-`sesh list -z` 列出 jumbit 记录（按得分降序）；`sesh connect <名字或路径>` 创建并连接会话，连接后经 `add_command` 回写使用记录——跳转决策与记忆积累双向打通
+`sesh list -z` 列出 jumbit 记录（按得分降序）；`sesh connect <名字或路径>` 创建并连接会话，连接后经 `add_command` 回写使用记录，跳转决策与记忆积累双向打通
 
 ### yazi（终端文件管理器）
 
@@ -200,7 +200,7 @@ yj() {
 }
 ```
 
-`yj <关键词>` 经 jumbit 解析出目录作为 yazi 起点进入文件管理；退出后自动 `jumbit add` 喂入本次到达的目录并 cd 过去——文件管理器成为目录记忆的采集器
+`yj <关键词>` 经 jumbit 解析出目录作为 yazi 起点进入文件管理；退出后自动 `jumbit add` 喂入本次到达的目录并 cd 过去，文件管理器成为目录记忆的采集器
 
 ## 导入
 
@@ -221,7 +221,7 @@ jumbit import <plugin>
 
 注：数据库非空时须加 `--merge` 合并导入（如 `jumbit import --merge z`）；坏行逐条上报、不中止导入
 
-注：atuin 经子进程 `atuin history list` 读取，其退出码不检查（对齐上游）——atuin 自身报错时得到空结果且 exit 0，成败以 stderr 为准
+注：atuin 经子进程 `atuin history list` 读取，其退出码不检查（对齐上游）：atuin 自身报错时得到空结果且 exit 0，成败以 stderr 为准
 
 ## 工作原理
 
@@ -234,7 +234,7 @@ jumbit import <plugin>
 | 1 周内 | ×0.5 |
 | 其余 | ×0.25 |
 
-**老化**。库内总分**严格超过** `_JB_MAXAGE`（默认 10000）时触发一次全局衰减：全体 rank 乘 `0.9 × max_age / total`，乘后 rank < 1 的条目删除——常去的地方留下，冷门自然淡出
+**老化**。库内总分**严格超过** `_JB_MAXAGE`（默认 10000）时触发一次全局衰减：全体 rank 乘 `0.9 × max_age / total`，乘后 rank < 1 的条目删除，常去的地方留下，冷门自然淡出
 
 **关键词匹配**（语义对齐上游）：最后一个关键词锚定路径末组件（命中点右侧到路径末尾不得再出现分隔符），其余关键词从右往左逐个消耗、命中区间不重叠；大小写归一仅限 ASCII
 
@@ -263,7 +263,7 @@ j backend api   # api 落在路径末组件，backend 在其左侧消耗
 - 关键词大小写归一仅限 ASCII（上游为 Unicode 全量）
 - `_JB_EXCLUDE_DIRS` 的 glob 排除不支持 `{a,b}` 括号展开；`**` 按两个 `*` 处理、不跨分隔符（上游 glob crate 的 `**` 为递归通配）；`*`/`?`/`[...]` 语义对齐；`query --exclude` 为精确路径过滤、不做 glob（对齐上游）
 - 仅支持 Linux；fzf 预览窗口的平台定制未实现（import 的 autojump/z.lua 路径探测同按 Linux 语义）
-- fzf 交互通道（`query --interactive`）：选中/`--score` 输出与退出码对齐上游（伪 fzf 探针矩阵逐字节对拍）；文案差异两处——fzf 取消（其退出码 1）jumbit 静默退出 1，上游报 `no match found`；fzf 自身异常的提示为英文原文且无 `zoxide: ` 前缀。另 spawn 失败不区分「未安装」与「无法启动」（上游区分，进程绑定不暴露错误类别），统一报 `could not find fzf, is it installed?`
+- fzf 交互通道（`query --interactive`）：选中/`--score` 输出与退出码对齐上游（伪 fzf 探针矩阵逐字节对拍）；文案差异两处：fzf 取消（其退出码 1）jumbit 静默退出 1，上游报 `no match found`；fzf 自身异常的提示为英文原文且无 `zoxide: ` 前缀。另 spawn 失败不区分「未安装」与「无法启动」（上游区分，进程绑定不暴露错误类别），统一报 `could not find fzf, is it installed?`
 - 未移植：`edit` 子命令
-- 已知问题（与上游 0.10.0 一致）：非 finite rank 毒库——`import` 接受 `inf`/`nan` 字面量与溢出饱和为 inf 的大数作 rank，`add --score` 同样接受（inf 直接入库；nan 字面量经 max(0) 钳制存为 0，不构成毒源，与上游 add 的 rank 下限钳制一致）；随后老化遇 `total=inf` 因子归零、库内其余条目被清出，遇 `total=NaN` 老化永久停摆，全程退出码 0 无告警。上游修复 [ajeetdsouza/zoxide#1280](https://github.com/ajeetdsouza/zoxide/pull/1280) 未合并，合并后跟进
-- 扩展（上游无）：`query --json`（单行 JSON 数组，含 `matched_by` 证据字段）、`query --tsv`（无表头 Tab 分隔行 `path\tscore\tlast_accessed\tmatched_by`，列序与 `--json` 键序一致；path 原样不转义——路径含 tab 时该行列数歧义，属已知限制；score 为最短表示，NaN/±Infinity 出 `NaN`/`Infinity`/`-Infinity` 原文而非 JSON 的 `null`）、`query --limit <n>`（`--list`/`--json`/`--tsv` 输出的前 n 条截断，`--limit 0` 为空输出、退出码 0；重复出现后者覆盖）、`query --fuzzy`（仅精确匹配零命中时启用，各关键词为某路径组件的子串即命中——不限末组件、无序且允许同组件，大小写归一同主路仅 ASCII）、`describe`（条目人工标注，随库持久化）、`export --agents`（项目地图）与 `status`（数据库自检：数据文件/大小/格式版本/条目数/标注数/老化阈值，`--json` 单行对象；`--check` 显式触发 O(N) 存在性扫描并报 `存在 K/N`；库损坏退出码 1）
+- 已知问题（与上游 0.10.0 一致）：非 finite rank 毒库，`import` 接受 `inf`/`nan` 字面量与溢出饱和为 inf 的大数作 rank，`add --score` 同样接受（inf 直接入库；nan 字面量经 max(0) 钳制存为 0，不构成毒源，与上游 add 的 rank 下限钳制一致）；随后老化遇 `total=inf` 因子归零、库内其余条目被清出，遇 `total=NaN` 老化永久停摆，全程退出码 0 无告警。上游修复 [ajeetdsouza/zoxide#1280](https://github.com/ajeetdsouza/zoxide/pull/1280) 未合并，合并后跟进
+- 扩展（上游无）：`query --json`（单行 JSON 数组，含 `matched_by` 证据字段）、`query --tsv`（无表头 Tab 分隔行 `path\tscore\tlast_accessed\tmatched_by`，列序与 `--json` 键序一致；path 原样不转义；路径含 tab 时该行列数歧义，属已知限制；score 为最短表示，NaN/±Infinity 出 `NaN`/`Infinity`/`-Infinity` 原文而非 JSON 的 `null`）、`query --limit <n>`（`--list`/`--json`/`--tsv` 输出的前 n 条截断，`--limit 0` 为空输出、退出码 0；重复出现后者覆盖）、`query --fuzzy`（仅精确匹配零命中时启用，各关键词为某路径组件的子串即命中：不限末组件、无序且允许同组件，大小写归一同主路仅 ASCII）、`describe`（条目人工标注，随库持久化）、`export --agents`（项目地图）与 `status`（数据库自检：数据文件/大小/格式版本/条目数/标注数/老化阈值，`--json` 单行对象；`--check` 显式触发 O(N) 存在性扫描并报 `存在 K/N`；库损坏退出码 1）
