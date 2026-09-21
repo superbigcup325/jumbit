@@ -259,6 +259,36 @@ test "sort_by_score：NaN 按 IEEE totalOrder 排最前（上游 total_cmp 对�
 }
 
 ///|
+test "sort_by_score：平分输入输出非降序且条目集不变" {
+  let now = 1788833590L
+  let db = @core.Database::from_dirs([
+    @core.Dir::{ path: "/b", rank: 1.0, last_accessed: now, note: None, },
+    @core.Dir::{ path: "/a", rank: 1.0, last_accessed: now, note: None, },
+    @core.Dir::{ path: "/c", rank: 2.0, last_accessed: now, note: None, },
+    @core.Dir::{ path: "/d", rank: 1.0, last_accessed: now, note: None, },
+  ])
+  db.sort_by_score(now)
+  // 平分条目（同分）顺序不锁（sort_by 不稳定），锁非降序与条目集
+  let all = db.all()
+  @debug.assert_eq(all.length(), 4)
+  @debug.assert_eq(all[0].score(now) <= all[1].score(now), true)
+  @debug.assert_eq(all[1].score(now) <= all[2].score(now), true)
+  @debug.assert_eq(all[2].score(now) <= all[3].score(now), true)
+  @debug.assert_eq(all[3].path, "/c")
+}
+
+///|
+test "sort_by_score：空库与单条" {
+  let now = 1788833590L
+  let db = @core.Database::new()
+  db.sort_by_score(now)
+  @debug.assert_eq(db.all().length(), 0)
+  db.add("/only", 1.0, now)
+  db.sort_by_score(now)
+  @debug.assert_eq(db.all()[0].path, "/only")
+}
+
+///|
 test "format_score：NaN 显示 NaN（Rust {:.1} 对齐）" {
   let dir = @core.Dir::{
     path: "/nan",
