@@ -2,7 +2,7 @@
 
 jumbit 与上游 zoxide 的百万行规模对拍基准。裁判是上游真二进制（zoxide 0.10.0），数据集固定种子可复现，所有场景位级一致性随表给出
 
-> **English summary.** jumbit vs upstream zoxide 0.10.0 on a 1M-line synthetic z-format dataset (300k unique paths, fixed seed). Judge = the real upstream binary; byte-level parity is verified per run (entry count, import stderr, database file). jumbit is 2.5–4.6x slower in wall time and ~2x in peak memory at this scale; the margin analysis below explains where the time goes and why. Real-world directories hold hundreds to thousands of entries, two to three orders of magnitude below this stress dataset
+> **English summary.** jumbit vs upstream zoxide 0.10.0 on a 1M-line synthetic z-format dataset (300k unique paths, fixed seed). Judge = the real upstream binary; byte-level parity is verified per run (entry count, import stderr, database file). jumbit is 2.4–5.0x slower in wall time and ~2x in peak memory at this scale; the margin analysis below explains where the time goes and why. Real-world directories hold hundreds to thousands of entries, two to three orders of magnitude below this stress dataset
 
 ## 方法学
 
@@ -10,7 +10,7 @@ jumbit 与上游 zoxide 的百万行规模对拍基准。裁判是上游真二�
 |---|---|
 | 硬件 | Intel i5-12500H（12th Gen，16 线程）/ 15 GiB / x86_64 |
 | 系统 | CachyOS，kernel 7.2.4-3-cachyos |
-| jumbit | release 构建，工具链 moon 0.1.20260904（数据采集时点的 ci.yml 锚定版本） |
+| jumbit | release 构建，工具链 moon 0.1.20260920（与 ci.yml `MOONBIT_VERSION` 一致） |
 | 裁判 | zoxide 0.10.0（PATH 真二进制，非 mock） |
 | 数据集 | z 格式 1,000,000 行 / 300,000 唯一路径 / 43,822,540 字节（`scripts/gen_dataset.py`，seed=20260908，Zipf 访问分布 + 时间衰减 + 边界行 + 确定性坏行） |
 | 环境压脚 | `_JB_MAXAGE`/`_ZO_MAXAGE` = u32::MAX（压住老化削库；1M 行 rank 累计远超默认阈值，不压则两侧同样清库） |
@@ -23,10 +23,10 @@ jumbit 与上游 zoxide 的百万行规模对拍基准。裁判是上游真二�
 
 | 场景 | jumbit | zoxide | 时间比 |
 |---|---|---|---|
-| import z（1M 行全量导入） | 1.654s / 203.0 MB | 0.357s / 101.2 MB | 4.63x |
-| query --list --score --all（全量输出） | 0.344s / 85.2 MB | 0.136s / 41.8 MB | 2.53x |
-| query 关键词（单结果） | 0.075s / 85.2 MB | 0.024s / 41.8 MB | 3.12x |
-| query --tsv --all（jumbit 扩展，上游无对应） | 0.151s / 85.1 MB | 无 | 无 |
+| import z（1M 行全量导入） | 1.764s / 203.3 MB | 0.352s / 101.2 MB | 5.01x |
+| query --list --score --all（全量输出） | 0.311s / 85.1 MB | 0.129s / 41.7 MB | 2.41x |
+| query 关键词（单结果） | 0.080s / 85.3 MB | 0.020s / 41.8 MB | 4.00x |
+| query --tsv --all（jumbit 扩展，上游无对应） | 0.143s / 85.2 MB | 无 | 无 |
 
 位级一致性（每轮 perf_check 校验）：
 
@@ -36,7 +36,7 @@ jumbit 与上游 zoxide 的百万行规模对拍基准。裁判是上游真二�
 
 ## 边际由什么决定（What decides the margin）
 
-**时间大头在 dedup 的前置排序，不在读取或写盘**。import 的 1.65s 里约 1s 是对 1M 条
+**时间大头在 dedup 的前置排序，不在读取或写盘**。import 的 1.76s 里约 1.1s 是对 1M 条
 `add_unchecked` 产物做 `sort_by_path`（2000 万+ 次 UTF-16 字符串比较）+ 1M 次
 swap_remove。读取段已是单趟流式（对齐上游 import.rs::run 的惰性迭代结构），写盘段
 （预分配编码 + 原子替换）占 ~0.25s。1M 行是一次性导入场景，秒级足够，进一步压缩

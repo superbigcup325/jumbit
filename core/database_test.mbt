@@ -289,6 +289,20 @@ test "sort_by_score：空库与单条" {
 }
 
 ///|
+test "sort_by_path：纯字典序（长度优先的 shortlex 是与上游的分歧，已改齐）" {
+  let db = @core.Database::from_dirs([
+    @core.Dir::{ path: "/z", rank: 1.0, last_accessed: 100L, note: None, },
+    @core.Dir::{ path: "/a/b", rank: 1.0, last_accessed: 100L, note: None, },
+    @core.Dir::{ path: "/a", rank: 1.0, last_accessed: 100L, note: None, },
+  ])
+  db.sort_by_path()
+  // 纯字典序：/a < /a/b < /z；shortlex（长度优先）会给出 /a、/z、/a/b
+  @debug.assert_eq(db.all()[0].path, "/a")
+  @debug.assert_eq(db.all()[1].path, "/a/b")
+  @debug.assert_eq(db.all()[2].path, "/z")
+}
+
+///|
 test "format_score：NaN 显示 NaN（Rust {:.1} 对齐）" {
   let dir = @core.Dir::{
     path: "/nan",

@@ -15,6 +15,7 @@
 - import/query 内存与分配优化（行为与输出字节面不变）：坏行消息与行定位串惰性构造、db 编码预分配、--tsv 输出流式化、stderr 批量写、import 改单趟流式（对齐上游 import.rs::run 惰性迭代结构，六插件文件源逐行回调解析+入库，atuin 折叠保持物化）：百万行 import 峰值内存 499→203MB、耗时 2.29→1.62s，--tsv 全量输出峰值 217→85MB
 
 ### Fixed
+- db 内条目序与上游分歧：`sort_by_path` 误用 MoonBit `String::compare`（shortlex 长度优先）导致混合长度路径集下条目序与上游 Rust `path.cmp`（纯字典序）不同，改为显式纯字典序比较（内容逐码元优先，前缀短者在前）；影响 import/写入后的 db.zo 条目排列与 score 平分时的 query 并列次序，条目多集不变；同数据集双工具 import 解析对拍实锤首条目一致，新增锁定用例（短lex 错序红色验证）
 - 用户面错误文案清理，Debug 枚举名与 Repr 结构不再外泄：`could not read <path>: <errno 短语> (os error N)`（原 `<@os_error.OSError: …>` 调试结构）、`数据文件损坏: <中文短句>`（原 `UnsupportedVersion(1651663207)` 等枚举名）、`打开数据库失败: <中文短句>`（原 `Codec(CorruptedData)`）；重审补齐同族残留：save 失败 `保存数据库失败: 读写失败: …`、`_JB_RESOLVE_SYMLINKS` realpath 失败 `解析路径失败: <path>: …`、status 读文件失败 `无法读取数据文件: …`（errno 短语走 OSError 公开谓词覆盖 ENOENT/EACCES/ENOTDIR/EEXIST，其余保 `(os error N)` 数字后缀，`errno_to_string` 标注 alert_internal 不可用）；golden status-corrupt.err 同步冻结
 - `query --interactive` 的 fzf 定位改为 spawn 前沿 PATH 预解析（取首个「普通文件 + 可执行」候选）：裸名命中不可执行文件或同名目录时，旧实现把 exec 失败留给子进程 wait 退出码路，报 `fzf returned an error` 且伴随子进程 stderr 泄漏（黑盒实测 `inappropriate ioctl for device`），违背「spawn 失败统一报 `could not find fzf, is it installed?`」口径，现统一归 NotFound（exit 1）；不可执行候选在前时跳过并选中后续可执行者
 - CLI 解析支持 `--flag=value` 等号形式（对齐上游 clap 双形态）：`init --cmd=`/`--hook=`、`query --exclude=`/`--limit=`、`add --score=`、`describe --note=`。此前 README 记载的 `--cmd=cd` 写法实际被拒（exit 2「未知命令」）；布尔/未知 flag 的等号形式维持报原文 exit 2，`--` 之后不拆分

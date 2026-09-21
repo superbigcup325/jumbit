@@ -164,9 +164,27 @@ pub fn Database::add_unchecked(
 }
 
 ///|
-/// 按路径字典序原地排序
+/// 纯字典序（对齐上游 path.cmp：内容逐码元优先，前缀短者在前）。
+/// 不能直接用 String::compare：MoonBit 实现为 shortlex（长度优先），
+/// 与上游 Rust String cmp 的字典序在混合长度路径集下条目序不同
+/// （实测分歧：同数据集 import 后 db 内首条目 jumbit=/opt/golf… vs 上游=/opt/alpha…）
+fn path_lex_cmp(a : String, b : String) -> Int {
+  let la = a.length()
+  let lb = b.length()
+  let n = if la < lb { la } else { lb }
+  for i in 0..<n {
+    let o = a.unsafe_get(i).compare(b.unsafe_get(i))
+    if o != 0 {
+      return o
+    }
+  }
+  la.compare(lb)
+}
+
+///|
+/// 按路径纯字典序原地排序（对齐上游 path.cmp 语义）
 pub fn Database::sort_by_path(self : Database) -> Unit {
-  self.dirs.sort_by(fn(a, b) { a.path.compare(b.path) })
+  self.dirs.sort_by(fn(a, b) { path_lex_cmp(a.path, b.path) })
   self.dirty = true
 }
 
