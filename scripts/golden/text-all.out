@@ -3,11 +3,11 @@
    6.0 /golden/delta/other
    1.0 /golden/delta/nested
    0.8 /golden/alpha
-   0.5 /golden/database/postgres
    0.5 /golden/service/web-app
-   0.2 /golden/esc"quote\slash
+   0.5 /golden/database/postgres
    0.2 /golden/tab	and-uni-中文
+   0.2 /golden/gamma
+   0.2 /golden/esc"quote\slash
+   0.2 /golden/ctlbyte
    0.2 /golden/Upper-Case
    0.2 /golden/MyApp/logs
-   0.2 /golden/ctlbyte
-   0.2 /golden/gamma

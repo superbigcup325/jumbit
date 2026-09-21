@@ -3,11 +3,11 @@
 /golden/delta/other	6	1099511627776	exact
 /golden/delta/nested	1	0	exact
 /golden/alpha	0.75	0	exact
-/golden/database/postgres	0.5	0	exact
 /golden/service/web-app	0.5	0	exact
-/golden/esc"quote\slash	0.25	0	exact
+/golden/database/postgres	0.5	0	exact
 /golden/tab	and-uni-中文	0.25	0	exact
+/golden/gamma	0.25	0	exact
+/golden/esc"quote\slash	0.25	0	exact
+/golden/ctlbyte	0.25	0	exact
 /golden/Upper-Case	0.25	0	exact
 /golden/MyApp/logs	0.25	0	exact
-/golden/ctlbyte	0.25	0	exact
-/golden/gamma	0.25	0	exact
