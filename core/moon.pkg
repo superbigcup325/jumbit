@@ -2,14 +2,10 @@ import {
   "moonbitlang/core/string",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/math",
+  "moonbitlang/core/debug",
 }
 
 import {
   "moonbitlang/async",
   "moonbitlang/async/fs" @afs,
-  "moonbitlang/core/debug",
 } for "test"
-
-import {
-  "moonbitlang/core/debug",
-} for "wbtest"

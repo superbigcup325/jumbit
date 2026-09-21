@@ -5,10 +5,10 @@ import {
   "moonbitlang/async/process",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/random",
+  "moonbitlang/core/debug",
   "superbigcup325/jumbit/core",
 }
 
 import {
   "moonbitlang/async",
-  "moonbitlang/core/debug",
 } for "wbtest"

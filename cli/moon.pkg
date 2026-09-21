@@ -1,10 +1,7 @@
 import {
   "moonbitlang/core/string",
+  "moonbitlang/core/debug",
   "superbigcup325/jumbit",
   "superbigcup325/jumbit/core",
   "superbigcup325/jumbit/templates" @tpl,
 }
-
-import {
-  "moonbitlang/core/debug",
-} for "test"
