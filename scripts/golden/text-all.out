@@ -1,4 +1,3 @@
-   NaN /golden/nan-entry
    8.0 /golden/beta
    6.0 /golden/delta/other
    1.0 /golden/delta/nested
@@ -11,3 +10,4 @@
    0.2 /golden/ctlbyte
    0.2 /golden/Upper-Case
    0.2 /golden/MyApp/logs
+   0.0 /golden/nan-entry

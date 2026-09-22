@@ -29,7 +29,7 @@ async test "add 含换行路径 → 静默跳过（对齐上游，退出码 0）
   let errs : Array[String] = []
   @debug.assert_eq(run(["add", "/a\nb"], env_with(data), errs), 0)
   @debug.assert_eq(errs.length(), 0)
-  @debug.assert_eq(@afs.exists(data + "/db.zo"), false)
+  @debug.assert_eq(@afs.exists(data + "/db.txt"), false)
   cleanup_test_dir(data)
 }
 
@@ -39,7 +39,7 @@ async test "add 非目录 → 立即中止且不落盘" {
   let errs : Array[String] = []
   // 先给一个合法目录再给非法路径：上游 bail 语义下整条命令失败、不保存
   @debug.assert_eq(run(["add", "/nonexistent-path"], env_with(data), errs), 1)
-  @debug.assert_eq(@afs.exists(data + "/db.zo"), false)
+  @debug.assert_eq(@afs.exists(data + "/db.txt"), false)
   cleanup_test_dir(data)
 }
 
@@ -161,7 +161,9 @@ async test "add --score：负增量 clamp 到 0" {
     Err(e) => fail("\{Repr(e)}")
   }
   @debug.assert_eq(store.database().all().length(), 1)
-  @debug.assert_eq(store.database().all()[0].rank, 0.0)
+  // 内存 clamp 到 0.0;经明文落盘 round-trip 后读回为 MIN_RANK 0.01
+  // (上游 #1288 明文格式同款语义:磁盘 rank 下限 0.01)
+  @debug.assert_eq(store.database().all()[0].rank, 0.01)
   cleanup_test_dir(data)
   cleanup_test_dir(target)
 }

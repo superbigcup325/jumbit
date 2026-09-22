@@ -18,6 +18,13 @@ pub fn Database::from_dirs(dirs : Array[Dir]) -> Database {
 }
 
 ///|
+/// 强制标脏（platform/load 迁移专用）：legacy db.zo 读入后置 dirty，下次
+/// save 落成明文 db.txt；只读命令不 save 故不触发迁移（规格 §1.3）
+pub fn Database::mark_dirty(self : Database) -> Unit {
+  self.dirty = true
+}
+
+///|
 /// 增加权重：已存在则 rank 累加（负增量 clamp 到 0），不存在则新建。
 /// 与 add_update 的区别：不更新 last_accessed（上游语义）。
 pub fn Database::add(

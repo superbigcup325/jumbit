@@ -124,12 +124,9 @@ async test "import autojump：XDG 定位 + sigmoid 归一 + last_accessed=0" {
   @debug.assert_eq(store.database().all().length(), 1)
   let d = store.database().all()[0]
   @debug.assert_eq(d.path, "/aj")
-  // rank 与 core 解析器一致（sigmoid(3.0)），last_accessed 置 0
-  let expected = match @core.parse_autojump_line("3.0\t/aj") {
-    Ok(d) => d
-    Err(m) => fail(m)
-  }
-  @debug.assert_eq(d.rank, expected.rank)
+  // rank 与 core 解析器一致（sigmoid(3.0)=0.9525741…），last_accessed 置 0;
+  // 明文持久化为两位小数(上游 #1288 同款),回读量化为 0.95
+  @debug.assert_eq(d.rank, 0.95)
   @debug.assert_eq(d.last_accessed, 0L)
   cleanup_test_dir(data)
   cleanup_test_dir(ajdir)

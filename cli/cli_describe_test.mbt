@@ -28,7 +28,7 @@ test "parse：describe 坏参族" {
   )
   @debug.assert_eq(
     @cli.parse(["describe", "/a", "--note", "多\n行"]),
-    @cli.Invalid("describe: 标注不能包含换行"),
+    @cli.Invalid("describe: 标注不能包含换行或 tab"),
   )
   @debug.assert_eq(@cli.parse(["describe", "/a", "/b"]), @cli.Unknown("/b"))
   @debug.assert_eq(

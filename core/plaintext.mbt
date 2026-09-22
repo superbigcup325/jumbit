@@ -92,7 +92,19 @@ fn plaintext_fmt_rank(rank : Double) -> String {
 /// 数字 0 填充到指定宽度（上游 `{:0COL_WIDTH$}`；超宽原样——epoch 2286 年
 /// 起 11 位，上游 {:010} 同样不截断，行为一致）
 fn plaintext_pad10(n : Int64) -> String {
-  plaintext_pad_str(n.to_string())
+  // 负数对齐 Rust `{:010}`：符号在前、0 填充其后（"-1" → "-000000001"）；
+  // i64::MIN 取绝对值溢出，直接原样（超宽不填充，Rust 同款）
+  if n < 0 {
+    let s = n.to_string()
+    let digits = s[1:].to_owned()
+    if digits.length() >= PLAINTEXT_COL_WIDTH {
+      s
+    } else {
+      "-" + plaintext_pad_str(digits)
+    }
+  } else {
+    plaintext_pad_str(n.to_string())
+  }
 }
 
 ///|
@@ -115,6 +127,12 @@ fn plaintext_pad_str(s : String) -> String {
 pub fn encode_plaintext(dirs : Array[Dir]) -> Bytes {
   let sb = StringBuilder()
   for dir in dirs {
+    // 空 path 条目跳过：明文行格式无法表达（空 path 行 decode 即拒，写出行
+    // 会让库永久不可读——上游 #1288 未处理此自锁），迁移救库语义与 NaN 归
+    // 下限同族（规格 §1.3）。空 path 仅混沌数据可产生（add 拒空路径）
+    if dir.path.is_empty() {
+      continue
+    }
     let rank = if dir.rank.is_nan() {
       PLAINTEXT_MIN_RANK
     } else {
@@ -128,6 +146,51 @@ pub fn encode_plaintext(dirs : Array[Dir]) -> Bytes {
     sb.write_char('\n')
   }
   @utf8.encode(sb.to_string())
+}
+
+///|
+/// i64 十进制文本解析（Rust i64::from_str 语义子集）：可选单个 +/-、
+/// 剩余全数字（前导 0 合法）、值域 [i64::MIN, i64::MAX]；空串/垃圾/溢出拒
+fn plaintext_parse_i64(s : String) -> Result[Int64, Unit] {
+  let n = s.length()
+  if n == 0 {
+    return Err(())
+  }
+  let mut i = 0
+  let neg = s[0] == 45 // '-'
+  if s[0] == 43 || s[0] == 45 { // '+' '-'
+    i += 1
+  }
+  if i >= n {
+    return Err(())
+  }
+  // 位数上限：i64 十进制最长 20 位（含符号另计）；超长必溢出，早拒
+  if n - i > 20 {
+    return Err(())
+  }
+  let mut v : UInt64 = 0
+  while i < n {
+    let c = s[i]
+    if c < 48 || c > 57 {
+      return Err(())
+    }
+    v = v * 10UL + (c - 48).to_uint64()
+    i += 1
+  }
+  let limit : UInt64 = if neg {
+    9223372036854775808UL
+  } else {
+    9223372036854775807UL
+  }
+  if v > limit {
+    return Err(())
+  }
+  if neg {
+    // -0 → 0;两补码取负安全（v ≤ 2^63）
+    Ok(if v == 0UL { 0L } else { (0UL - v).reinterpret_as_int64() })
+  } else {
+    Ok(v.reinterpret_as_int64())
+  }
 }
 
 ///|
@@ -206,10 +269,11 @@ fn decode_plaintext_line(
   if path.is_empty() {
     return Err(PLAINTEXT_EXPECTED)
   }
-  // timestamp：非负十进制整数（core parse_uint64：拒负号与 + 号——上游
-  // parse::<i64> 接受负 epoch，属病态输入，差异注记）
-  let last_accessed = @string.parse_uint64(ts_str) catch {
-    _ => return Err("could not parse timestamp: \{ts_str}")
+  // timestamp：Rust i64::from_str 语义（可选 +/-、前导 0 合法、溢出拒——
+  // 上游 parse::<Epoch>，atuin 数据集含 epoch=-1 边界行，必须 round-trip）
+  let last_accessed = match plaintext_parse_i64(ts_str) {
+    Ok(v) => v
+    Err(_) => return Err("could not parse timestamp: \{ts_str}")
   }
   // rank：Rust f64::from_str 语义（inf/nan 字面量可解析）→ NaN 拒收
   // （上游 clamp 返 NaN 后 isnan bail 同效）→ clamp 值域
@@ -221,14 +285,7 @@ fn decode_plaintext_line(
     return Err("could not parse rank: \{rank_str}")
   }
   let rank = rank.clamp(min=PLAINTEXT_MIN_RANK, max=PLAINTEXT_MAX_RANK)
-  Ok(
-    Some({
-      path,
-      rank,
-      last_accessed: last_accessed.reinterpret_as_int64(),
-      note: None,
-    }),
-  )
+  Ok(Some({ path, rank, last_accessed, note: None, }))
 }
 
 ///|

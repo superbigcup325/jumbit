@@ -152,10 +152,15 @@ g limit-mutex query --limit 2
 g limit-invalid-value query --json --all --limit abc
 g limit-negative query --json --all --limit -1
 
-# --- status 损坏库（独立库目录，exit 1 + stderr）---
+# --- status 损坏库（独立库目录，exit 1 + stderr）：
+#     status-corrupt = legacy db.zo 二进制路径；status-corrupt-plaintext =
+#     明文坏行聚合（行号 + 上游逐字文案 + 8 条折叠之外的常规两行）---
 mkdir -p "$tmp/db-corrupt"
 printf 'garbage-not-a-db' > "$tmp/db-corrupt/db.zo"
 _JB_DATA_DIR="$tmp/db-corrupt" gs status-corrupt status
+mkdir -p "$tmp/db-corrupt-txt"
+printf '1789054423\t00000001.00\t/golden/ok\nbadline2\n1789054423\tzzz\t/golden/x\n' > "$tmp/db-corrupt-txt/db.txt"
+_JB_DATA_DIR="$tmp/db-corrupt-txt" gs status-corrupt-plaintext status
 
 if [ "$mode" = update ]; then
   echo "== golden 已重生成至 $golden/（请 git diff 人工审查后冻结）=="
@@ -181,7 +186,7 @@ for case in json-empty-db list-empty-db miss-with-kw import-quiet \
   describe-missing json-exists-filtered text-exists-empty json-after-lazy \
   json-limit-2 limit-zero limit-mutex limit-invalid-value limit-negative \
   tsv-all tsv-limit-2 tsv-mutex-json tsv-mutex-interactive \
-  status-empty status-full status-json status-check status-corrupt; do
+  status-empty status-full status-json status-check status-corrupt status-corrupt-plaintext; do
   local_ok=1
   for ext in out err code; do
     [ "$(cmp_case "$case" "$ext")" = 1 ] || local_ok=0

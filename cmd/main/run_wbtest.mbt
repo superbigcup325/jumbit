@@ -58,7 +58,7 @@ async test "add → query 全链路" {
   let target = make_test_dir("target")
   let errs : Array[String] = []
   @debug.assert_eq(run(["add", target], env_with(data), errs), 0)
-  @debug.assert_eq(@afs.exists(data + "/db.zo"), true)
+  @debug.assert_eq(@afs.exists(data + "/db.txt"), true)
   @debug.assert_eq(errs.length(), 0)
   @debug.assert_eq(run(["query"], env_with(data), errs), 0)
   cleanup_test_dir(data)

@@ -35,8 +35,9 @@ fn parse_describe(args : Array[String]) -> Command {
     i += 1
   }
   if bad is None && note is Some(t) {
-    if t.contains("\n") || t.contains("\r") {
-      return Invalid("describe: 标注不能包含换行")
+    // 明文持久化后 note 走 notes.tsv(TSV 列分隔),tab 与换行一并拒绝
+    if t.contains("\n") || t.contains("\r") || t.contains("\t") {
+      return Invalid("describe: 标注不能包含换行或 tab")
     }
   }
   match bad {

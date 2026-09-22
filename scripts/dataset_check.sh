@@ -4,7 +4,17 @@
 # 场景：z 系四插件（z/fasd/zsh-z/z.lua）、autojump、atuin（伪 atuin 注入）、
 #       aging（低 maxage 强制触发）、--merge 合并。
 # 每场景三段查询：-a 全量 dump → 非 --all 查询（真实 FS exists 过滤 + 懒删除）→ -a 复查。
-# 对拍面：import 退出码 + stderr（坏行消息）、query stdout 逐字节、query 退出码。
+# 对拍面：import 退出码 + stderr（坏行消息）、query stdout、query 退出码。
+#
+# 【明文迁移窗口期判定域】（2026-09-22，jumbit 先行上游 #1288 明文格式）：
+# jumbit 持久化 rank 为两位小数（上游 0.10.0 bincode 仍全精度），量化误差
+# ≤0.005 经衰减因子放大后 score 显示位在恰半界处可翻转（实测 5/122 条，
+# 差 ≤0.1），并列块内次序随之重排。故 query stdout 判定为：
+#   - 路径集合一致（排序后按 path 比对，score 列剥离）
+#   - 同一路径 score 数值差 ≤ 0.1（容差取 0.1001 吃浮点噪声；量化上界：0.005×衰减 4 = 0.02，显示
+#     位翻转 ±0.1，取 0.1 覆盖）
+# stderr（坏行消息）与退出码保持字节级。上游合并 #1288 后两侧同为两位
+# 小数，判定域恢复全字节级（届时删本段与本文件的容差逻辑）。
 #
 # 依赖：zoxide（PATH）、python3、jumbit release 二进制（moon build --release）。
 # 数据由 scripts/gen_dataset.py 生成（固定种子可复现）；数据本体落 /tmp 不入库。
@@ -92,12 +102,18 @@ run_case() {
   fi
   local q jcode zcode ties=0
   for q in q1 q2 q3; do
-    # 内容判定：排序后逐字节（多集一致）——等分条目的平分顺序是排序算法实现
-    # 细节（上游 sort_unstable_by），跨实现不定义，不作要求
-    sort -o "$tmp/jb-$name.$q.s" "$tmp/jb-$name.$q"
-    sort -o "$tmp/zo-$name.$q.s" "$tmp/zo-$name.$q"
-    if ! cmp -s "$tmp/jb-$name.$q.s" "$tmp/zo-$name.$q.s"; then
-      ok=0 why="$why $q.内容分歧"
+    # 内容判定（明文迁移窗口期）：
+    # ① 路径集合一致（剥 score 列，排序后逐字节）——条目多集与次序无关性
+    # ② 同路径 score 数值差 ≤ 0.1（量化上界，见文件头判定域说明）
+    # ③ NaN 行不参与②（NaN 显示字面量，只可能两侧同为 NaN 或单侧量化消失）
+    # 平分块内的次序是排序算法实现细节，不作要求（不变）
+    awk '{ $1=""; sub(/^ +/, ""); print }' "$tmp/jb-$name.$q" | sort > "$tmp/jb-$name.$q.p"
+    awk '{ $1=""; sub(/^ +/, ""); print }' "$tmp/zo-$name.$q" | sort > "$tmp/zo-$name.$q.p"
+    if ! cmp -s "$tmp/jb-$name.$q.p" "$tmp/zo-$name.$q.p"; then
+      ok=0 why="$why $q.路径集合分歧"
+    fi
+    if ! python3 scripts/score_tolerance_check.py "$tmp/jb-$name.$q" "$tmp/zo-$name.$q" 0.1001 >"$tmp/$name.$q.tol" 2>&1; then
+      ok=0 why="$why $q.score容差超限($(cat "$tmp/$name.$q.tol" | tail -1))"
     fi
     # 顺序判定：两侧各自按 score 非递增（NaN 行豁免，主数据集无 NaN）
     if ! awk 'NR>1 && $1 !~ /NaN/ && p1 !~ /NaN/ && $1+0 > p1+0 { exit 1 } { p1=$1 }' "$tmp/jb-$name.$q"; then

@@ -15,6 +15,14 @@
 # 依赖：zoxide（PATH）、python3、jumbit release 二进制（moon build --release）。
 # 数据本体落 /tmp 不入库；变异种子固定可复现。
 #
+# 【明文迁移窗口期判定域】（2026-09-22，规格 docs/spec-plaintext-edit.md）：
+# jumbit 明文 rank 两位小数 + 毒条目救库（NaN→0.01、空 path 跳过），与裁判
+# zoxide 0.10.0 bincode（NaN/空 path 存活、rank 全精度）存在既定分歧：
+#   - score 数值差 ≤ 0.1001（量化半界翻转，同 dataset_check）
+#   - zo 侧 NaN 条目：jb 侧任意有限值通过（救库语义 §1.3）
+#   - zo 侧空 path 条目：jb 侧缺失通过（明文行格式无法表达）
+# stderr/退出码/行号仍字节级。上游合并 #1288 后重议。
+#
 # 用法：bash scripts/chaos_check.sh
 
 set -u
@@ -283,7 +291,10 @@ run_scenario() {
     esac
     sort -o "$tmp/jb-$name.$q.s" "$tmp/jb-$name.$q"
     sort -o "$tmp/zo-$name.$q.s" "$tmp/zo-$name.$q"
-    cmp -s "$tmp/jb-$name.$q.s" "$tmp/zo-$name.$q.s" || { ok=0 why="$why $q.内容分歧"; }
+    # 窗口期判定:路径集合(空 path 豁免) + score 容差(NaN 单侧豁免)
+    if ! python3 scripts/score_tolerance_check.py "$tmp/jb-$name.$q" "$tmp/zo-$name.$q" 0.1001 --allow-missing-empty --allow-zo-nan >"$tmp/$name.$q.tol" 2>&1; then
+      ok=0 why="$why $q.内容分歧($(tail -1 "$tmp/$name.$q.tol"))"
+    fi
     # jumbit 侧 score 非递增（NaN 行豁免）
     if ! awk 'NR>1 && $1 !~ /NaN/ && p1 !~ /NaN/ && $1+0 > p1+0 { exit 1 } { p1=$1 }' "$tmp/jb-$name.$q"; then
       ok=0 why="$why $q.jb非降序"

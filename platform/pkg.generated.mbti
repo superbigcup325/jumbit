@@ -50,6 +50,7 @@ pub async fn Store::save(Self) -> Result[Unit, StoreError]
 pub enum StoreError {
   Io(String)
   Codec(@core.CodecError)
+  Plaintext(@core.PlaintextError)
 } derive(@debug.Debug)
 pub fn StoreError::message(Self) -> String
 

@@ -1,0 +1,2 @@
+数据文件损坏: line 2: expected: <timestamp> <rank> <path>
+line 3: could not parse rank: zzz

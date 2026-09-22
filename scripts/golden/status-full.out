@@ -1,6 +1,6 @@
-数据文件      @JUMBIT_TMP@/db/db.zo
-文件大小      581 字节
-格式版本      2
+数据文件      @JUMBIT_TMP@/db/db.txt
+文件大小      548 字节
+格式          plaintext
 条目          13
 标注          2
 老化阈值      10000

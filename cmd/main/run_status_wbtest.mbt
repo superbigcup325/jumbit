@@ -1,9 +1,9 @@
 ///|
 test "render_status_human：标签列与 --check 追加行（字节面）" {
   let r : DbStatus = {
-    data_file: "/home/you/.local/share/jumbit/db.zo",
+    data_file: "/home/you/.local/share/jumbit/db.txt",
     file_size: 13854848,
-    format_version: Some(2),
+    format: Some("plaintext"),
     entries: 266618,
     notes: 12,
     maxage: 10000.0,
@@ -13,23 +13,23 @@ test "render_status_human：标签列与 --check 追加行（字节面）" {
   @debug.assert_eq(lines.length(), 6)
   @debug.assert_eq(
     lines[0],
-    "数据文件      /home/you/.local/share/jumbit/db.zo",
+    "数据文件      /home/you/.local/share/jumbit/db.txt",
   )
   @debug.assert_eq(lines[1], "文件大小      13854848 字节")
-  @debug.assert_eq(lines[2], "格式版本      2")
+  @debug.assert_eq(lines[2], "格式          plaintext")
   @debug.assert_eq(lines[4], "标注          12")
   @debug.assert_eq(lines[5], "老化阈值      10000")
   // 无库：版本位为 -
   let empty : DbStatus = {
-    data_file: "/tmp/nodir/db.zo",
+    data_file: "/tmp/nodir/db.txt",
     file_size: 0,
-    format_version: None,
+    format: None,
     entries: 0,
     notes: 0,
     maxage: 10000.0,
     existing: None,
   }
-  @debug.assert_eq(render_status_human(empty)[2], "格式版本      -")
+  @debug.assert_eq(render_status_human(empty)[2], "格式          -")
   // --check：追加「存在」行
   let checked = { ..r, existing: Some(210000), }
   let lines2 = render_status_human(checked)
@@ -40,9 +40,9 @@ test "render_status_human：标签列与 --check 追加行（字节面）" {
 ///|
 test "render_status_json：键序固定、existing 仅 --check 出现、路径转义" {
   let r : DbStatus = {
-    data_file: "/home/you/.local/share/jumbit/db.zo",
+    data_file: "/home/you/.local/share/jumbit/db.txt",
     file_size: 13854848,
-    format_version: Some(2),
+    format: Some("plaintext"),
     entries: 266618,
     notes: 12,
     maxage: 10000.0,
@@ -50,18 +50,18 @@ test "render_status_json：键序固定、existing 仅 --check 出现、路径�
   }
   @debug.assert_eq(
     render_status_json(r),
-    "{\"data_file\":\"/home/you/.local/share/jumbit/db.zo\",\"file_size\":13854848,\"format_version\":2,\"entries\":266618,\"notes\":12,\"maxage\":10000}",
+    "{\"data_file\":\"/home/you/.local/share/jumbit/db.txt\",\"file_size\":13854848,\"format\":\"plaintext\",\"entries\":266618,\"notes\":12,\"maxage\":10000}",
   )
-  // 无库：format_version 出 null
-  let empty = { ..r, file_size: 0, format_version: None, entries: 0, notes: 0, }
-  assert_true(render_status_json(empty).contains("\"format_version\":null"))
+  // 无库：format 出 null
+  let empty = { ..r, file_size: 0, format: None, entries: 0, notes: 0, }
+  assert_true(render_status_json(empty).contains("\"format\":null"))
   // --check：尾部追加 existing
   let checked = { ..r, existing: Some(210000), }
   assert_true(render_status_json(checked).contains(",\"existing\":210000}"))
   // 路径经 json_escape（引号转义验证）
-  let weird = { ..r, data_file: "/tmp/a\"b/db.zo", }
+  let weird = { ..r, data_file: "/tmp/a\"b/db.txt", }
   assert_true(
-    render_status_json(weird).contains("data_file\":\"/tmp/a\\\"b/db.zo"),
+    render_status_json(weird).contains("data_file\":\"/tmp/a\\\"b/db.txt"),
   )
 }
 
@@ -87,7 +87,7 @@ async test "status：空库 / 有库 / 损坏库 / --check 的退出码与 stder
   @debug.assert_eq(run(["status", "--json"], env_with(data), errs2), 0)
   @debug.assert_eq(run(["status", "--check"], env_with(data), errs2), 0)
   // 损坏库 → 1 + stderr
-  @platform.write_atomic(data + "/db.zo", b"garbage-not-a-db")
+  @platform.write_atomic(data + "/db.txt", b"garbage-not-a-db")
   let errs3 : Array[String] = []
   @debug.assert_eq(run(["status"], env_with(data), errs3), 1)
   @debug.assert_eq(errs3.length(), 1)
@@ -100,19 +100,19 @@ async test "status：空库 / 有库 / 损坏库 / --check 的退出码与 stder
 }
 
 ///|
-async test "status：db.zo 不可读 → 无法读取数据文件 + exit 1（Repr 不再外泄）" {
+async test "status：db.txt 不可读 → 无法读取数据文件 + exit 1（Repr 不再外泄）" {
   let data = make_test_dir("status-noread")
   let target = make_test_dir("status-noread-t")
   let errs : Array[String] = []
   @debug.assert_eq(run(["add", target], env_with(data), errs), 0)
-  @afs.chmod(data + "/db.zo", 0o000)
+  @afs.chmod(data + "/db.txt", 0o000)
   let errs2 : Array[String] = []
   @debug.assert_eq(run(["status"], env_with(data), errs2), 1)
   @debug.assert_eq(
     errs2[0],
     "无法读取数据文件: Permission denied (os error 13)",
   )
-  @afs.chmod(data + "/db.zo", 0o644)
+  @afs.chmod(data + "/db.txt", 0o644)
   cleanup_test_dir(data)
   cleanup_test_dir(target)
 }
