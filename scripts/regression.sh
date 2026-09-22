@@ -20,4 +20,14 @@ if ! git diff --exit-code -- '*.mbti'; then
   exit 1
 fi
 
-echo "✓ regression 全绿"
+# VERSION 单一事实源：jumbit.mbt 的 pub const 与 moon.mod version 必须一致
+# （moon publish 打包读 moon.mod，用户面 help/mcp serverInfo 读 jumbit.mbt，
+#  0.1.1 曾因两边不同步导致 registry 包二进制自报 0.1.0）
+MOD_VERSION=$(sed -n 's/^version = "\(.*\)"$/\1/p' moon.mod)
+MBT_VERSION=$(sed -n 's/^pub const VERSION : String = "\(.*\)"$/\1/p' jumbit.mbt)
+if [ -z "$MOD_VERSION" ] || [ "$MOD_VERSION" != "$MBT_VERSION" ]; then
+  echo "✗ 版本不一致：moon.mod=$MOD_VERSION jumbit.mbt=$MBT_VERSION（发版两处同 bump）" >&2
+  exit 1
+fi
+
+echo "✓ regression 全绿（version=$MOD_VERSION）"
