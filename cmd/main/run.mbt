@@ -149,6 +149,7 @@ pub async fn run(
     @cli.Describe(dopts) => run_describe(dopts, getenv, errs)
     @cli.Export(eopts) => run_export(eopts, getenv, errs)
     @cli.Status(sopts) => run_status(sopts, getenv, errs)
+    @cli.Edit(eopts) => run_edit(eopts, getenv, errs)
     @cli.Mcp => run_mcp(getenv)
   }
 }

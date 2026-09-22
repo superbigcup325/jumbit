@@ -18,6 +18,31 @@ pub fn Database::from_dirs(dirs : Array[Dir]) -> Database {
 }
 
 ///|
+/// 改路径（edit --rename 专用）：note/权重/时间全保留；new 撞既有条目返回
+/// false（不合并，调用方报错——语义裁定见规格 §1.4）
+pub fn Database::rename(self : Database, old : String, new : String) -> Bool {
+  match self.find_idx(old) {
+    Some(i) => {
+      self.dirs[i].path = new
+      self.dirty = true
+      true
+    }
+    None => false
+  }
+}
+
+///|
+/// 整库替换（edit 交互形态专用：编辑后的全量条目集替换现有集合；note 已由
+/// 调用方按 path 附着），置 dirty
+pub fn Database::replace_all(self : Database, dirs : Array[Dir]) -> Unit {
+  self.dirs.clear()
+  for d in dirs {
+    self.dirs.push(d)
+  }
+  self.dirty = true
+}
+
+///|
 /// 强制标脏（platform/load 迁移专用）：legacy db.zo 读入后置 dirty，下次
 /// save 落成明文 db.txt；只读命令不 save 故不触发迁移（规格 §1.3）
 pub fn Database::mark_dirty(self : Database) -> Unit {

@@ -30,6 +30,7 @@ pub(all) enum Command {
   Describe(DescribeOptions)
   Export(ExportOptions)
   Status(StatusOptions)
+  Edit(EditOptions)
   Mcp
   Help
   Unknown(String)
@@ -39,6 +40,12 @@ pub(all) enum Command {
 pub(all) struct DescribeOptions {
   path : String
   mut note : String?
+} derive(Eq, @debug.Debug)
+
+pub(all) struct EditOptions {
+  mut rename_old : String?
+  mut rename_new : String?
+  mut prune : Bool
 } derive(Eq, @debug.Debug)
 
 pub(all) struct ExportOptions {

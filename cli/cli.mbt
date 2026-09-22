@@ -61,6 +61,19 @@ pub(all) struct StatusOptions {
 } derive(Debug, Eq)
 
 ///|
+
+///|
+/// edit 参数解析（jumbit 扩展，规格 docs/spec-plaintext-edit.md §1.4）：
+/// 无 flag = $EDITOR 交互编辑；--rename <old> <new> 改路径（note 跟随）；
+/// --prune 清除不存在条目。三形态互斥
+pub(all) struct EditOptions {
+  mut rename_old : String?
+  mut rename_new : String?
+  mut prune : Bool
+} derive(Debug, Eq)
+
+///|
+/// 子命令（add / query / remove / init / import / describe / export / help）
 pub(all) enum Command {
   Add(AddOptions)
   Query(QueryOptions)
@@ -70,6 +83,8 @@ pub(all) enum Command {
   Describe(DescribeOptions)
   Export(ExportOptions)
   Status(StatusOptions)
+  /// 数据库编辑（jumbit 扩展，上游无；规格 §1.4）
+  Edit(EditOptions)
   /// stdio MCP 服务器（jumbit 扩展，上游无）
   Mcp
   Help
@@ -97,6 +112,7 @@ pub fn parse(args : Array[String]) -> Command {
     "describe" => parse_describe(rest)
     "export" => parse_export(rest)
     "status" => parse_status(rest)
+    "edit" => parse_edit(rest)
     "mcp" => parse_mcp(rest)
     "help" | "--help" | "-h" => Help
     other => Unknown(other)
@@ -196,6 +212,8 @@ pub fn usage() -> String {
   "    plugin ∈ atuin/autojump/fasd/z/z.lua/zsh-z（坏行逐条上报不中止）\n" +
   "  jumbit status [--json] [--check]         数据库自检：条目/标注/版本/阈值（--check 扫存在性，--json 给 agent，jumbit 扩展）\n" +
   "  jumbit mcp                              启动 stdio MCP 服务器（agent 通道，tool：jumbit_query / jumbit_export_agents，jumbit 扩展）\n" +
+  "  jumbit edit                             用 $VISUAL/$EDITOR 编辑数据库（jumbit 扩展）\n" +
+  "    [--rename <old> <new>] | [--prune]    改路径（标注跟随）/ 清除不存在条目；三形态互斥\n" +
   "  jumbit help                             显示本帮助\n\n" +
   "环境变量：\n" +
   "  _JB_DATA_DIR                            数据目录（默认 $HOME/.local/share/jumbit，须绝对路径）\n" +

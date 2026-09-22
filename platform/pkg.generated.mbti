@@ -21,11 +21,19 @@ pub fn os_error_message(Error) -> String
 
 pub async fn read_import_lines(String) -> Result[Array[ImportRecord], String]
 
+pub async fn run_editor(String, (String) -> String?) -> Result[Unit, EditorError]
+
 pub async fn write_atomic(String, Bytes) -> Unit
 
 // Errors
 
 // Types and methods
+pub enum EditorError {
+  NotFound
+  Failed(Int)
+  Spawn
+} derive(@debug.Debug)
+
 pub(all) enum FzfError {
   NotFound
   NoMatch

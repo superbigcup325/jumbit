@@ -78,6 +78,26 @@ if [ "$mode" = update ]; then
   }
 fi
 
+# genv <case名> <VAR=val>... -- <命令...>：带环境注入的 g（edit 用例：
+# VISUAL 指伪 editor、_JB_DATA_DIR 指独立库）
+genv() {
+  local case="$1"
+  shift
+  local envs=()
+  while [ "$1" != "--" ]; do
+    envs+=("$1")
+    shift
+  done
+  shift
+  local outdir="$tmp"
+  if [ "$mode" = update ]; then
+    outdir="$golden"
+  fi
+  env "${envs[@]}" "$bin" "$@" >"$outdir/$case.out" 2>"$outdir/$case.err"
+  echo $? >"$outdir/$case.code"
+  sed -i "s|$tmp|@JUMBIT_TMP@|g" "$outdir/$case.out" "$outdir/$case.err"
+}
+
 # gs <case名> <命令...>：status 用例专用——status 输出含数据文件绝对路径
 # （位于随机 mktemp 目录），比对前归一化为 @JUMBIT_TMP@，两种模式同规则
 gs() {
@@ -162,6 +182,23 @@ mkdir -p "$tmp/db-corrupt-txt"
 printf '1789054423\t00000001.00\t/golden/ok\nbadline2\n1789054423\tzzz\t/golden/x\n' > "$tmp/db-corrupt-txt/db.txt"
 _JB_DATA_DIR="$tmp/db-corrupt-txt" gs status-corrupt-plaintext status
 
+# --- edit（jumbit 扩展；伪 editor + 独立库 edit-db，不触碰主库/status 库）：
+#     手编库 2 条（/e-keep 带标注、/e-gone 不存在）→ noop 静默 → rename 改
+#     /e-keep（note 跟随）→ 未命中/互斥错误面 → prune 移除 /e-gone 出清单 ---
+mkdir -p "$tmp/edit-db"
+printf '1789054423\t00000001.00\t/e-keep\n1789054423\t00000002.00\t/e-gone\n' > "$tmp/edit-db/db.txt"
+printf '/e-keep\tkept-note\n' > "$tmp/edit-db/notes.tsv"
+mkdir -p "$tmp/fake-editor"
+printf '#!/bin/sh\nexit 0\n' > "$tmp/fake-editor/noop"
+printf '#!/bin/sh\nsed -i s#/e-keep#/e-renamed# "$1"\n' > "$tmp/fake-editor/rename"
+chmod +x "$tmp/fake-editor/noop" "$tmp/fake-editor/rename"
+genv edit-noop VISUAL="$tmp/fake-editor/noop" _JB_DATA_DIR="$tmp/edit-db" -- edit
+genv edit-rename VISUAL="$tmp/fake-editor/rename" _JB_DATA_DIR="$tmp/edit-db" -- edit
+genv describe-renamed _JB_DATA_DIR="$tmp/edit-db" -- describe /e-renamed
+genv edit-missing VISUAL="$tmp/fake-editor/noop" _JB_DATA_DIR="$tmp/edit-db" -- edit --rename /nope /x
+genv edit-mutex VISUAL="$tmp/fake-editor/noop" _JB_DATA_DIR="$tmp/edit-db" -- edit --rename /a /b --prune
+genv edit-prune VISUAL="$tmp/fake-editor/noop" _JB_DATA_DIR="$tmp/edit-db" -- edit --prune
+
 if [ "$mode" = update ]; then
   echo "== golden 已重生成至 $golden/（请 git diff 人工审查后冻结）=="
   rm -rf "$tmp"
@@ -186,7 +223,8 @@ for case in json-empty-db list-empty-db miss-with-kw import-quiet \
   describe-missing json-exists-filtered text-exists-empty json-after-lazy \
   json-limit-2 limit-zero limit-mutex limit-invalid-value limit-negative \
   tsv-all tsv-limit-2 tsv-mutex-json tsv-mutex-interactive \
-  status-empty status-full status-json status-check status-corrupt status-corrupt-plaintext; do
+  status-empty status-full status-json status-check status-corrupt status-corrupt-plaintext \
+  edit-noop edit-rename describe-renamed edit-missing edit-mutex edit-prune; do
   local_ok=1
   for ext in out err code; do
     [ "$(cmp_case "$case" "$ext")" = 1 ] || local_ok=0

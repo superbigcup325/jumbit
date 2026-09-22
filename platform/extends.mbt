@@ -24,3 +24,8 @@ pub extend StoreError with @debug.Debug::{to_repr}
 #deprecated("Use `@debug.Debug::to_repr` instead", skip_current_package=true)
 #doc(hidden)
 pub extend Store with @debug.Debug::{to_repr}
+
+///|
+#deprecated("Use `@debug.Debug::to_repr` instead", skip_current_package=true)
+#doc(hidden)
+pub extend EditorError with @debug.Debug::{to_repr}
