@@ -20,6 +20,11 @@ pub extend Dir with @debug.Debug::{to_repr}
 ///|
 #deprecated("Use `@debug.Debug::to_repr` instead", skip_current_package=true)
 #doc(hidden)
+pub extend PlaintextError with @debug.Debug::{to_repr}
+
+///|
+#deprecated("Use `@debug.Debug::to_repr` instead", skip_current_package=true)
+#doc(hidden)
 pub extend GlobError with @debug.Debug::{to_repr}
 
 ///|

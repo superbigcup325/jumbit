@@ -24,7 +24,11 @@ pub fn collapse_consecutive(Array[LocatedDir]) -> Array[LocatedDir]
 
 pub fn decode(Bytes) -> Result[Array[Dir], CodecError]
 
+pub fn decode_plaintext(Bytes) -> Result[Array[Dir], PlaintextError]
+
 pub fn encode(Array[Dir]) -> Bytes
+
+pub fn encode_plaintext(Array[Dir]) -> Bytes
 
 pub fn filter_by_keywords(Array[String], String) -> Bool
 
@@ -107,6 +111,11 @@ pub(all) struct LocatedDir {
   location : String
   result : Result[Dir, String]
 } derive(@debug.Debug)
+
+pub(all) struct PlaintextError {
+  lines : Array[String]
+} derive(@debug.Debug)
+pub fn PlaintextError::message(Self) -> String
 
 pub(all) struct StreamOptions {
   now : Int64
