@@ -1,8 +1,10 @@
 # Changelog
 
-本文件记录 jumbit 所有对外可见的变更，与 git 提交历史保持同步。格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循语义化版本（SemVer）。
+本文件记录 jumbit 所有对外可见的变更，与 git 提交历史保持同步。格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循语义化版本（SemVer）
 
 ## [Unreleased]
+
+## [0.1.1] - 2026-09-22
 
 ### Added
 - `mcp`：stdio MCP 服务器（jumbit 扩展，上游无）：newline-delimited JSON-RPC 2.0（MCP stdio transport，版本协商支持 2024-11-05/2025-03-26/2025-06-18：支持则回显否则回 2025-06-18）；两个 tool：`jumbit_query`（keywords/fuzzy/limit，执行层与 `query --json` 同源同字节）与 `jumbit_export_agents`（同 `export --agents`）；`initialize` 应答带 server instructions（何时用 jumbit 的短叙事）；错误划分对齐同类实现（atuin mcp）：未知工具/参数形态非法走协议层 -32602，miss 等执行失败走结果内 `isError: true`（文案与 CLI stderr 同源）；通知一律不响应，客户端关闭 stdin 正常退出 0。协议字节由 `scripts/mcp_check.sh` 冻结（CI 新步骤），真 client 兼容性经官方 TypeScript SDK 实测（握手/tools/list/双工具调用/错误划分）
@@ -10,9 +12,14 @@
 - shell 集成模板扩至 9 shell 全量（对齐上游）：新增 elvish / nushell / posix / powershell / tcsh / xonsh，`jumbit init <shell>` 参数矩阵与语法门禁（elvish 编译、nu-check、sh -n、pwsh 解析、tcsh -n、py_compile）全部真机验证
 
 ### Changed
-- 工具链锚定升级 `0.1.20260904` → `0.1.20260915`（moonc v0.10.13）：`bytes.view` 迁移 `exact_view`（严格切片改名，语义零变化）；新版 unused_package lint（主块 import 只按主代码判定）下测试用依赖归位 `for "test"`/`for "wbtest"` 块（cli/cmd/main/core/platform/templates 五包），删除全仓无使用的 `moonbitlang/async/io` 导入；dataset/chaos/realdata/golden/mcp 字节面全绿，性能同量级
+- 工具链锚定升级 `0.1.20260904` → `0.1.20260920`（moonc v0.10.13 → v0.10.14）：`bytes.view` 迁移 `exact_view`（严格切片改名，语义零变化）；新版 unused_package lint（主块 import 只按主代码判定）下测试用依赖归位 `for "test"`/`for "wbtest"` 块（cli/cmd/main/core/platform/templates 五包），删除全仓无使用的 `moonbitlang/async/io` 导入；implicit_impl_as_method lint 下 15 个 pub 类型的 derive 方法提升以各包 `extends.mbt` 显式抑制（moon info 前后 .mbti 逐字节相同，公开面零变化）；黑盒测试 59 处被测包引用补 `@pkg.fn` 限定；dataset/chaos/realdata/golden/mcp 字节面全绿，性能同量级
 - help 环境变量表补 `_JB_FZF_OPTS`（透传给 fzf 的自定义参数）：README 环境变量表早有记载、`jumbit help` 输出漏列
 - import/query 内存与分配优化（行为与输出字节面不变）：坏行消息与行定位串惰性构造、db 编码预分配、--tsv 输出流式化、stderr 批量写、import 改单趟流式（对齐上游 import.rs::run 惰性迭代结构，六插件文件源逐行回调解析+入库，atuin 折叠保持物化）：百万行 import 峰值内存 499→203MB、耗时 2.29→1.62s，--tsv 全量输出峰值 217→85MB
+
+### Documentation
+
+- README 重构为项目介绍面（为什么做/功能/安装/快速上手/最小命令集/文档导航）：命令与 flag 全表、shell 集成参数、agent 通道、工具集成、六插件导入、frecency/老化/匹配语义、环境变量与差异清单迁入新增 USAGE.md；退出码表、症状速查、stderr 文案对照（逐条黑盒实测）、数据损坏处置独立为 TROUBLESHOOTING.md；import 文档补各插件数据格式速查列
+- 新增英文版 README_EN.md，与中文版逐节镜像
 
 ### Fixed
 - db 内条目序与上游分歧：`sort_by_path` 误用 MoonBit `String::compare`（shortlex 长度优先）导致混合长度路径集下条目序与上游 Rust `path.cmp`（纯字典序）不同，改为显式纯字典序比较（内容逐码元优先，前缀短者在前）；影响 import/写入后的 db.zo 条目排列与 score 平分时的 query 并列次序，条目多集不变；同数据集双工具 import 解析对拍实锤首条目一致，新增锁定用例（短lex 错序红色验证）
@@ -76,4 +83,6 @@
 
 - Database 封装收敛：字段改为外部不可构造/原地修改，`all()` 返回数组副本，保证 dirty 标志一致性
 
-[Unreleased]: https://github.com/superbigcup325/jumbit
+[Unreleased]: https://github.com/superbigcup325/jumbit/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/superbigcup325/jumbit/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/superbigcup325/jumbit
