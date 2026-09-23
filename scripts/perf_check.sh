@@ -103,7 +103,7 @@ zo_n=$(wc -l < "$tmp/qall.zo.out")
 echo
 echo "库条目数（qall 输出行数）: jumbit=$jb_n zoxide=$zo_n（≈ $unique 减老化削边，两侧应一致）"
 echo "import stderr 字节: jb=$(wc -c < "$tmp/imp.jb.err") zo=$(wc -c < "$tmp/imp.zo.err")"
-echo "DB 文件字节: jb=$(wc -c < "$tmp/jb-0/db.zo") zo=$(wc -c < "$tmp/zo-0/db.zo")"
+echo "DB 条目: jb=$(wc -l < "$tmp/jb-0/db.txt") zo=$(wc -l < "$tmp/zo-0/db.zo")"
 
 fail=0
 if [ "$jb_n" -lt $((unique * 8 / 10)) ] || [ "$zo_n" -lt $((unique * 8 / 10)) ]; then
