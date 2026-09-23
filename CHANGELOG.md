@@ -4,6 +4,16 @@
 
 ## [Unreleased]
 
+### Added
+- `edit` 子命令（jumbit 扩展，上游无）：无 flag 时以 `$VISUAL`/`$EDITOR`（回落 `vi`）编辑明文库，读回逐行校验，坏行不落库并按行号报错；`--rename <old> <new>` 改路径（人工标注跟随迁移，撞库内既有路径报 `path already in database` 不合并）；`--prune` 清除不存在条目并逐行输出清单。三形态互斥。上游现行 `edit` 为 fzf 交互调 rank（已宣布待砍），不跟随
+- 明文数据库 `db.txt`（对齐上游 [zoxide#1288](https://github.com/ajeetdsouza/zoxide/pull/1288) 的明文方向，该 PR 合并前 jumbit 已先行）：每行 `timestamp\trank\tpath`，文本工具可直接查看与手改，坏行整库拒绝加载并按行号报错（最多列 8 行，超出折叠 `... and N more`）；人工标注拆分至侧文件 `notes.tsv`（`path\tnote`），主格式与上游明文可互换
+
+### Changed
+- **存储格式迁移**：`db.zo`（二进制）→ `db.txt`（明文）。旧库在首次写库时自动转换（只读命令不触发），转换后原 `db.zo` 保留可手动删除；迁移时病态数据自动修复——`NaN` rank 归最低权重（0.01）、超界 rank 钳到 [0.01, 9999999.99]、空路径条目丢弃（明文行格式无法表达）
+- `status --json` 的 `format_version`（整数）键更名为 `format`，值为格式标识字符串：`"plaintext"` / `"binary"`（旧库未迁移）/ `null`（无库）；human 面对应行改为「格式」（breaking，消费方需同步）
+- `describe --note` 拒绝 tab（标注持久化于 TSV 侧文件，tab 为列分隔符），文案为「标注不能包含换行或 tab」
+- 非有限 rank 行为变化：读取遇 `nan` rank 行整库拒绝（按行报错），入库时 `inf` 钳上限、`nan` 归 0.01——上游 0.10.0 的「非 finite 毒库」问题（[zoxide#1280](https://github.com/ajeetdsouza/zoxide/pull/1280)）在明文格式下不再成立，0.1.0 所载「已知问题」随之销账
+
 ## [0.1.1] - 2026-09-22
 
 ### Added
@@ -77,7 +87,7 @@
 
 ### 已知问题
 
-- 非 finite rank 毒库（继承自上游 0.10.0，2026-09-10 与真 zoxide Linux 探针逐字节对拍一致）：`import`（z 系/autojump；atuin rank 恒 1.0 不受影响）接受 `inf`/`nan` 字面量与 `1e309` 等溢出饱和为 inf 的大数入库（Rust `f64::from_str` 语义），`add --score` 同样接受。后果：`age()` 遇 `total=inf` 因子归零，库内其余条目被清出（rank < 1）而 NaN 条目幸存；`total=NaN` 使 `total > max_age` 永假，老化从此永久停摆；全程退出码 0 无告警。上游修复 [ajeetdsouza/zoxide#1280](https://github.com/ajeetdsouza/zoxide/pull/1280) 为 open PR 未合并，合并后跟进调整（import 拒收非 finite rank、按行号报错）
+- 非 finite rank 毒库（继承自上游 0.10.0，2026-09-10 与真 zoxide Linux 探针逐字节对拍一致）：`import`（z 系/autojump；atuin rank 恒 1.0 不受影响）接受 `inf`/`nan` 字面量与 `1e309` 等溢出饱和为 inf 的大数入库（Rust `f64::from_str` 语义），`add --score` 同样接受。后果：`age()` 遇 `total=inf` 因子归零，库内其余条目被清出（rank < 1）而 NaN 条目幸存；`total=NaN` 使 `total > max_age` 永假，老化从此永久停摆；全程退出码 0 无告警。上游修复 [ajeetdsouza/zoxide#1280](https://github.com/ajeetdsouza/zoxide/pull/1280) 为 open PR 未合并，合并后跟进调整（import 拒收非 finite rank、按行号报错）。**后记（0.1.2）：明文格式迁移已内置修复**——见 Unreleased 的 Changed 节，本问题在 db.txt 下不再成立
 
 ### Internal
 

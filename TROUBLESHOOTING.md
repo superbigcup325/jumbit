@@ -20,7 +20,7 @@
 | fuzzy 命中能不能信 | 看 `--json`/`--tsv` 的 `matched_by` | `exact` 可直接行动，`fuzzy` 先核对再动 |
 | import 拒绝执行 | 库非空 | 加 `--merge` |
 | `could not find fzf` | fzf 未安装 | 安装 fzf 或改用非交互查询 |
-| 数据文件在哪 | 默认 `$HOME/.local/share/jumbit/db.zo` | `_JB_DATA_DIR` 重定向（须绝对路径） |
+| 数据文件在哪 | 默认 `$HOME/.local/share/jumbit/db.txt`（旧版 db.zo 首次写库时自动转明文，原文件保留可删） | `_JB_DATA_DIR` 重定向（须绝对路径） |
 | shell 报「possible configuration issue」 | init 没放在 rc 文件末尾，或被后续配置覆盖 | 把 `eval "$(jumbit init bash)"` 移到 rc 文件末尾；确认无误可 `export _JB_DOCTOR=0` 关闭提示 |
 
 ## stderr 文案对照
@@ -57,11 +57,24 @@
 
 ## 数据损坏处置
 
-库文件（`<数据目录>/db.zo`）损坏无法自动修复。处置：
+库文件（`<数据目录>/db.txt`）为明文，每行 `timestamp<TAB>rank<TAB>path`。轻微损坏（个别坏行）**可直接手编修复**，`jumbit status` 会给出坏行行号与原因；修好再跑 `jumbit status` 确认不再报错
 
 ```bash
-mv ~/.local/share/jumbit/db.zo ~/.local/share/jumbit/db.zo.bak   # 留档
-jumbit status                                                    # 自此按空库重建
+jumbit status                                    # 查看坏行位置与原因
+$EDITOR ~/.local/share/jumbit/db.txt             # 手编修复（或 jumbit edit）
+jumbit status                                    # 复核
+```
+
+大面积损坏（不想修）：
+
+```bash
+mv ~/.local/share/jumbit/db.txt ~/.local/share/jumbit/db.txt.bak   # 留档
+jumbit status                                                      # 自此按空库重建
 ```
 
 历史目录随后自然重新积累；已有插件数据可 `jumbit import --merge z` 等回灌。换库位置用 `_JB_DATA_DIR`（须绝对路径）
+
+附注：
+
+- 旧版二进制 `db.zo` 在首次写库时自动转换为 `db.txt`，转换后**原文件保留**；确认新库正常后可手动删除 `db.zo`
+- `notes.tsv`（标注侧文件）可随 `db.txt` 一起手编，行格式 `path<TAB>note`；path 被改名时标注不会自动跟随（note 按 path 关联），改名请同步编辑两处，或用 `edit --rename`（标注自动跟随）

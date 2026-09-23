@@ -22,7 +22,9 @@ jumbit init <shell>                     生成 shell 集成脚本（默认定义
 jumbit import <plugin> [--merge]        从其他工具导入历史数据（plugin ∈ atuin/autojump/fasd/z/z.lua/zsh-z）
 jumbit describe <path> [--note text]    查看/设置人工标注（--note "" 清除，jumbit 扩展）
 jumbit export --agents                  输出项目地图 Markdown（jumbit 扩展）
-jumbit status [--json] [--check]        数据库自检：条目/标注/版本/阈值（--check 扫存在性，jumbit 扩展）
+jumbit status [--json] [--check]        数据库自检：条目/标注/格式/阈值（--check 扫存在性，jumbit 扩展）
+jumbit edit                             用 $VISUAL/$EDITOR 编辑数据库（jumbit 扩展）
+  [--rename <old> <new>] | [--prune]    改路径（标注跟随）/ 清除不存在条目；三形态互斥
 jumbit mcp                              启动 stdio MCP 服务器（agent 通道，jumbit 扩展，见「面向 agent」）
 jumbit help                             显示帮助
 ```
@@ -236,6 +238,8 @@ jumbit import <plugin>
 
 **老化**。库内总分**严格超过** `_JB_MAXAGE`（默认 10000）时触发一次全局衰减：全体 rank 乘 `0.9 × max_age / total`，乘后 rank < 1 的条目删除，常去的地方留下，冷门自然淡出
 
+**持久化**。数据存于明文文本 `<数据目录>/db.txt`，每行一条：`timestamp\trank\tpath`（timestamp 为 10 位访问时间，rank 定点两位小数、上限 9999999.99），任意文本工具可直接查看与手改（改坏会整库拒绝加载并按行报错，见 TROUBLESHOOTING）。人工标注存于同目录 `notes.tsv`（`path\tnote`），不进 db.txt；换行/tab 的标注被拒绝。旧版二进制 `db.zo` 首次写库时自动转换为明文，转换后原文件保留，确认无误可手动删除
+
 **关键词匹配**（语义对齐上游）：最后一个关键词锚定路径末组件（命中点右侧到路径末尾不得再出现分隔符），其余关键词从右往左逐个消耗、命中区间不重叠；大小写归一仅限 ASCII
 
 ```bash
@@ -258,12 +262,12 @@ j backend api   # api 落在路径末组件，backend 在其左侧消耗
 
 ## 与 zoxide 的差异
 
-- 持久化格式为自定义二进制（版本号 + 长度前缀条目），与上游 `db.zo` **不互通**；v2 起条目带 note 标注（jumbit 扩展），旧 v1 库免迁移兼容读
+- 持久化为明文 `db.txt`（`timestamp\trank\tpath`，对齐上游 [zoxide#1288](https://github.com/ajeetdsouza/zoxide/pull/1288) 的明文方向，该 PR 合并前 jumbit 已先行）；rank 定点两位小数（全精度入、两位出），标注存侧文件 `notes.tsv` 不进主格式（jumbit 扩展）；与上游 0.10.0 的二进制 `db.zo` 不互通，与未来上游明文格式可互换（减 note 列）
 - 环境变量前缀 `_ZO_*` → `_JB_*`，两者可共存
 - 关键词大小写归一仅限 ASCII（上游为 Unicode 全量）
 - `_JB_EXCLUDE_DIRS` 的 glob 排除不支持 `{a,b}` 括号展开；`**` 按两个 `*` 处理、不跨分隔符（上游 glob crate 的 `**` 为递归通配）；`*`/`?`/`[...]` 语义对齐；`query --exclude` 为精确路径过滤、不做 glob（对齐上游）
 - 仅支持 Linux；fzf 预览窗口的平台定制未实现（import 的 autojump/z.lua 路径探测同按 Linux 语义）
 - fzf 交互通道（`query --interactive`）：选中/`--score` 输出与退出码对齐上游（伪 fzf 探针矩阵逐字节对拍）；文案差异两处：fzf 取消（其退出码 1）jumbit 静默退出 1，上游报 `no match found`；fzf 自身异常的提示为英文原文且无 `zoxide: ` 前缀。另 spawn 失败不区分「未安装」与「无法启动」（上游区分，进程绑定不暴露错误类别），统一报 `could not find fzf, is it installed?`
-- 未移植：`edit` 子命令
-- 已知问题（与上游 0.10.0 一致）：非 finite rank 毒库，`import` 接受 `inf`/`nan` 字面量与溢出饱和为 inf 的大数作 rank，`add --score` 同样接受（inf 直接入库；nan 字面量经 max(0) 钳制存为 0，不构成毒源，与上游 add 的 rank 下限钳制一致）；随后老化遇 `total=inf` 因子归零、库内其余条目被清出，遇 `total=NaN` 老化永久停摆，全程退出码 0 无告警。上游修复 [ajeetdsouza/zoxide#1280](https://github.com/ajeetdsouza/zoxide/pull/1280) 未合并，合并后跟进
-- 扩展（上游无）：`query --json`（单行 JSON 数组，含 `matched_by` 证据字段）、`query --tsv`（无表头 Tab 分隔行 `path\tscore\tlast_accessed\tmatched_by`，列序与 `--json` 键序一致；path 原样不转义；路径含 tab 时该行列数歧义，属已知限制；score 为最短表示，NaN/±Infinity 出 `NaN`/`Infinity`/`-Infinity` 原文而非 JSON 的 `null`）、`query --limit <n>`（`--list`/`--json`/`--tsv` 输出的前 n 条截断，`--limit 0` 为空输出、退出码 0；重复出现后者覆盖）、`query --fuzzy`（仅精确匹配零命中时启用，各关键词为某路径组件的子串即命中：不限末组件、无序且允许同组件，大小写归一同主路仅 ASCII）、`describe`（条目人工标注，随库持久化）、`export --agents`（项目地图）与 `status`（数据库自检：数据文件/大小/格式版本/条目数/标注数/老化阈值，`--json` 单行对象；`--check` 显式触发 O(N) 存在性扫描并报 `存在 K/N`；库损坏退出码 1）
+- `edit` 上游为 fzf 交互调 rank（0.10.0），jumbit 为编辑器/结构化形态（见 `edit` 扩展条）；上游已宣布该形态待砍（#1288 评论区），不跟随
+- 非 finite rank：明文格式下入库时 `inf` 钳到上限、`nan` 归最低权重（0.01），读取遇 `nan` 行整库拒绝并按行报错——上游 0.10.0 的「非 finite 毒库」问题（[zoxide#1280](https://github.com/ajeetdsouza/zoxide/pull/1280)）在 jumbit 明文格式下不再成立
+- 扩展（上游无）：`query --json`（单行 JSON 数组，含 `matched_by` 证据字段）、`query --tsv`（无表头 Tab 分隔行 `path\tscore\tlast_accessed\tmatched_by`，列序与 `--json` 键序一致；path 原样不转义；路径含 tab 时该行列数歧义，属已知限制；score 为最短表示，NaN/±Infinity 出 `NaN`/`Infinity`/`-Infinity` 原文而非 JSON 的 `null`）、`query --limit <n>`（`--list`/`--json`/`--tsv` 输出的前 n 条截断，`--limit 0` 为空输出、退出码 0；重复出现后者覆盖）、`query --fuzzy`（仅精确匹配零命中时启用，各关键词为某路径组件的子串即命中：不限末组件、无序且允许同组件，大小写归一同主路仅 ASCII）、`describe`（条目人工标注，随库持久化）、`export --agents`（项目地图）、`status`（数据库自检：数据文件/大小/格式/条目数/标注数/老化阈值，`--json` 单行对象，`format` 出 `plaintext`/`binary`/`null`；`--check` 显式触发 O(N) 存在性扫描并报 `存在 K/N`；库损坏退出码 1）与 `edit`（`$VISUAL`/`$EDITOR` 编辑明文库，`--rename` 改路径、`--prune` 清除不存在条目）

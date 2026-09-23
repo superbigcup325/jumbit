@@ -57,7 +57,7 @@ to `jumbit help`), `130` = fzf user interrupt (`--interactive` only).
 | Fuzzy hit trustworthiness | n/a | `matched_by` in `--json`: `exact` = act, `fuzzy` = verify first |
 | import refuses to run | Database non-empty | `--merge` |
 | `could not find fzf` | fzf not installed | Install fzf or use non-interactive query |
-| Where is the data | Default `$HOME/.local/share/jumbit/db.zo` | `_JB_DATA_DIR` (absolute path) |
+| Where is the data | Default `$HOME/.local/share/jumbit/db.txt` (plaintext TSV) | `_JB_DATA_DIR` (absolute path) |
 
 ## Record directories
 

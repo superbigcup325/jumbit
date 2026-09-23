@@ -30,7 +30,7 @@ zoxide 用 frecency（频次 × 时间衰减）把「cd 过的地方」变成「
 - **agent 通道**：`--json`/`--tsv` 字节级稳定输出（含 `matched_by` 证据字段）、`describe` 人工标注随库持久化、`export --agents` 生成项目地图 Markdown、`jumbit mcp` 起 stdio MCP 服务器（`jumbit_query`/`jumbit_export_agents` 双工具 + server instructions，官方 SDK 真 client 实测）
 - **历史迁移**：从 z / zsh-z / z.lua / autojump / fasd / atuin 一键导入，空库直灌、`--merge` 合并、坏行不中止
 - **工具生态**：sesh（tmux 会话管理）可整体切换 frecency 后端；yazi 经包装函数成为目录记忆采集器
-- **数据自检**：`status` 一眼看库（条目/标注/格式版本/老化阈值），`--json` 供脚本消费
+- **数据自检与编辑**：`status` 一眼看库（条目/标注/格式/老化阈值），`edit` 用编辑器或 `--rename`/`--prune` 直接改库，`--json` 供脚本消费
 
 ## 安装
 
