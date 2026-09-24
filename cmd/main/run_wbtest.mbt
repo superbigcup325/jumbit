@@ -28,7 +28,9 @@ async fn make_test_dir(prefix : String) -> String {
   for _attempt = 0 {
     let dir = "\{test_temp_root()}/jumbit-e2e-\{@async.now()}-\{prefix}-\{_attempt}"
     if !@afs.exists(dir) {
-      @afs.mkdir(dir, recursive=true)
+      // 非递归：temp 根父目录恒存在；recursive=true 在 Windows 对已存在
+      // 组件报 EEXIST（async 上游 bug，probe run 36064860009 全量复现）
+      @afs.mkdir(dir)
       break dir
     } else {
       continue _attempt + 1

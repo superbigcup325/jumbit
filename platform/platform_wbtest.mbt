@@ -19,7 +19,9 @@ fn test_temp_root() -> String {
 ///|
 async fn make_tmp_dir() -> String {
   let dir = "\{test_temp_root()}/jumbit-test-\{@async.now()}-\{rand_name()}"
-  @afs.mkdir(dir, recursive=true)
+  // 非递归：temp 根父目录恒存在；recursive=true 在 Windows 对已存在组件
+  // 报 EEXIST（async 上游 bug，probe run 36064860009 全量复现）
+  @afs.mkdir(dir)
   dir
 }
 
