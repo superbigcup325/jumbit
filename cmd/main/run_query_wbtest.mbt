@@ -78,9 +78,16 @@ async test "_JB_EXCLUDE_DIRS glob 命中懒删除（重载后条目消失）" {
   let keeper = make_test_dir("keeper-dir")
   let errs : Array[String] = []
   @debug.assert_eq(run(["add", victim, keeper], env_with(data), errs), 0)
+  // pattern 同源推导：victim 的父目录 + *victim*（POSIX 字面 /tmp 形态
+  // 在 temp 根平台化后不成立）
+  let parent_end = match victim.rev_find("/") {
+    Some(i) => i
+    None => 0
+  }
+  let exclude_pattern = victim[0:parent_end].to_owned() + "/*victim*"
   let env = env_map([
     ("_JB_DATA_DIR", data),
-    ("_JB_EXCLUDE_DIRS", "/tmp/*victim*"),
+    ("_JB_EXCLUDE_DIRS", exclude_pattern),
   ])
   @debug.assert_eq(run(["query", "--list"], env, errs), 0)
   // 懒删除已落盘：重载后只剩 keeper

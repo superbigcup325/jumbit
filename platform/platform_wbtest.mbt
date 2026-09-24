@@ -7,9 +7,19 @@
 /// 硬编码 /tmp 在 Windows 会落 C:\tmp 触发 mkdir EEXIST 上游问题
 /// （moonbitlang/async recursive mkdir 非幂等，probe run 36044327191）
 fn test_temp_root() -> String {
+  // 剥尾斜杠：macOS TMPDIR 以 / 结尾，拼路径出 // 双斜杠，resolve_path
+  // 归一后与原串不一致会打挂 exclude 精确比对/形状断言（macOS CI 实证）
   for key in ["TEMP", "TMP", "TMPDIR"] {
     match @env.get_env_var(key) {
-      Some(v) => return v
+      Some(v) => {
+        let mut s = v
+        while s.has_suffix("/") && s.length() > 1 {
+          s = s[0:s.length() - 1].to_owned()
+        }
+        if s != "" {
+          return s
+        }
+      }
       None => ()
     }
   }
