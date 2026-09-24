@@ -65,6 +65,7 @@ g() {
   shift
   "$bin" "$@" >"$tmp/$case.out" 2>"$tmp/$case.err"
   echo $? >"$tmp/$case.code"
+  strip_cr "$tmp/$case.out" "$tmp/$case.err" "$tmp/$case.code"
 }
 
 # 生成模式直接落 scripts/golden/，检查模式留 tmp 比对
@@ -75,11 +76,12 @@ if [ "$mode" = update ]; then
     shift
     "$bin" "$@" >"$golden/$case.out" 2>"$golden/$case.err"
     echo $? >"$golden/$case.code"
+    strip_cr "$golden/$case.out" "$golden/$case.err" "$golden/$case.code"
   }
 fi
 
 # 就地改写（GNU/BSD sed 通用）：BSD sed 的 -i 必带后缀参数（会吞掉 sed 表达式），
-# 统一走「stdout 落临时文件再 mv 回原位」
+# 统一走「stdout 落临时文件 mv 回原位」
 sed_inplace() {
   local expr="$1"
   shift
@@ -87,6 +89,12 @@ sed_inplace() {
   for f in "$@"; do
     sed "$expr" "$f" >"$f.jt" && mv "$f.jt" "$f"
   done
+}
+
+# CRLF 归一化：Windows 下进程输出重定向经文本模式翻译带 \r（Git Bash 侧
+# 重定向同样翻译），逐字节比对/冻结前剥离；POSIX 输出无 \r，Linux 侧零影响
+strip_cr() {
+  tr -d '\r' <"$1" >"$1.nt" && mv "$1.nt" "$1"
 }
 
 # genv <case名> <VAR=val>... -- <命令...>：带环境注入的 g（edit 用例：
@@ -107,6 +115,7 @@ genv() {
   env "${envs[@]}" "$bin" "$@" >"$outdir/$case.out" 2>"$outdir/$case.err"
   echo $? >"$outdir/$case.code"
   sed_inplace "s|$tmp|@JUMBIT_TMP@|g" "$outdir/$case.out" "$outdir/$case.err"
+  strip_cr "$outdir/$case.out" "$outdir/$case.err" "$outdir/$case.code"
 }
 
 # gs <case名> <命令...>：status 用例专用——status 输出含数据文件绝对路径
@@ -121,6 +130,7 @@ gs() {
   "$bin" "$@" >"$outdir/$case.out" 2>"$outdir/$case.err"
   echo $? >"$outdir/$case.code"
   sed_inplace "s|$tmp|@JUMBIT_TMP@|g" "$outdir/$case.out" "$outdir/$case.err"
+  strip_cr "$outdir/$case.out" "$outdir/$case.err" "$outdir/$case.code"
 }
 
 # --- 空库行为 ---
