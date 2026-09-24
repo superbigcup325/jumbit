@@ -78,3 +78,42 @@ test "win32：非盘符冒号段按普通段处理（Rust Prefix 仅认 ASCII �
   assert_eq(resolve_path_windows("1:\\a", "C:\\w"), "C:\\w\\1:\\a")
   assert_eq(resolve_path_windows(":x", "C:\\w"), "C:\\w\\:x")
 }
+
+///|
+// 原 path_test.mbt 迁入：pub 面在 Windows 构建走 win32 分支，POSIX 期望值
+// 只能在实现级断言（直呼 private 实现，全平台可测）
+test "posix：绝对路径解析 .. 与 ." {
+  assert_eq(resolve_path_posix("/a/b/../c", "/"), "/a/c")
+  assert_eq(resolve_path_posix("/a/./b", "/"), "/a/b")
+  assert_eq(resolve_path_posix("/a//b", "/"), "/a/b")
+}
+
+///|
+test "posix：相对路径基于当前目录拼接" {
+  assert_eq(resolve_path_posix("a/b", "/x/y"), "/x/y/a/b")
+  assert_eq(resolve_path_posix("./a", "/x/y"), "/x/y/a")
+  assert_eq(resolve_path_posix("../a", "/x/y"), "/x/a")
+  assert_eq(resolve_path_posix("../..", "/x/y"), "/")
+}
+
+///|
+test "posix：越界 .. 停在根" {
+  assert_eq(resolve_path_posix("/..", "/"), "/")
+  assert_eq(resolve_path_posix("/../../a", "/"), "/a")
+}
+
+///|
+test "posix：空路径与根" {
+  assert_eq(resolve_path_posix("", "/x/y"), "/x/y")
+  assert_eq(resolve_path_posix("/", "/x/y"), "/")
+  assert_eq(resolve_path_posix(".", "/x/y"), "/x/y")
+}
+
+///|
+test "posix：base 恒为规范路径，其中的 .. 与 . 与空段被忽略" {
+  // 上游 base = current_dir()，经 Path::components 恒不含 .. / . 段，
+  // 故本实现对 base 中此类段静默丢弃（锁定为前置条件规格）
+  assert_eq(resolve_path_posix("a", "/x/../y/./z"), "/x/y/z/a")
+  assert_eq(resolve_path_posix("a", "/x//y"), "/x/y/a")
+  assert_eq(resolve_path_posix("a", "/x/y/"), "/x/y/a")
+}
