@@ -7,7 +7,10 @@ cd "$(dirname "$0")/.."
 
 data=$(mktemp -d)
 target=$(mktemp -d)
-trap 'rm -rf "$data" "$target"' EXIT
+# BSD/macOS mktemp 的模板要求 X 结尾，收不了 test.ps1 等带后缀形态（GNU 允许）：
+# 带后缀的临时文件统一落唯一目录内的固定名文件，目录随 trap 清理
+scratch=$(mktemp -d "${TMPDIR:-/tmp}/jumbit-sfx-XXXX")
+trap 'rm -rf "$data" "$target" "$scratch"' EXIT
 
 echo "== 构建发布二进制 =="
 moon build --release
@@ -37,7 +40,7 @@ for shell in bash zsh fish elvish nushell posix powershell tcsh; do
     elif [ "$shell" = "fish" ]; then
       _JB_RESOLVE_SYMLINKS=1 "$bin" init fish $args | fish -n || { echo "✗ fish -n 失败: $args" >&2; exit 1; }
     elif [ "$shell" = "powershell" ]; then
-      psfile=$(mktemp /tmp/jumbit-ps-XXXX.ps1)
+      psfile=$scratch/jumbit-ps.ps1
       "$bin" init powershell $args > "$psfile"
       if ! pwsh -NoProfile -Command "\$null = [scriptblock]::Create((Get-Content -Raw '$psfile'))"; then
         echo "✗ powershell 解析失败: $args" >&2
@@ -48,7 +51,7 @@ for shell in bash zsh fish elvish nushell posix powershell tcsh; do
     elif [ "$shell" = "posix" ]; then
       "$bin" init posix $args | sh -n || { echo "✗ sh -n 失败: $args" >&2; exit 1; }
     elif [ "$shell" = "nushell" ]; then
-      nufile=$(mktemp /tmp/jumbit-nu-XXXX.nu)
+      nufile=$scratch/jumbit-nu.nu
       "$bin" init nushell $args > "$nufile"
       if ! nu -n -c "nu-check '$nufile'" | grep -q true; then
         echo "✗ nushell 语法错误: $args" >&2
@@ -59,7 +62,7 @@ for shell in bash zsh fish elvish nushell posix powershell tcsh; do
     else
       # elvish 语法门禁 = parse 级：edit: 命名空间仅交互态可解析，
       # headless 编译的 "cannot find variable $edit:" 属预期，豁免
-      elfile=$(mktemp /tmp/jumbit-elvish-XXXX.elv)
+      elfile=$scratch/jumbit-elvish.elv
       errfile=$(mktemp /tmp/jumbit-elvish-err-XXXX)
       "$bin" init elvish $args > "$elfile"
       rc=0
@@ -109,7 +112,7 @@ PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" jumbit status >/dev/null ||
 # 非交互态差异：bash/zsh 的 PROMPT_COMMAND/precmd 仅交互态自动触发，手动调
 # __jumbit_hook；fish 的 --on-variable PWD 事件脚本态也触发，仍显式调一次。
 # --noprofile --norc / --no-rcs / --no-config 过各自的用户配置。
-hook_posix=$(mktemp /tmp/jumbit-hook-XXXX.sh)
+hook_posix=$scratch/jumbit-hook.sh
 cat > "$hook_posix" <<'EOF'
 set -e
 # bash 钩子有 [[ -o history ]] 门，非交互态默认关——先打开（zsh 钩子无此门）
@@ -123,7 +126,7 @@ if [ "$PWD" != "$JUMBIT_HOOK_TO" ]; then
   exit 1
 fi
 EOF
-hook_fish=$(mktemp /tmp/jumbit-hook-XXXX.fish)
+hook_fish=$scratch/jumbit-hook.fish
 cat > "$hook_fish" <<'EOF'
 # fish 4+ 的 --no-config 隐含 private 模式，模板钩子按设计跳过 private 会话；
 # 清除以模拟「无用户配置的普通会话」

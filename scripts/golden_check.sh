@@ -78,6 +78,17 @@ if [ "$mode" = update ]; then
   }
 fi
 
+# 就地改写（GNU/BSD sed 通用）：BSD sed 的 -i 必带后缀参数（会吞掉 sed 表达式），
+# 统一走「stdout 落临时文件再 mv 回原位」
+sed_inplace() {
+  local expr="$1"
+  shift
+  local f
+  for f in "$@"; do
+    sed "$expr" "$f" >"$f.jt" && mv "$f.jt" "$f"
+  done
+}
+
 # genv <case名> <VAR=val>... -- <命令...>：带环境注入的 g（edit 用例：
 # VISUAL 指伪 editor、_JB_DATA_DIR 指独立库）
 genv() {
@@ -95,7 +106,7 @@ genv() {
   fi
   env "${envs[@]}" "$bin" "$@" >"$outdir/$case.out" 2>"$outdir/$case.err"
   echo $? >"$outdir/$case.code"
-  sed -i "s|$tmp|@JUMBIT_TMP@|g" "$outdir/$case.out" "$outdir/$case.err"
+  sed_inplace "s|$tmp|@JUMBIT_TMP@|g" "$outdir/$case.out" "$outdir/$case.err"
 }
 
 # gs <case名> <命令...>：status 用例专用——status 输出含数据文件绝对路径
@@ -109,7 +120,7 @@ gs() {
   fi
   "$bin" "$@" >"$outdir/$case.out" 2>"$outdir/$case.err"
   echo $? >"$outdir/$case.code"
-  sed -i "s|$tmp|@JUMBIT_TMP@|g" "$outdir/$case.out" "$outdir/$case.err"
+  sed_inplace "s|$tmp|@JUMBIT_TMP@|g" "$outdir/$case.out" "$outdir/$case.err"
 }
 
 # --- 空库行为 ---
@@ -190,7 +201,7 @@ printf '1789054423\t00000001.00\t/e-keep\n1789054423\t00000002.00\t/e-gone\n' > 
 printf '/e-keep\tkept-note\n' > "$tmp/edit-db/notes.tsv"
 mkdir -p "$tmp/fake-editor"
 printf '#!/bin/sh\nexit 0\n' > "$tmp/fake-editor/noop"
-printf '#!/bin/sh\nsed -i s#/e-keep#/e-renamed# "$1"\n' > "$tmp/fake-editor/rename"
+printf '#!/bin/sh\nsed s#/e-keep#/e-renamed# "$1" > "$1.jt" && mv "$1.jt" "$1"\n' > "$tmp/fake-editor/rename"
 chmod +x "$tmp/fake-editor/noop" "$tmp/fake-editor/rename"
 genv edit-noop VISUAL="$tmp/fake-editor/noop" _JB_DATA_DIR="$tmp/edit-db" -- edit
 genv edit-rename VISUAL="$tmp/fake-editor/rename" _JB_DATA_DIR="$tmp/edit-db" -- edit
