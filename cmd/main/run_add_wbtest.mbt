@@ -189,7 +189,13 @@ async test "_JB_RESOLVE_SYMLINKS=1：add 符号链接记录真实目录" {
     Err(e) => fail("\{Repr(e)}")
   }
   @debug.assert_eq(store.database().all().length(), 1)
-  @debug.assert_eq(store.database().all()[0].path, real)
+  // 期望路径与被测语义同源取 realpath：macOS 下 /tmp 是指向 /private/tmp 的
+  // 符号链接，解析会转义出 /private 前缀（Linux 无此链接，两值相等），
+  // 字面量断言会平台性失败
+  let expected = @afs.realpath(real) catch {
+    err => fail("\{@platform.os_error_message(err)}")
+  }
+  @debug.assert_eq(store.database().all()[0].path, expected)
   @debug.assert_eq(@afs.kind(link, follow_symlink=false), @afs.SymLink)
   cleanup_test_dir(data)
   cleanup_test_dir(real)
@@ -205,7 +211,14 @@ async test "add _JB_RESOLVE_SYMLINKS=1：自环符号链接 → 解析路径失�
   let env = env_map([("_JB_DATA_DIR", data), ("_JB_RESOLVE_SYMLINKS", "1")])
   let errs : Array[String] = []
   @debug.assert_eq(run(["add", loop_path], env, errs), 1)
-  @debug.assert_eq(errs[0], "解析路径失败: \{loop_path}: (os error 40)")
+  // ELOOP 的 errno 数值平台各异（Linux 40 / macOS 62），锁形状不锁数值：
+  // 前缀文案 + (os error N) 数字后缀（ELOOP 不在 os_error_message 短语集，
+  // 若被误并入短语集或退回 Debug 结构会在此挂）
+  @debug.assert_eq(
+    errs[0].has_prefix("解析路径失败: \{loop_path}: (os error ") &&
+    errs[0].has_suffix(")"),
+    true,
+  )
   cleanup_test_dir(data)
   cleanup_test_dir(dir)
 }
