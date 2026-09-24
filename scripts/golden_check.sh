@@ -217,7 +217,12 @@ _JB_DATA_DIR="$tmp/db-corrupt-txt" gs status-corrupt-plaintext status
 
 # --- edit（jumbit 扩展；伪 editor + 独立库 edit-db，不触碰主库/status 库）：
 #     手编库 2 条（/e-keep 带标注、/e-gone 不存在）→ noop 静默 → rename 改
-#     /e-keep（note 跟随）→ 未命中/互斥错误面 → prune 移除 /e-gone 出清单 ---
+#     /e-keep（note 跟随）→ 未命中/互斥错误面 → prune 移除 /e-gone 出清单
+#     伪 editor 依赖 POSIX sh + chmod 可执行位，Windows 的 CreateProcess
+#     无法执行无扩展名脚本（.cmd 桩改造属 Phase-2 剩余），Git Bash 下跳过 ---
+if command -v cygpath >/dev/null; then
+  echo "  跳过 edit 组（伪 editor 为 POSIX sh 桩，Windows 待 .cmd 化）"
+else
 mkdir -p "$tmp/edit-db"
 printf '1789054423\t00000001.00\t/e-keep\n1789054423\t00000002.00\t/e-gone\n' > "$tmp/edit-db/db.txt"
 printf '/e-keep\tkept-note\n' > "$tmp/edit-db/notes.tsv"
@@ -231,6 +236,7 @@ genv describe-renamed _JB_DATA_DIR="$tmp/edit-db" -- describe /e-renamed
 genv edit-missing VISUAL="$tmp/fake-editor/noop" _JB_DATA_DIR="$tmp/edit-db" -- edit --rename /nope /x
 genv edit-mutex VISUAL="$tmp/fake-editor/noop" _JB_DATA_DIR="$tmp/edit-db" -- edit --rename /a /b --prune
 genv edit-prune VISUAL="$tmp/fake-editor/noop" _JB_DATA_DIR="$tmp/edit-db" -- edit --prune
+fi
 
 if [ "$mode" = update ]; then
   echo "== golden 已重生成至 $golden/（请 git diff 人工审查后冻结）=="
@@ -261,6 +267,10 @@ for case in json-empty-db list-empty-db miss-with-kw import-quiet \
   tsv-all tsv-limit-2 tsv-mutex-json tsv-mutex-interactive \
   status-empty status-full status-json status-check status-corrupt status-corrupt-plaintext \
   edit-noop edit-rename describe-renamed edit-missing edit-mutex edit-prune; do
+  # Windows（Git Bash）下 edit 组未跑，golden 侧同名文件缺位，跳过比对
+  if command -v cygpath >/dev/null && [ "$case" = "edit-noop" ] || [ "$case" = "edit-rename" ] || [ "$case" = "describe-renamed" ] || [ "$case" = "edit-missing" ] || [ "$case" = "edit-mutex" ] || [ "$case" = "edit-prune" ]; then
+    continue
+  fi
   local_ok=1
   for ext in out err code; do
     [ "$(cmp_case "$case" "$ext")" = 1 ] || local_ok=0

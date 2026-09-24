@@ -289,7 +289,7 @@ if _JB_DATA_DIR="$data" _Z_DATA="$zdata" "$bin" import z 2>/dev/null; then
   exit 1
 fi
 out=$(_JB_DATA_DIR="$data" _Z_DATA="$zdata" "$bin" import --merge z 2>&1)
-if [ "$out" != "$zdata:2: invalid entry: bad line" ]; then
+if [ "$out" != "$(win_file "$zdata"):2: invalid entry: bad line" ]; then
   echo "✗ import 坏行上报不符: [$out]" >&2
   exit 1
 fi
