@@ -262,10 +262,11 @@ pub fn starts_with(path : String, base : String) -> Bool {
 }
 
 ///|
-/// 按分隔符切分并丢弃空段（"/" 与 "" 的段列表均为空）
+/// 按分隔符切分并丢弃空段（"/" 与 "" 的段列表均为空）；
+/// Windows 下先归一 '\'（单码元等长，组件内容不受影响）
 fn non_empty_segments(path : String) -> Array[String] {
   let out : Array[String] = []
-  for seg in path.split("/") {
+  for seg in normalize_separators(path).split("/") {
     if seg != "" {
       out.push(seg.to_owned())
     }

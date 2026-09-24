@@ -10,7 +10,9 @@ pub fn filter_by_keywords(keywords : Array[String], path : String) -> Bool {
   if keywords.is_empty() {
     return true
   }
-  let lower = path.to_lower()
+  // 分隔符归一后再匹配：Windows 下库内路径为 '\' 形态，末组件锚定的
+  // 分隔符检查须按平台语义（归一单码元等长，rev_find/切片索引不变）
+  let lower = normalize_separators(path.to_lower())
   let last = keywords[keywords.length() - 1].to_lower()
   let mut limit = match lower.rev_find(last) {
     Some(idx) => {
@@ -43,7 +45,7 @@ pub fn filter_by_keywords_fuzzy(
   if keywords.is_empty() {
     return true
   }
-  let lower = path.to_lower()
+  let lower = normalize_separators(path.to_lower())
   for kw in keywords {
     let k = kw.to_lower()
     let mut hit = false

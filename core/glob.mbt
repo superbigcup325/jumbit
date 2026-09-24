@@ -80,7 +80,6 @@ fn compile_glob(pattern : String) -> Array[Char] {
 fn glob_match_compiled(p : Array[Char], s : String) -> Bool {
   let pn = p.length()
   let sn = s.length()
-  let slash = 47 // '/'
   let mut pi = 0
   let mut si = 0
   let mut star_pi = -1
@@ -96,25 +95,16 @@ fn glob_match_compiled(p : Array[Char], s : String) -> Bool {
         continue
       }
       let sc = s.at(si).to_int()
-      let consumed = match_single(p, pi, sc, slash)
-      match consumed {
-        Some(next_pi) => {
-          // 单字符 token：字面量与转义可匹配 '/'，'?' 与 [...] 不匹配
-          if sc == slash && c != 63 && c != 92 && !(c >= 91 && c <= 93) {
-            // '/' 只被字面量/转义匹配——但单字符 token 的排除规则在
-            // match_single 内已按 token 类别处理，这里无需再排除
-            ()
-          }
-          pi = next_pi
-          si += 1
-          continue
-        }
-        None => ()
+      let consumed = match_single(p, pi, sc)
+      if consumed is Some(next_pi) {
+        pi = next_pi
+        si += 1
+        continue
       }
     }
     if star_pi >= 0 {
-      // 回溯：最近一个 `*` 多吞一个字符；`*` 不吞 `/`
-      if s.at(star_si).to_int() == slash {
+      // 回溯：最近一个 `*` 多吞一个字符；`*` 不吞分隔符（平台判定）
+      if is_path_separator(s.at(star_si).to_int()) {
         return false
       }
       star_si += 1
@@ -133,20 +123,21 @@ fn glob_match_compiled(p : Array[Char], s : String) -> Bool {
 ///|
 /// 单字符 token 匹配（`*` 之外）：sc 为 s[si] 的 codeunit 值，返回 pattern
 /// 侧推进位置；不匹配返回 None。token 语义与原递归版逐条对应：`?` 与
-/// `[...]` 不匹配 `/`（由 slash 参数判定），`\x` 按字面量（含 '/'）。
-fn match_single(p : Array[Char], pi : Int, sc : Int, slash : Int) -> Int? {
+/// `[...]` 不匹配分隔符（is_path_separator 平台判定），`\x` 按字面量
+/// （含分隔符）；字面量 token 在 Windows 下与 path 侧分隔符等价匹配
+fn match_single(p : Array[Char], pi : Int, sc : Int) -> Int? {
   let pn = p.length()
   let c = p[pi].to_int()
   if c == 63 {
     // '?'
-    if sc != slash {
+    if !is_path_separator(sc) {
       Some(pi + 1)
     } else {
       None
     }
   } else if c == 91 {
     // '['
-    if sc == slash {
+    if is_path_separator(sc) {
       return None
     }
     let mut j = pi + 1
@@ -184,7 +175,7 @@ fn match_single(p : Array[Char], pi : Int, sc : Int, slash : Int) -> Int? {
     } else {
       None
     }
-  } else if sc == c {
+  } else if sc == c || literal_sep_equiv(sc, c) {
     Some(pi + 1)
   } else {
     None
