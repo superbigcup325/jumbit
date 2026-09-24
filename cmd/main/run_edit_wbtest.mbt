@@ -3,6 +3,8 @@
 /// 伪 editor 探针矩阵 + --rename/--prune 端到端
 
 ///|
+#cfg(not(platform="windows"))
+// cfg 门控：仅被 Windows 门控测试消费（见各测试处注释）
 /// 构造伪 editor 脚本：shell 片段在编辑时执行（$1 = 被编辑文件路径）
 async fn make_fake_editor(dir : String, name : String, body : String) -> String {
   let path = dir + "/" + name

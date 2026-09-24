@@ -264,6 +264,8 @@ fn fzf_hits() -> Array[@core.Dir] {
 }
 
 ///|
+#cfg(not(platform="windows"))
+// cfg 门控：仅被 Windows 门控测试消费（见各测试处注释）
 /// 伪 fzf 基建：fzf 本体是只写一次的 wrapper（source 同目录 fzf-body），
 /// 各 case 只改写 body——wrapper 从不重写、body 从不被 exec，
 /// 结构性规避「重写正被 exec 的文件」的 ETXTBSY 竞态
@@ -278,6 +280,8 @@ async fn make_fake_fzf(bindir : String) -> String {
 }
 
 ///|
+#cfg(not(platform="windows"))
+// cfg 门控：仅被 Windows 门控测试消费（见各测试处注释）
 async fn write_fake_fzf_body(bindir : String, body : String) -> Unit {
   write_atomic(bindir + "/fzf-body", @utf8.encode(body))
 }
@@ -435,6 +439,8 @@ async test "for_each_import_line：文件缺失报 could not read（与 read_imp
 }
 
 ///|
+#cfg(not(platform="windows"))
+// cfg 门控：仅被 Windows 门控测试消费（见各测试处注释）
 /// 环境读取桩：仅 PATH 可注入（裸名解析预检的测试面）
 fn env_path_only(path : String) -> (String) -> String? {
   fn(key : String) -> String? { if key == "PATH" { Some(path) } else { None } }
