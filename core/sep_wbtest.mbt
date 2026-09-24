@@ -22,14 +22,8 @@ test "win32：is_path_separator 双认与归一" {
   assert_eq(is_path_separator(92), true)
   assert_eq(normalize_separators("C:\\a\\b"), "C:/a/b")
   // 关键词末组件锚定：反斜杠库内路径按平台分隔符判定
-  assert_eq(
-    filter_by_keywords(["user", "work"], "C:\\home\\user\\work"),
-    true,
-  )
-  assert_eq(
-    filter_by_keywords(["work", "user"], "C:\\home\\user\\work"),
-    false,
-  )
+  assert_eq(filter_by_keywords(["user", "work"], "C:\\home\\user\\work"), true)
+  assert_eq(filter_by_keywords(["work", "user"], "C:\\home\\user\\work"), false)
   // fuzzy 组件子串：反斜杠组件化
   assert_eq(filter_by_keywords_fuzzy(["ork"], "C:\\home\\user\\work"), true)
 }
