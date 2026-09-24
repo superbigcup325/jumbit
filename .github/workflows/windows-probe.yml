@@ -1,0 +1,89 @@
+# Windows probe（roadmap「Windows 不承诺，probe 信号齐再议」项的 probe 侧）。
+# 定位与 macOS probe 不同：预期红。目的是一次性采集全量信号，回答「Windows
+# 立项的真实成本」：
+#   1. 工具链：moonbit-windows-x86_64.zip 是否可装可跑（install/powershell.ps1）
+#   2. 依赖与构建：moon update/install、check、test、release 产物
+#   3. 脚本闸门：smoke/golden 在 Git Bash 下的 POSIX 假设能走多远
+# 全绿才谈并入矩阵；红的步骤逐条进台账，作为立项/不立项的证据。
+# 触发仅 workflow_dispatch（预期红，不给 push CI 添噪声）；探测步骤
+# continue-on-error 保证单步失败不截断后续信号，末步 Verdict 聚合裁决，
+# 任一失败则 run 整体红（红/绿口径诚实）。
+name: Windows Probe
+
+on:
+  workflow_dispatch:
+
+env:
+  # 与 ci.yml 同一权威版本，升级 SOP 见 ci.yml env 块注释
+  MOONBIT_VERSION: 0.1.20260920
+
+jobs:
+  probe:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Install MoonBit (official powershell.ps1)
+        run: irm https://cli.moonbitlang.com/install/powershell.ps1 | iex
+
+      - name: Add MoonBit to PATH
+        run: Add-Content $env:GITHUB_PATH "$env:USERPROFILE\.moon\bin"
+
+      # latest 会漂移：与钉住版本不符时立即失败（与 ci.yml 同一口径，此步硬性）
+      - name: Verify pinned toolchain version
+        run: |
+          moon version --all
+          moon version | Select-String -SimpleMatch $env:MOONBIT_VERSION
+
+      - name: Fetch dependencies
+        id: deps
+        continue-on-error: true
+        run: |
+          moon update
+          moon install
+
+      - name: Lint (check --deny-warn)
+        id: check
+        continue-on-error: true
+        run: moon check --deny-warn
+
+      - name: Test
+        id: test
+        continue-on-error: true
+        run: moon test
+
+      - name: Release build & help
+        id: build
+        continue-on-error: true
+        run: |
+          moon build --release
+          _build/native/release/build/cmd/main/main.exe help > $null
+
+      # Git Bash 下的 POSIX 假设探底：mktemp/PATH/裸名调用/钩子链路
+      - name: End-to-end smoke (scripts/smoke.sh, Git Bash)
+        id: smoke
+        continue-on-error: true
+        shell: bash
+        run: bash scripts/smoke.sh
+
+      - name: Golden check (scripts/golden_check.sh, Git Bash)
+        id: golden
+        continue-on-error: true
+        shell: bash
+        run: bash scripts/golden_check.sh
+
+      - name: Verdict
+        if: always()
+        run: |
+          $results = [ordered]@{
+            deps   = "${{ steps.deps.outcome }}"
+            check  = "${{ steps.check.outcome }}"
+            test   = "${{ steps.test.outcome }}"
+            build  = "${{ steps.build.outcome }}"
+            smoke  = "${{ steps.smoke.outcome }}"
+            golden = "${{ steps.golden.outcome }}"
+          }
+          $results.GetEnumerator() | ForEach-Object { "{0,-8} {1}" -f $_.Key, $_.Value }
+          if ($results.Values -contains "failure") { exit 1 }
