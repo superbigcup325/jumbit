@@ -9,5 +9,6 @@ import {
   "moonbitlang/async",
   "moonbitlang/async/fs" @afs,
   "moonbitlang/core/bench",
+  "moonbitlang/core/quickcheck",
   "moonbitlang/core/random",
 } for "test"
