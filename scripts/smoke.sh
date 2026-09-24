@@ -249,12 +249,12 @@ edata=$(mktemp -d "${TMPDIR:-/tmp}/jumbit-exp-XXXX")
 etgt=$(mktemp -d "${TMPDIR:-/tmp}/jumbit-exp-tgt-XXXX")
 _JB_DATA_DIR="$edata" "$bin" add -- "$etgt" >/dev/null
 _JB_DATA_DIR="$edata" "$bin" describe "$etgt" --note "后端服务 | 含API" >/dev/null
-_JB_DATA_DIR="$edata" "$bin" export --agents > "$edata/map.md"
+_JB_DATA_DIR="$edata" "$bin" export --agents | tr -d '\r' > "$edata/map.md"
 printf '%s\n' \
   '<!-- jumbit export --agents：项目地图，按常用度（frecency）降序 -->' \
   '| 路径 | 说明 |' \
   '|---|---|' \
-  "| $(win_path "$etgt") | 后端服务 \| 含API |" > "$edata/expected.md"
+  "| $(win_path "$etgt") | 后端服务 \| 含API |" | tr -d '\r' > "$edata/expected.md"
 if ! diff -u "$edata/expected.md" "$edata/map.md"; then
   echo "✗ export --agents 输出不符" >&2
   exit 1

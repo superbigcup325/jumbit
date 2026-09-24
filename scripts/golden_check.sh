@@ -31,6 +31,12 @@ fi
 [ -x "$bin" ] || { echo "✗ 缺 $bin（先 moon build --release）" >&2; exit 2; }
 
 tmp=$(mktemp -d /tmp/jumbit-golden-XXXX)
+# Windows（Git Bash）下转混合形态：MSYS 的 /tmp 与 Windows 原生程序的
+# 「当前盘根 \tmp」是两个真实位置，python3 写数据集与 jumbit 经 _Z_DATA
+# 读取必须落在同处；C:/ 形态 bash 工具同样接受。POSIX 无 cygpath 原样
+if command -v cygpath >/dev/null; then
+  tmp=$(cygpath -m "$tmp")
+fi
 pass=0
 fail=0
 failed=()
