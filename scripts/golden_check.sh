@@ -16,6 +16,12 @@
 set -u
 cd "$(dirname "$0")/.."
 
+# Git Bash/MSYS 会把 POSIX 形态参数（合成路径 /golden/**）自动映射为
+# Git 安装根的真实路径（probe 实证 /golden/alpha → C:/Program Files/Git/
+# golden/alpha），污染查询参数与库内原样路径的精确匹配；禁用之
+export MSYS_NO_PATHCONV=1
+export MSYS2_ARG_CONV_EXCL='*'.
+
 bin=_build/native/release/build/cmd/main/main.exe
 golden=scripts/golden
 mode=check

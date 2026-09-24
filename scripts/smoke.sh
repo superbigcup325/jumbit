@@ -146,7 +146,9 @@ eval "$(jumbit init "$JUMBIT_HOOK_SHELL" --cmd j)"
 cd "$JUMBIT_HOOK_FROM"
 __jumbit_hook
 j "$JUMBIT_HOOK_KW"
-if [ "$PWD" != "$JUMBIT_HOOK_TO" ]; then
+pwd_cmp=$PWD
+if command -v cygpath >/dev/null; then pwd_cmp=$(cygpath -w "$PWD"); fi
+if [ "$pwd_cmp" != "$JUMBIT_HOOK_TO" ]; then
   echo "✗ j 落点 [$PWD] ≠ [$JUMBIT_HOOK_TO]" >&2
   exit 1
 fi
