@@ -16,12 +16,23 @@ echo "== 构建发布二进制 =="
 moon build --release
 bin=_build/native/release/build/cmd/main/main.exe
 
+# MSYS/Git Bash 会把 argv 里的 POSIX 路径自动转成 Windows 形态传给 jumbit
+# （环境变量不做转换），jumbit 记录与回显均为 Windows 形态；断言前把期望值
+# 过同一转换（cygpath），POSIX 平台无 cygpath 恒等回原样
+win_path() {
+  if command -v cygpath >/dev/null; then
+    cygpath -w "$1"
+  else
+    printf '%s' "$1"
+  fi
+}
+
 echo "== add 目标目录 =="
 _JB_DATA_DIR="$data" "$bin" add "$target"
 
 echo "== query 应精确回显目标目录 =="
 out=$(_JB_DATA_DIR="$data" "$bin" query)
-if [ "$out" != "$target" ]; then
+if [ "$out" != "$(win_path "$target")" ]; then
   echo "✗ query 输出 [$out] ≠ [$target]" >&2
   exit 1
 fi
@@ -99,7 +110,7 @@ cp "$bin" "$rbin/jumbit"
 PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" jumbit add -- "$rtgt" ||
   { echo "✗ PATH 裸名 add 失败（argv[0] 剥除回归）" >&2; exit 1; }
 out=$(PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" jumbit query)
-if [ "$out" != "$rtgt" ]; then
+if [ "$out" != "$(win_path "$rtgt")" ]; then
   echo "✗ 裸名 query 输出 [$out] ≠ [$rtgt]" >&2
   exit 1
 fi
@@ -150,19 +161,19 @@ for shell in bash zsh; do
   fi
   if [ "$shell" = bash ]; then rcflags=(--noprofile --norc); else rcflags=(--no-rcs); fi
   PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" JUMBIT_HOOK_SHELL="$shell" \
-    JUMBIT_HOOK_FROM="$rfrom" JUMBIT_HOOK_TO="$rtgt" JUMBIT_HOOK_KW=real-tgt \
+    JUMBIT_HOOK_FROM="$(win_path "$rfrom")" JUMBIT_HOOK_TO="$(win_path "$rtgt")" JUMBIT_HOOK_KW=real-tgt \
     "$shell" "${rcflags[@]}" "$hook_posix" ||
     { echo "✗ $shell hook 全链路失败" >&2; exit 1; }
   # 逐 shell 断言入库：CI 可能只装一个 shell，不能让别的 shell 掩盖漏 add
-  PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" jumbit query --all --list | grep -qF -- "$rfrom" ||
+  PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" jumbit query --all --list | grep -qF -- "$(win_path "$rfrom")" ||
     { echo "✗ $shell hook add 未入库（缺 $rfrom）" >&2; exit 1; }
 done
 if command -v fish >/dev/null; then
   PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" \
-    JUMBIT_HOOK_FROM="$rfrom" JUMBIT_HOOK_TO="$rtgt" JUMBIT_HOOK_KW=real-tgt \
+    JUMBIT_HOOK_FROM="$(win_path "$rfrom")" JUMBIT_HOOK_TO="$(win_path "$rtgt")" JUMBIT_HOOK_KW=real-tgt \
     fish --no-config "$hook_fish" ||
     { echo "✗ fish hook 全链路失败" >&2; exit 1; }
-  PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" jumbit query --all --list | grep -qF -- "$rfrom" ||
+  PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" jumbit query --all --list | grep -qF -- "$(win_path "$rfrom")" ||
     { echo "✗ fish hook add 未入库（缺 $rfrom）" >&2; exit 1; }
 else
   echo "  跳过 fish hook 链路（未安装）"
@@ -184,7 +195,7 @@ if [ "$(echo "$out" | wc -l)" -lt 1 ]; then
   echo "✗ --list 无输出" >&2
   exit 1
 fi
-if ! echo "$out" | grep -qE '^ *[0-9]+\.[0-9] .*tmp'; then
+if ! echo "$out" | grep -qE '^ *[0-9]+\.[0-9] .+'; then
   echo "✗ --score 前缀格式不符: $out" >&2
   exit 1
 fi
@@ -227,7 +238,7 @@ printf '%s\n' \
   '<!-- jumbit export --agents：项目地图，按常用度（frecency）降序 -->' \
   '| 路径 | 说明 |' \
   '|---|---|' \
-  "| $etgt | 后端服务 \| 含API |" > "$edata/expected.md"
+  "| $(win_path "$etgt") | 后端服务 \| 含API |" > "$edata/expected.md"
 if ! diff -u "$edata/expected.md" "$edata/map.md"; then
   echo "✗ export --agents 输出不符" >&2
   exit 1
@@ -245,7 +256,7 @@ t2=$(mktemp -d "${TMPDIR:-/tmp}/foo-demo-XXXX")
 trap 'rm -rf "$data" "$target" "$t2"' EXIT
 _JB_DATA_DIR="$data" "$bin" add -- "$t2"
 out=$(_JB_DATA_DIR="$data" "$bin" query foo)
-if [ "$out" != "$t2" ]; then
+if [ "$out" != "$(win_path "$t2")" ]; then
   echo "✗ query foo 输出 [$out] ≠ [$t2]" >&2
   exit 1
 fi
