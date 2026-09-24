@@ -12,6 +12,8 @@ jumbit 的纯函数内核：路径规范化、glob 匹配、关键词过滤、�
 
 ```mbt check
 ///|
+// POSIX 形态断言（win32 实现输出反斜杠且 base 语义不同，平台各测）
+#cfg(not(platform="windows"))
 test "resolve_path 绝对化与点段规范化" {
   // 相对路径基于 base 拼接
   inspect(@core.resolve_path("a/b", "/x/y"), content="/x/y/a/b")

@@ -100,6 +100,8 @@ async test "status：空库 / 有库 / 损坏库 / --check 的退出码与 stder
 }
 
 ///|
+#cfg(not(platform="windows"))
+// // Windows 门控：不可读构造依赖 chmod 权限位（Windows 无效），待平台化
 async test "status：db.txt 不可读 → 无法读取数据文件 + exit 1（Repr 不再外泄）" {
   let data = make_test_dir("status-noread")
   let target = make_test_dir("status-noread-t")

@@ -213,6 +213,8 @@ async test "等号形式 --flag=value 端到端（clap 双形态对齐）" {
 }
 
 ///|
+#cfg(not(platform="windows"))
+// // Windows 门控：只读目录依赖 chmod 权限位（Windows 无效），待平台化
 async test "save 失败：数据目录不可写 → 清晰文案 exit 1（Repr 不再外泄）" {
   let data = make_test_dir("save-ro")
   let target = make_test_dir("save-ro-t")
