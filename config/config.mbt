@@ -18,7 +18,31 @@ pub fn data_dir(get : (String) -> String?) -> Result[String, String] {
 }
 
 ///|
-/// 绝对路径判定（Linux：以 / 开头）
+/// 绝对路径判定：POSIX 以 / 开头。Windows 另认盘符根（C:\ 或 C:/）、
+/// UNC/设备（\\ 或 // 开头）；/ 开头的 POSIX 形态 Win32 API 同样接受
+/// （Git Bash/MSYS 互操作），一并放行
+#cfg(platform="windows")
+fn is_absolute(path : String) -> Bool {
+  if path.has_prefix("/") || path.has_prefix("\\\\") {
+    return true
+  }
+  let rooted = path.length() >= 3 &&
+    ({
+      let c0 = path.get_char(0)
+      (c0 is Some(c) && c >= 'a' && c <= 'z') ||
+      (c0 is Some(c) && c >= 'A' && c <= 'Z')
+    }) &&
+    path.get_char(1) == Some(':') &&
+    ({
+      let c2 = path.get_char(2)
+      c2 == Some('/') || c2 == Some('\\')
+    })
+  rooted
+}
+
+///|
+#warnings("-unused_value")
+#cfg(not(platform="windows"))
 fn is_absolute(path : String) -> Bool {
   path.has_prefix("/")
 }
