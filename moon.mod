@@ -26,6 +26,6 @@ preferred_target = "native"
 description = "a MoonBit rewrite of zoxide: jump to directories in a few keystrokes"
 
 import {
-  "moonbitlang/async@0.21.2",
+  "moonbitlang/async@0.22.4",
   "moonbitlang/x@0.5.1",
 }
