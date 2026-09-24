@@ -259,6 +259,8 @@ for case in json-empty-db list-empty-db miss-with-kw import-quiet \
     for ext in code err out; do
       echo "  --- $ext ---"
       diff "$golden/$case.$ext" "$tmp/$case.$ext" 2>/dev/null | head -4 | sed 's/^/  /'
+      echo "  golden bytes: $(od -An -tx1 -N 32 "$golden/$case.$ext" 2>/dev/null | tr -s ' ')"
+      echo "  actual bytes: $(od -An -tx1 -N 32 "$tmp/$case.$ext" 2>/dev/null | tr -s ' ')"
     done
   fi
 done

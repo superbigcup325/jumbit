@@ -27,6 +27,17 @@ win_path() {
   fi
 }
 
+# 给外部解释器（pwsh/nu/elvish 等 Windows 原生程序）的文件路径：混合形态
+# （C:/...，Windows API 与 .NET 通吃）；MSYS 路径传进去会被当成当前盘
+# \tmp\... 而找不到文件
+win_file() {
+  if command -v cygpath >/dev/null; then
+    cygpath -m "$1"
+  else
+    printf '%s' "$1"
+  fi
+}
+
 echo "== add 目标目录 =="
 _JB_DATA_DIR="$data" "$bin" add "$target"
 
@@ -53,7 +64,8 @@ for shell in bash zsh fish elvish nushell posix powershell tcsh; do
     elif [ "$shell" = "powershell" ]; then
       psfile=$scratch/jumbit-ps.ps1
       "$bin" init powershell $args > "$psfile"
-      if ! pwsh -NoProfile -Command "\$null = [scriptblock]::Create((Get-Content -Raw '$psfile'))"; then
+      psfile_w=$(win_file "$psfile")
+      if ! pwsh -NoProfile -Command "\$null = [scriptblock]::Create((Get-Content -Raw '$psfile_w'))"; then
         echo "✗ powershell 解析失败: $args" >&2
         rm -f "$psfile"
         exit 1
@@ -64,7 +76,8 @@ for shell in bash zsh fish elvish nushell posix powershell tcsh; do
     elif [ "$shell" = "nushell" ]; then
       nufile=$scratch/jumbit-nu.nu
       "$bin" init nushell $args > "$nufile"
-      if ! nu -n -c "nu-check '$nufile'" | grep -q true; then
+      nufile_w=$(win_file "$nufile")
+      if ! nu -n -c "nu-check '$nufile_w'" | grep -q true; then
         echo "✗ nushell 语法错误: $args" >&2
         rm -f "$nufile"
         exit 1
@@ -76,8 +89,9 @@ for shell in bash zsh fish elvish nushell posix powershell tcsh; do
       elfile=$scratch/jumbit-elvish.elv
       errfile=$(mktemp /tmp/jumbit-elvish-err-XXXX)
       "$bin" init elvish $args > "$elfile"
+      elfile_w=$(win_file "$elfile")
       rc=0
-      elvish -compileonly "$elfile" 2> "$errfile" || rc=$?
+      elvish -compileonly "$elfile_w" 2> "$errfile" || rc=$?
       if [ $rc -ne 0 ] && grep -q "Parse error" "$errfile"; then
         echo "✗ elvish 语法错误: $args" >&2
         cat "$errfile" >&2
