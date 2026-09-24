@@ -230,6 +230,9 @@ fi
 
 cmp_case() {
   local case="$1" ext="$2" ok=1
+  # golden 侧同样剥 \r：防御 checkout 行尾翻译（.gitattributes 已禁止，
+  # 此为本地既有工作区的双保险）
+  strip_cr "$golden/$case.$ext"
   if ! cmp -s "$tmp/$case.$ext" "$golden/$case.$ext"; then
     ok=0
   fi
