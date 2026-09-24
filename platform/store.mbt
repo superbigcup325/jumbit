@@ -36,13 +36,16 @@ pub fn StoreError::message(self : StoreError) -> String {
 pub fn os_error_message(err : Error) -> String {
   match err {
     @os_error.OSError(errno, ..) as ose => {
-      let phrase = if ose.is_ENOENT() {
+      // Windows 数值回落（probe run 36044327191 实证：async 的 is_E* 谓词在
+      // Windows 构建下对短语表失效）；四类 errno 数值 POSIX 与 Windows CRT
+      // 一致（2/13/20/17），上游修复谓词后可撤
+      let phrase = if ose.is_ENOENT() || (is_windows() && errno == 2) {
         "No such file or directory"
-      } else if ose.is_EACCES() {
+      } else if ose.is_EACCES() || (is_windows() && errno == 13) {
         "Permission denied"
-      } else if ose.is_ENOTDIR() {
+      } else if ose.is_ENOTDIR() || (is_windows() && errno == 20) {
         "Not a directory"
-      } else if ose.is_EEXIST() {
+      } else if ose.is_EEXIST() || (is_windows() && errno == 17) {
         "File exists"
       } else {
         return "(os error \{errno})"
@@ -51,6 +54,21 @@ pub fn os_error_message(err : Error) -> String {
     }
     other => "\{Repr(other)}"
   }
+}
+
+///|
+/// Windows 判定（编译期）：数值回落只圈 Windows，Linux/macOS 语义保持
+/// 谓词驱动不变
+#cfg(platform="windows")
+fn is_windows() -> Bool {
+  true
+}
+
+///|
+#warnings("-unused_value")
+#cfg(not(platform="windows"))
+fn is_windows() -> Bool {
+  false
 }
 
 ///|

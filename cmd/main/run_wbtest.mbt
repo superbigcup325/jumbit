@@ -9,10 +9,24 @@ async fn cleanup_test_dir(dir : String) -> Unit {
 }
 
 ///|
+/// 测试临时根目录：平台 temp（Windows TEMP/TMP、UNIX TMPDIR）回落 /tmp；
+/// 硬编码 /tmp 在 Windows 会落 C:\tmp 触发 mkdir EEXIST 上游问题
+/// （moonbitlang/async recursive mkdir 非幂等，probe run 36044327191）
+fn test_temp_root() -> String {
+  for key in ["TEMP", "TMP", "TMPDIR"] {
+    match @env.get_env_var(key) {
+      Some(v) => return v
+      None => ()
+    }
+  }
+  "/tmp"
+}
+
+///|
 async fn make_test_dir(prefix : String) -> String {
   // rand_name 不可见（platform 私有），用毫秒 + exists 重试保证并发测试不撞名
   for _attempt = 0 {
-    let dir = "/tmp/jumbit-e2e-\{@async.now()}-\{prefix}-\{_attempt}"
+    let dir = "\{test_temp_root()}/jumbit-e2e-\{@async.now()}-\{prefix}-\{_attempt}"
     if !@afs.exists(dir) {
       @afs.mkdir(dir, recursive=true)
       break dir

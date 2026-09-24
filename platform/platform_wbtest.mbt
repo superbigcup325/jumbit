@@ -3,8 +3,22 @@
 ///|
 
 ///|
+/// 测试临时根目录：平台 temp（Windows TEMP/TMP、UNIX TMPDIR）回落 /tmp；
+/// 硬编码 /tmp 在 Windows 会落 C:\tmp 触发 mkdir EEXIST 上游问题
+/// （moonbitlang/async recursive mkdir 非幂等，probe run 36044327191）
+fn test_temp_root() -> String {
+  for key in ["TEMP", "TMP", "TMPDIR"] {
+    match @env.get_env_var(key) {
+      Some(v) => return v
+      None => ()
+    }
+  }
+  "/tmp"
+}
+
+///|
 async fn make_tmp_dir() -> String {
-  let dir = "/tmp/jumbit-test-\{@async.now()}-\{rand_name()}"
+  let dir = "\{test_temp_root()}/jumbit-test-\{@async.now()}-\{rand_name()}"
   @afs.mkdir(dir, recursive=true)
   dir
 }
@@ -23,6 +37,8 @@ async test "atomic_write：写入一致、覆盖、无 tmp 残留" {
 }
 
 ///|
+#cfg(not(platform="windows"))
+// 只读目录经 chmod 0o555 造（Windows 无权限位）
 async test "atomic_write：只读目录报错且无残留" {
   let dir = make_tmp_dir()
   @afs.chmod(dir, 0o555)
@@ -255,6 +271,8 @@ async fn write_fake_fzf_body(bindir : String, body : String) -> Unit {
 }
 
 ///|
+#cfg(not(platform="windows"))
+// 伪 fzf 桩经 chmod 可执行位造（Windows 无 exec 位，待 .cmd 桩平台化）
 async test "fzf_select：选中回传原样 stdout，候选按 score\\tpath\\0 投喂" {
   let bindir = make_tmp_dir()
   let fake = make_fake_fzf(bindir)
@@ -272,6 +290,8 @@ async test "fzf_select：选中回传原样 stdout，候选按 score\\tpath\\0 �
 }
 
 ///|
+#cfg(not(platform="windows"))
+// 伪 fzf 桩经 chmod 可执行位造（Windows 无 exec 位，待 .cmd 桩平台化）
 async test "fzf_select：FZF_DEFAULT_OPTS 仅在 fzf_opts 传入时注入" {
   let hits = fzf_hits()
   // Some → extra_env 注入
@@ -305,6 +325,8 @@ async test "fzf_select：FZF_DEFAULT_OPTS 仅在 fzf_opts 传入时注入" {
 }
 
 ///|
+#cfg(not(platform="windows"))
+// 伪 fzf 桩经 chmod 可执行位造（Windows 无 exec 位，待 .cmd 桩平台化）
 async test "fzf_select：退出码矩阵 → FzfError（上游探针表）" {
   let bindir = make_tmp_dir()
   let fake = make_fake_fzf(bindir)
@@ -413,6 +435,8 @@ fn env_none(key : String) -> String? {
 }
 
 ///|
+#cfg(not(platform="windows"))
+// 伪 fzf 桩经 chmod 可执行位造（Windows 无 exec 位，待 .cmd 桩平台化）
 async test "fzf_select：裸名沿 PATH 解析——不可执行候选被跳过，选中首个可执行者" {
   let noexec_dir = make_tmp_dir()
   let good_dir = make_tmp_dir()
@@ -434,6 +458,8 @@ async test "fzf_select：裸名沿 PATH 解析——不可执行候选被跳过�
 }
 
 ///|
+#cfg(not(platform="windows"))
+// 伪 fzf 桩经 chmod 可执行位造（Windows 无 exec 位，待 .cmd 桩平台化）
 async test "fzf_select：裸名 PATH 无可执行候选 → NotFound" {
   let noexec_dir = make_tmp_dir()
   // 不可执行普通文件

@@ -210,6 +210,8 @@ async test "import z：超大 rank 触发 age 老化（0.9×maxage/total 因子�
 }
 
 ///|
+#cfg(not(platform="windows"))
+// 伪 atuin 桩经 chmod 可执行位造（Windows 无 exec 位，待 .cmd 桩平台化）
 async test "import atuin：连续同路径折叠 + 错误不打断链（PATH 注入伪 atuin 走真实子进程）" {
   let data = make_test_dir("imp-atuin-data")
   let bindir = make_test_dir("imp-atuin-bin")

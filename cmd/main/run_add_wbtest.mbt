@@ -169,6 +169,8 @@ async test "add --score：负增量 clamp 到 0" {
 }
 
 ///|
+#cfg(not(platform="windows"))
+// Windows 门控：符号链接创建需特权/开发者模式，probe run 36044327191
 async test "_JB_RESOLVE_SYMLINKS=1：add 符号链接记录真实目录" {
   let data = make_test_dir("sym-data")
   let real = make_test_dir("sym-real")
@@ -203,6 +205,8 @@ async test "_JB_RESOLVE_SYMLINKS=1：add 符号链接记录真实目录" {
 }
 
 ///|
+#cfg(not(platform="windows"))
+// Windows 门控：符号链接创建需特权/开发者模式，probe run 36044327191
 async test "add _JB_RESOLVE_SYMLINKS=1：自环符号链接 → 解析路径失败 + exit 1（ELOOP 走数字后缀）" {
   let data = make_test_dir("loop-data")
   let dir = make_test_dir("loop-link")

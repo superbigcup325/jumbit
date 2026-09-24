@@ -14,6 +14,8 @@ async fn make_fake_editor(dir : String, name : String, body : String) -> String 
 }
 
 ///|
+#cfg(not(platform="windows"))
+// 伪 editor 桩经 chmod 可执行位造（Windows 无 exec 位，待 .cmd 桩平台化）
 async test "edit 交互：正常编辑改 rank → 落盘；编辑器缺失 → no editor" {
   let data = make_test_dir("edit-data")
   let target = make_test_dir("edit-target")
@@ -75,6 +77,8 @@ async test "edit 交互：正常编辑改 rank → 落盘；编辑器缺失 → 
 }
 
 ///|
+#cfg(not(platform="windows"))
+// 伪 editor 桩经 chmod 可执行位造（Windows 无 exec 位，待 .cmd 桩平台化）
 async test "edit --rename：note 跟随；未命中/撞名报错" {
   let data = make_test_dir("ren-data")
   let target = make_test_dir("ren-target")
