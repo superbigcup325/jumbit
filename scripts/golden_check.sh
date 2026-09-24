@@ -34,7 +34,9 @@ tmp=$(mktemp -d /tmp/jumbit-golden-XXXX)
 # Windows（Git Bash）下转混合形态：MSYS 的 /tmp 与 Windows 原生程序的
 # 「当前盘根 \tmp」是两个真实位置，python3 写数据集与 jumbit 经 _Z_DATA
 # 读取必须落在同处；C:/ 形态 bash 工具同样接受。POSIX 无 cygpath 原样
+is_win=0
 if command -v cygpath >/dev/null; then
+  is_win=1
   tmp=$(cygpath -m "$tmp")
 fi
 pass=0
@@ -268,8 +270,11 @@ for case in json-empty-db list-empty-db miss-with-kw import-quiet \
   status-empty status-full status-json status-check status-corrupt status-corrupt-plaintext \
   edit-noop edit-rename describe-renamed edit-missing edit-mutex edit-prune; do
   # Windows（Git Bash）下 edit 组未跑，golden 侧同名文件缺位，跳过比对
-  if command -v cygpath >/dev/null && [ "$case" = "edit-noop" ] || [ "$case" = "edit-rename" ] || [ "$case" = "describe-renamed" ] || [ "$case" = "edit-missing" ] || [ "$case" = "edit-mutex" ] || [ "$case" = "edit-prune" ]; then
-    continue
+  # （is_win 见下；注意 && / || 混用的左结合陷阱，用 case 分发）
+  if [ "$is_win" = 1 ]; then
+    case "$case" in
+      edit-noop|edit-rename|describe-renamed|edit-missing|edit-mutex|edit-prune) continue ;;
+    esac
   fi
   local_ok=1
   for ext in out err code; do
