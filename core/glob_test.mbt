@@ -100,3 +100,27 @@ test "pattern 与路径等长边界" {
   @debug.assert_eq(@core.glob_match("", ""), true)
   @debug.assert_eq(@core.glob_match("", "a"), false)
 }
+
+///|
+test "越界留档核实：匹配器对非法 pattern 全函数（无 panic）" {
+  // 留档核实（2026-09-25）：validate_glob 拒绝的四类非法 pattern 直接喂
+  // glob_match（绕过前置闸的最坏情况），匹配器所有索引访问均有边界守卫，
+  // 垃圾进垃圾出（返回 Bool）但绝不越界 panic；入口闸=config 解析期逐个
+  // validate + escape_glob 默认值 + glob_matches 公开面（核实记录见 roadmap）
+  let invalid = [
+    "[abc", // 未闭合
+     "[]", // 空类
+     "[!]", // 空否定类
+     "[z-a]", // 倒序区间
+     "abc\\", // 尾转义
+     "[", // 裸 [
+  ]
+  for p in invalid {
+    let _ = @core.glob_match(p, "/usr/local/bin")
+    let _ = @core.glob_match(p, "")
+    let _ = @core.glob_match(p, "[abc")
+  }
+  // 空 pattern 与空路径的平凡匹配
+  inspect(@core.glob_match("", ""), content="true")
+  inspect(@core.glob_match("", "/x"), content="false")
+}
