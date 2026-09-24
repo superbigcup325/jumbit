@@ -18,7 +18,13 @@ env:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # macOS 档自 probe（2026-09-25）毕业并入：darwin-aarch64 全套闸门与 Linux
+    # 零分歧后转正；fail-fast 关闭，一腿失败不掩盖另一腿
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -28,7 +34,8 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.moon
-          key: moonbit-${{ env.MOONBIT_VERSION }}
+          # key 带平台段：linux/macos 工具链二进制互不兼容，缓存不可跨腿命中
+          key: moonbit-${{ matrix.os }}-${{ env.MOONBIT_VERSION }}
 
       - name: Install MoonBit (cache miss only)
         if: steps.moon-cache.outputs.cache-hit != 'true'

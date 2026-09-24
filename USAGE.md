@@ -266,7 +266,7 @@ j backend api   # api 落在路径末组件，backend 在其左侧消耗
 - 环境变量前缀 `_ZO_*` → `_JB_*`，两者可共存
 - 关键词大小写归一仅限 ASCII（上游为 Unicode 全量）
 - `_JB_EXCLUDE_DIRS` 的 glob 排除不支持 `{a,b}` 括号展开；`**` 按两个 `*` 处理、不跨分隔符（上游 glob crate 的 `**` 为递归通配）；`*`/`?`/`[...]` 语义对齐；`query --exclude` 为精确路径过滤、不做 glob（对齐上游）
-- 仅支持 Linux；fzf 预览窗口的平台定制未实现（import 的 autojump/z.lua 路径探测同按 Linux 语义）
+- 支持 Linux 与 macOS（CI 双平台矩阵实测；macOS 为 Apple Silicon darwin-aarch64，Intel mac 未支持：工具链官方安装脚本无 darwin-x86_64 分支）；fzf 预览窗口的平台定制未实现（import 的 autojump/z.lua 路径探测同按 Linux 语义）；Windows 不支持（上游支持）
 - fzf 交互通道（`query --interactive`）：选中/`--score` 输出与退出码对齐上游（伪 fzf 探针矩阵逐字节对拍）；文案差异两处：fzf 取消（其退出码 1）jumbit 静默退出 1，上游报 `no match found`；fzf 自身异常的提示为英文原文且无 `zoxide: ` 前缀。另 spawn 失败不区分「未安装」与「无法启动」（上游区分，进程绑定不暴露错误类别），统一报 `could not find fzf, is it installed?`
 - `edit` 上游为 fzf 交互调 rank（0.10.0），jumbit 为编辑器/结构化形态（见 `edit` 扩展条）；上游已宣布该形态待砍（#1288 评论区），不跟随
 - 非 finite rank：明文格式下入库时 `inf` 钳到上限、`nan` 归最低权重（0.01），读取遇 `nan` 行整库拒绝并按行报错；上游 0.10.0 的「非 finite 毒库」问题（[zoxide#1280](https://github.com/ajeetdsouza/zoxide/pull/1280)）在 jumbit 明文格式下不再成立
