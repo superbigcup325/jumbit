@@ -36,16 +36,13 @@ pub fn StoreError::message(self : StoreError) -> String {
 pub fn os_error_message(err : Error) -> String {
   match err {
     @os_error.OSError(errno, ..) as ose => {
-      // Windows 数值回落（probe run 36044327191 实证：async 的 is_E* 谓词在
-      // Windows 构建下对短语表失效）；四类 errno 数值 POSIX 与 Windows CRT
-      // 一致（2/13/20/17），上游修复谓词后可撤
-      let phrase = if ose.is_ENOENT() || (is_windows() && errno == 2) {
+      let phrase = if ose.is_ENOENT() {
         "No such file or directory"
-      } else if ose.is_EACCES() || (is_windows() && errno == 13) {
+      } else if ose.is_EACCES() {
         "Permission denied"
-      } else if ose.is_ENOTDIR() || (is_windows() && errno == 20) {
+      } else if ose.is_ENOTDIR() {
         "Not a directory"
-      } else if ose.is_EEXIST() || (is_windows() && errno == 17) {
+      } else if ose.is_EEXIST() {
         "File exists"
       } else {
         return "(os error \{errno})"
@@ -54,21 +51,6 @@ pub fn os_error_message(err : Error) -> String {
     }
     other => "\{Repr(other)}"
   }
-}
-
-///|
-/// Windows 判定（编译期）：数值回落只圈 Windows，Linux/macOS 语义保持
-/// 谓词驱动不变
-#cfg(platform="windows")
-fn is_windows() -> Bool {
-  true
-}
-
-///|
-#warnings("-unused_value")
-#cfg(not(platform="windows"))
-fn is_windows() -> Bool {
-  false
 }
 
 ///|
@@ -163,11 +145,10 @@ pub async fn load(data_dir : String) -> Result[Store, StoreError] {
       Err(e) => Err(Codec(e))
     }
   } else {
-    // async/fs 的 mkdir 对已存在目录也报 EEXIST，先探测
-    if !@afs.exists(data_dir) {
-      @afs.mkdir(data_dir, recursive=true) catch {
-        err => return Err(Io(os_error_message(err)))
-      }
+    // allow_exist=true：目录已存在不报错（mkdir -p 语义，0.22 线参数），
+    // 消 exists-then-mkdir 竞态；0.21.2 时代的 exists 先探测守卫随之移除
+    @afs.mkdir(data_dir, recursive=true, allow_exist=true) catch {
+      err => return Err(Io(os_error_message(err)))
     }
     Ok({ db: @core.Database::new(), data_dir, })
   }

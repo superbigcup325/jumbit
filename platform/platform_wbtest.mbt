@@ -510,13 +510,32 @@ test "codec_error_message：经真实 decode 产物冻结文案（pub enum 只�
 }
 
 ///|
+
+///|
+/// EEXIST 的平台真实值：POSIX CRT 17 / Win32 ERROR_ALREADY_EXISTS 183
+/// （谓词与 fs 层在 Windows 同报 Win32 码，构造值须平台真实；
+/// 勘误辨析见 docs/handoff-os-error-predicate.md）
+#cfg(platform="windows")
+fn test_eexist_errno() -> Int {
+  183
+}
+
+///|
+#warnings("-unused_value")
+#cfg(not(platform="windows"))
+fn test_eexist_errno() -> Int {
+  17
+}
+
+///|
 test "os_error_message：ENOENT 短语 + (os error N) 后缀，非 OSError 兜底 Repr" {
   @debug.assert_eq(
     os_error_message(@os_error.OSError(2, context="test")),
     "No such file or directory (os error 2)",
   )
+  let eexist = test_eexist_errno()
   @debug.assert_eq(
-    os_error_message(@os_error.OSError(17, context="test")),
-    "File exists (os error 17)",
+    os_error_message(@os_error.OSError(eexist, context="test")),
+    "File exists (os error \{eexist})",
   )
 }
