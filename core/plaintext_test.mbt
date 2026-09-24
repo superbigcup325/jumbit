@@ -188,3 +188,103 @@ test "明文 decode：非法 UTF-8 报行号；错误聚合超 8 条折叠为 ..
     Ok(_) => fail("expected error")
   }
 }
+
+///|
+/// 边界补课（coverage 2026-09-25 盲区明细）：pad10 负数路、空 path 跳过、
+/// parse_i64 分支矩阵、多行错误聚合、行首空白
+test "明文 encode：负数 last_accessed 的 pad10（-1 补零、i64::MIN 超宽原样）" {
+  let dirs : Array[@core.Dir] = [
+    { path: "/a", rank: 1.0, last_accessed: -1L, note: None, },
+    { path: "/b", rank: 1.0, last_accessed: -9223372036854775808L, note: None, },
+  ]
+  let text = @core.encode_plaintext(dirs)
+  // -1 → "-000000001"（符号在前 0 填充其后）；MIN 20 位超宽原样不截断
+  inspect(
+    @utf8.decode(text).contains("-0000000001\t0000001.00\t/a"),
+    content="true",
+  )
+  inspect(
+    @utf8.decode(text).contains("-9223372036854775808\t0000001.00\t/b"),
+    content="true",
+  )
+  // 负数 epoch roundtrip（atuin 数据集 epoch=-1 边界行的另一半）
+  match @core.decode_plaintext(text) {
+    Ok(out) => {
+      @debug.assert_eq(out[0].last_accessed, -1L)
+      @debug.assert_eq(out[1].last_accessed, -9223372036854775808L)
+    }
+    Err(e) => fail("\{e.message()}")
+  }
+}
+
+///|
+test "明文 encode：空 path 条目跳过（明文行格式无法表达，迁移救库语义）" {
+  let dirs : Array[@core.Dir] = [
+    { path: "", rank: 1.0, last_accessed: 0L, note: None, },
+    { path: "/kept", rank: 1.0, last_accessed: 0L, note: None, },
+  ]
+  let text = @utf8.decode(@core.encode_plaintext(dirs))
+  inspect(text.contains("/kept"), content="true")
+  // 空 path 行不落盘（写出让库永久不可读的自锁预防）
+  inspect(text.split("\n").length(), content="2")
+}
+
+///|
+test "明文 decode：timestamp 解析分支矩阵（i64::from_str 语义）" {
+  // 符号位单独出现（"+" / "-"）→ could not parse timestamp
+  // 超过 20 位（必溢出）早拒；2^63 超 i64::MAX 拒；-0 归 0；i64::MIN 接受
+  let cases : Array[(String, Result[Int64, Unit])] = [
+    ("+ 00000001.00 /x", Err(())),
+    ("- 00000001.00 /x", Err(())),
+    ("0000000000000000000001 00000001.00 /x", Err(())),
+    ("9223372036854775807 00000001.00 /x", Ok(9223372036854775807L)),
+    ("9223372036854775808 00000001.00 /x", Err(())),
+    ("-9223372036854775808 00000001.00 /x", Ok(-9223372036854775808L)),
+    ("-0 00000001.00 /x", Ok(0L)),
+    ("007 00000001.00 /x", Ok(7L)),
+  ]
+  for case in cases {
+    let line = case.0
+    let want = case.1
+    match @core.decode_plaintext(@utf8.encode(line + "\n")) {
+      Ok(out) =>
+        match want {
+          Ok(v) => @debug.assert_eq(out[0].last_accessed, v)
+          Err(_) => fail("应拒: \{line}")
+        }
+      Err(_) =>
+        match want {
+          Ok(_) => fail("应收: \{line}")
+          Err(_) => ()
+        }
+    }
+  }
+}
+
+///|
+test "明文 decode：多坏行错误聚合换行拼接与行号" {
+  let bad = "garbage\nalso bad\n1789054423\t00000001.00\t/ok\n"
+  match @core.decode_plaintext(@utf8.encode(bad)) {
+    Ok(_) => fail("坏行应整库拒绝")
+    Err(e) => {
+      let msg = e.message()
+      // 逐行换行拼接（对齐上游 errors.join("\n")）
+      inspect(msg.contains("\n"), content="true")
+      inspect(msg.contains("line 1:"), content="true")
+      inspect(msg.contains("line 2:"), content="true")
+    }
+  }
+}
+
+///|
+test "明文 decode：行首空白 trim_start 与 CR 行尾容忍" {
+  let text = "  \t1789054423\t00000001.00\t/x\r\n"
+  match @core.decode_plaintext(@utf8.encode(text)) {
+    Ok(out) => {
+      @debug.assert_eq(out.length(), 1)
+      @debug.assert_eq(out[0].path, "/x")
+      @debug.assert_eq(out[0].last_accessed, 1789054423L)
+    }
+    Err(e) => fail("\{e.message()}")
+  }
+}
