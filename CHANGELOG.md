@@ -8,6 +8,7 @@
 - `edit` 子命令（jumbit 扩展，上游无）：无 flag 时以 `$VISUAL`/`$EDITOR`（回落 `vi`）编辑明文库，读回逐行校验，坏行不落库并按行号报错；`--rename <old> <new>` 改路径（人工标注跟随迁移，撞库内既有路径报 `path already in database` 不合并）；`--prune` 清除不存在条目并逐行输出清单。三形态互斥。上游现行 `edit` 为 fzf 交互调 rank（已宣布待砍），不跟随
 - 明文数据库 `db.txt`（对齐上游 [zoxide#1288](https://github.com/ajeetdsouza/zoxide/pull/1288) 的明文方向，该 PR 合并前 jumbit 已先行）：每行 `timestamp\trank\tpath`，文本工具可直接查看与手改，坏行整库拒绝加载并按行号报错（最多列 8 行，超出折叠 `... and N more`）；人工标注拆分至侧文件 `notes.tsv`（`path\tnote`），主格式与上游明文可互换
 - macOS 支持（Apple Silicon）：CI 矩阵扩至 ubuntu/macos 双平台实测（darwin-aarch64），280 测试/smoke/golden/MCP 字节面与 Linux 侧零分歧；Intel mac 未支持（工具链官方安装脚本无 darwin-x86_64 分支），Windows 仍不支持
+- Windows 支持（x64）：CI probe 全绿（288 测试/smoke 全链路/golden 字节面），路径解析按平台组件模型（盘符/双分隔符，对齐上游 Windows 分支）、关键词与 glob 分隔符判定平台化（glob pattern 以正斜杠书写，`/` 等价匹配 `\` 路径）；moonbitlang/async 升至 0.22.4（`mkdir allow_exist` 消除目录创建竞态）；`_JB_EXCLUDE_DIRS` 冒号分隔与盘符冒号冲突为已知限制
 
 ### Changed
 - **存储格式迁移**：`db.zo`（二进制）→ `db.txt`（明文）。旧库在首次写库时自动转换（只读命令不触发），转换后原 `db.zo` 保留可手动删除；迁移时病态数据自动修复：`NaN` rank 归最低权重（0.01）、超界 rank 钳到 [0.01, 9999999.99]、空路径条目丢弃（明文行格式无法表达）

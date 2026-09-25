@@ -7,7 +7,7 @@ A MoonBit rewrite of [zoxide](https://github.com/ajeetdsouza/zoxide): jump to di
 [![CI](https://github.com/superbigcup325/jumbit/actions/workflows/ci.yml/badge.svg)](https://github.com/superbigcup325/jumbit/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/superbigcup325/jumbit/blob/main/LICENSE)
 [![written in MoonBit](https://img.shields.io/badge/written%20in-MoonBit-9B7EDE)](https://www.moonbitlang.com/)
-[![platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey)](USAGE.md)
+[![platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)](USAGE.md)
 [![rewrite of zoxide](https://img.shields.io/badge/rewrite%20of-zoxide-orange)](https://github.com/ajeetdsouza/zoxide)
 
 ```bash
