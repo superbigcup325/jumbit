@@ -70,7 +70,7 @@ ji               # fzf 交互式跳转（需安装 fzf）
 | `j <关键词>...` | frecency 最高分匹配并 cd；跳转目的地随后自动入库（`--hook none` 下不自动记录） |
 | `ji [关键词]...` | fzf 交互式选择后 cd |
 
-> 测试覆盖口径：bash / zsh / fish 的 hook 链路在 CI 中真跑（source init 输出、驱动钩子、断言落点与入库）；其余六模板为上游同源转译，仅做语法门禁校验，未做 headless 全链路真测，发现问题请提 issue
+> 测试覆盖口径：bash / zsh / fish 的 hook 全链路在 CI 中真跑（source init 输出、驱动钩子、断言落点与入库）；tcsh / xonsh 在 smoke 中做脚本态真加载门禁（source/execx 后断言命令别名已定义）；elvish / nushell / posix / powershell 保持语法门禁（nu-check / sh -n / pwsh 解析 / elvish 编译），九模板的 headless 全链路已于 2026-09-27 真机逐壳验证通过（bash/zsh/posix/tcsh 脚本态、fish/nu/pwsh/xonsh 脚本态、elvish pty 交互态），发现问题请提 issue
 
 ## 面向 agent
 

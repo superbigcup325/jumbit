@@ -87,7 +87,8 @@ claude mcp add jumbit -- jumbit mcp
 
 For MCP-native clients, `jumbit mcp` runs a stdio MCP server exposing the same data as two
 tools: `jumbit_query` (keywords/fuzzy/limit, same JSON shape and semantics as
-`query --json`) and `jumbit_export_agents` (the project map). The initialize response
+`query --json`; keywords is required, omitting it is a protocol error) and
+`jumbit_export_agents` (the project map). The initialize response
 carries server instructions describing when to reach for jumbit. A miss is reported as a
 result with `isError: true`, a normal outcome, not a protocol error.
 

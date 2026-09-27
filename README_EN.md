@@ -30,7 +30,7 @@ On that foundation, jumbit extends directory memory beyond the shell: coding age
 - **Agent channels**: byte-stable `--json`/`--tsv` output (with the `matched_by` evidence field), `describe` human annotations persisted in the database, `export --agents` project-map Markdown, and `jumbit mcp`, a stdio MCP server exposing the `jumbit_query`/`jumbit_export_agents` tools plus server instructions (verified against the official SDK client)
 - **History migration**: one-command import from z / zsh-z / z.lua / autojump / fasd / atuin: direct pour into an empty database, `--merge` otherwise, bad rows never abort the run
 - **Tool ecosystem**: sesh (tmux session manager) can swap its frecency backend wholesale; yazi becomes a directory-memory collector through a wrapper function
-- **Data self-check**: `status` shows the database at a glance (entries/notes/format version/aging threshold), `--json` for scripts
+- **Data self-check and editing**: `status` shows the database at a glance (entries/notes/format/aging threshold), `edit` rewrites the database with an editor or `--rename`/`--prune` directly, `--json` for scripts
 
 ## Install
 
