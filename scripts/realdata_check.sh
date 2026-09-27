@@ -8,6 +8,9 @@
 #     rank 用 python repr 最短往返表示，Rust f64::from_str 正确舍入解析后逐位一致。
 # R2 真 atuin 回放：真 atuin 二进制（v18 实测，不再用伪脚本）从真实 shell 历史
 #     导入 → 两侧 import atuin 走真 atuin 子进程对拍。
+#     定位注记（2026-09-27）：历史文件导入的 atuin 记录无 directory 字段
+#     （atuin 以字面量 unknown 填充），本腿两侧产出均为 unknown 条目——验证的
+#     是解析器 parity 而非导入语义质量；hook 实时记录（带 cwd）才是目标数据。
 #
 # 边界：本机真实数据量即回放规模（价值在真实性不在量，规模面归 D9）；
 # 用户真实 db.zo 只读不写（zoxide query 会重排序落盘，故绝不对真实库跑命令）；

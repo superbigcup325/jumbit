@@ -227,7 +227,7 @@ jumbit import <plugin>
 
 注：atuin 经子进程 `atuin history list` 读取，其退出码不检查（对齐上游）：atuin 自身报错时得到空结果且 exit 0，成败以 stderr 为准
 
-注：atuin 18 起 `history list` 输出变为三段制表（追加时长列），上游 0.10.0 的解析器不识别，导入结果全部为 `unknown`（jumbit 与上游逐字节一致，实测 2026-09）；修复属上游（[zoxide#1288](https://github.com/ajeetdsouza/zoxide/pull/1288) 明文方向合并后随行），本侧不做单方面偏离
+注：`import atuin` 读取的是 atuin 记录里随命令实时捕获的目录字段（子进程 `atuin history list --format={time}\t{directory} --print0`，对齐上游）。该字段仅当记录由 atuin shell hook 实时产生时才有值；经 `atuin import bash` 等从 shell 历史文件灌入的记录不含目录信息，atuin 以字面量 `unknown` 填充，导入结果即为无意义的 `unknown` 条目（与上游逐字节一致，实测 2026-09-27；atuin 18 的 `{directory}` 模板变量本身有效，历史输出格式变化与本导入无关）。若你的 atuin 数据源自历史文件导入，`import atuin` 无目录信息可导
 
 ## 工作原理
 
