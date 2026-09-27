@@ -1,0 +1,36 @@
+jumbit 0.1.2 — a MoonBit rewrite of zoxide
+
+用法：
+  jumbit add [--score N] <path>...        记录目录（--score 指定本次增量权重）
+  jumbit remove <path>...                 从数据库移除目录
+  jumbit query [kw]...                    输出最高得分匹配目录
+    --list                                输出全部匹配（按得分降序）
+    --score                               前缀显示得分
+    --all                                 跳过存在性检查
+    --exclude <path>                      排除指定目录（精确路径）
+    --interactive                         fzf 交互式选择
+    --json                                单行 JSON 数组输出全部匹配（agent 通道，与 --interactive 互斥）
+    --fuzzy                               精确零命中时按组件子串兜底（jumbit 扩展）
+    --tsv                                Tab 分隔输出 path/score/last_accessed/matched_by（jumbit 扩展，与 --json/--interactive 互斥）
+    --limit <n>                           只输出前 n 条（与 --list/--json/--tsv 组合，jumbit 扩展）
+  jumbit init <shell>                     生成 shell 集成脚本（默认定义 j/ji，hook=pwd）
+    [--cmd C] [--hook pwd|prompt|none] [--no-cmd]
+  jumbit import <plugin> [--merge]        从其他工具导入历史数据（空库直灌，--merge 合并进非空库）
+  jumbit describe <path> [--note text]     查看/设置人工标注（--note "" 清除，jumbit 扩展）
+  jumbit export --agents                   输出项目地图 Markdown（贴进 AGENTS.md，jumbit 扩展）
+    plugin ∈ atuin/autojump/fasd/z/z.lua/zsh-z（坏行逐条上报不中止）
+  jumbit status [--json] [--check]         数据库自检：条目/标注/版本/阈值（--check 扫存在性，--json 给 agent，jumbit 扩展）
+  jumbit mcp                              启动 stdio MCP 服务器（agent 通道，tool：jumbit_query / jumbit_export_agents，jumbit 扩展）
+  jumbit edit                             用 $VISUAL/$EDITOR 编辑数据库（jumbit 扩展）
+    [--rename <old> <new>] | [--prune]    改路径（标注跟随）/ 清除不存在条目；三形态互斥
+  jumbit help                             显示本帮助
+  jumbit --version                        显示版本（-V 同义）
+
+环境变量：
+  _JB_DATA_DIR                            数据目录（默认 $HOME/.local/share/jumbit，须绝对路径）
+  _JB_ECHO=1                              add 时回显记录的目录
+  _JB_EXCLUDE_DIRS                        冒号分隔的 glob 列表，命中即从库中移除
+  _JB_FZF_OPTS                            透传给 fzf 的自定义参数
+  _JB_RESOLVE_SYMLINKS=1                  add 时解析符号链接（查询时反向不跟随）
+  _JB_MAXAGE=N                            数据库总分老化阈值（默认 10000）
+import 读取各插件标准数据文件，可经 _Z_DATA/_FASD_DATA/ZSHZ_DATA/_ZL_DATA/XDG_DATA_HOME 定位

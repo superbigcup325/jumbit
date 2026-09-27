@@ -13,6 +13,8 @@ pub fn parse(Array[String]) -> Command
 
 pub fn usage() -> String
 
+pub fn version() -> String
+
 // Errors
 
 // Types and methods
@@ -33,6 +35,8 @@ pub(all) enum Command {
   Edit(EditOptions)
   Mcp
   Help
+  Version
+  Usage
   Unknown(String)
   Invalid(String)
 } derive(Eq, @debug.Debug)

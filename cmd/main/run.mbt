@@ -131,6 +131,15 @@ pub async fn run(
       println(@cli.usage())
       0
     }
+    @cli.Version => {
+      println(@cli.version())
+      0
+    }
+    @cli.Usage => {
+      // 帮助全文走 stderr + 退出码 2（对齐上游 clap 无子命令调用）
+      err_line(errs, @cli.usage())
+      2
+    }
     @cli.Unknown(cmd) => {
       err_line(errs, "未知命令: \{cmd}")
       err_line(errs, "运行 jumbit help 查看用法")

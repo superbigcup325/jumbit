@@ -88,6 +88,11 @@ pub(all) enum Command {
   /// stdio MCP 服务器（jumbit 扩展，上游无）
   Mcp
   Help
+  /// 版本输出（--version/-V，对齐上游 clap 顶层面）
+  Version
+  /// 无参数调用：帮助全文走 stderr、退出码 2（对齐上游 clap 无子命令）；
+  /// 与 Help（help/--help/-h 显式请求，stdout + 0）区分
+  Usage
   Unknown(String)
   /// 参数值语义错误（flag 组合冲突/值非法）：文案原样上报，不带「未知命令」前缀
   Invalid(String)
@@ -97,7 +102,15 @@ pub(all) enum Command {
 /// 子命令解析（args 不含程序名，@env.args() 已验证）
 pub fn parse(args : Array[String]) -> Command {
   if args.is_empty() {
-    return Help
+    return Usage
+  }
+  // 顶层面 --version/-V（对齐上游 clap）：独立使用输出版本退出 0；
+  // 后随多余参数按用法错误退出 2（clap unexpected argument）
+  if args[0] == "--version" || args[0] == "-V" {
+    if args.length() == 1 {
+      return Version
+    }
+    return Invalid("意外参数: \{args[1]}")
   }
   let rest : Array[String] = []
   for i in 1..<args.length() {
@@ -189,6 +202,12 @@ fn strip_double_dash(args : Array[String]) -> Array[String] {
 }
 
 ///|
+/// 版本行（--version/-V 输出，与 usage 首行同源）
+pub fn version() -> String {
+  "jumbit \{@jumbit.VERSION}"
+}
+
+///|
 pub fn usage() -> String {
   "jumbit \{@jumbit.VERSION} — a MoonBit rewrite of zoxide\n\n" +
   "用法：\n" +
@@ -214,7 +233,8 @@ pub fn usage() -> String {
   "  jumbit mcp                              启动 stdio MCP 服务器（agent 通道，tool：jumbit_query / jumbit_export_agents，jumbit 扩展）\n" +
   "  jumbit edit                             用 $VISUAL/$EDITOR 编辑数据库（jumbit 扩展）\n" +
   "    [--rename <old> <new>] | [--prune]    改路径（标注跟随）/ 清除不存在条目；三形态互斥\n" +
-  "  jumbit help                             显示本帮助\n\n" +
+  "  jumbit help                             显示本帮助\n" +
+  "  jumbit --version                        显示版本（-V 同义）\n\n" +
   "环境变量：\n" +
   "  _JB_DATA_DIR                            数据目录（默认 $HOME/.local/share/jumbit，须绝对路径）\n" +
   "  _JB_ECHO=1                              add 时回显记录的目录\n" +

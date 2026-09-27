@@ -49,7 +49,25 @@ test "parse：help 三种写法" {
   @debug.assert_eq(@cli.parse(["help"]), @cli.Help)
   @debug.assert_eq(@cli.parse(["--help"]), @cli.Help)
   @debug.assert_eq(@cli.parse(["-h"]), @cli.Help)
-  @debug.assert_eq(@cli.parse([]), @cli.Help)
+}
+
+///|
+test "parse：--version/-V 与无参数用法错误（对齐上游 clap 顶层面）" {
+  @debug.assert_eq(@cli.parse(["--version"]), @cli.Version)
+  @debug.assert_eq(@cli.parse(["-V"]), @cli.Version)
+  // 版本 flag 后随多余参数 → 用法错误（clap unexpected argument）
+  @debug.assert_eq(
+    @cli.parse(["--version", "x"]),
+    @cli.Invalid("意外参数: x"),
+  )
+  @debug.assert_eq(@cli.parse(["-V", "x"]), @cli.Invalid("意外参数: x"))
+  // 无参数 = 用法错误（帮助全文走 stderr、退出码 2，对齐上游）
+  @debug.assert_eq(@cli.parse([]), @cli.Usage)
+  // 版本 flag 不劫持子命令命名空间：作子命令参数时照常走子命令解析
+  @debug.assert_eq(
+    @cli.parse(["query", "--version"]),
+    @cli.Unknown("--version"),
+  )
 }
 
 ///|

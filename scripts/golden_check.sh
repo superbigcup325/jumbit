@@ -240,6 +240,12 @@ genv edit-mutex VISUAL="$tmp/fake-editor/noop" _JB_DATA_DIR="$tmp/edit-db" -- ed
 genv edit-prune VISUAL="$tmp/fake-editor/noop" _JB_DATA_DIR="$tmp/edit-db" -- edit --prune
 fi
 
+# 顶层面（--version/-V/无参数；不触库，置于末段）
+g version --version
+g version-short -V
+g version-extra --version x
+g noargs
+
 if [ "$mode" = update ]; then
   echo "== golden 已重生成至 $golden/（请 git diff 人工审查后冻结）=="
   rm -rf "$tmp"
@@ -268,7 +274,8 @@ for case in json-empty-db list-empty-db miss-with-kw import-quiet \
   json-limit-2 limit-zero limit-mutex limit-invalid-value limit-negative \
   tsv-all tsv-limit-2 tsv-mutex-json tsv-mutex-interactive \
   status-empty status-full status-json status-check status-corrupt status-corrupt-plaintext \
-  edit-noop edit-rename describe-renamed edit-missing edit-mutex edit-prune; do
+  edit-noop edit-rename describe-renamed edit-missing edit-mutex edit-prune \
+  version version-short version-extra noargs; do
   # Windows（Git Bash）下 edit 组未跑，golden 侧同名文件缺位，跳过比对
   # （is_win 见下；注意 && / || 混用的左结合陷阱，用 case 分发）
   if [ "$is_win" = 1 ]; then
