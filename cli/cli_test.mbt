@@ -69,14 +69,17 @@ test "parse：--version/-V 与无参数用法错误（对齐上游 clap 顶层�
   // 版本 flag 不劫持子命令命名空间：作子命令参数时照常走子命令解析
   @debug.assert_eq(
     @cli.parse(["query", "--version"]),
-    @cli.Unknown("--version"),
+    @cli.Invalid("unexpected argument '--version'"),
   )
 }
 
 ///|
 test "parse：未知命令回显原名" {
   @debug.assert_eq(@cli.parse(["frobnicate"]), @cli.Unknown("frobnicate"))
-  @debug.assert_eq(@cli.parse(["--bogus"]), @cli.Unknown("--bogus"))
+  @debug.assert_eq(
+    @cli.parse(["--bogus"]),
+    @cli.Invalid("unexpected argument '--bogus'"),
+  )
 }
 
 ///|
@@ -139,11 +142,14 @@ test "parse：--flag=value 等号形式（对齐上游 clap 双形态）" {
 ///|
 test "parse：等号形式边界与原有行为不回退" {
   // 布尔 flag 的等号形式不是带值 flag，报原文归 Unknown（对齐 clap 拒收）
-  @debug.assert_eq(@cli.parse(["query", "--list=x"]), @cli.Unknown("--list=x"))
+  @debug.assert_eq(
+    @cli.parse(["query", "--list=x"]),
+    @cli.Invalid("unexpected argument '--list=x'"),
+  )
   // 未知 flag 的等号形式报原文
   @debug.assert_eq(
     @cli.parse(["query", "--bogus=1"]),
-    @cli.Unknown("--bogus=1"),
+    @cli.Invalid("unexpected argument '--bogus=1'"),
   )
   // 空值：--exclude= 收空路径；--cmd= 收空串；--limit= 值非法归 Invalid
   @debug.assert_eq(
@@ -167,12 +173,15 @@ test "parse：等号形式边界与原有行为不回退" {
   )
   @debug.assert_eq(
     @cli.parse(["init", "bash", "--hook="]),
-    @cli.Unknown(
+    @cli.Invalid(
       "invalid value '' for '--hook <HOOK>'\n  [possible values: pwd, prompt, none]",
     ),
   )
-  // --= 与 -- 语义不冲突：原样报 Unknown
-  @debug.assert_eq(@cli.parse(["add", "--=1"]), @cli.Unknown("--=1"))
+  // --= 与 -- 语义不冲突：按 unexpected argument 归 Invalid
+  @debug.assert_eq(
+    @cli.parse(["add", "--=1"]),
+    @cli.Invalid("unexpected argument '--=1'"),
+  )
   // -- 之后不拆分，等号串按位置参数收录
   @debug.assert_eq(
     @cli.parse(["query", "--", "--limit=3"]),
@@ -187,6 +196,12 @@ test "parse：等号形式边界与原有行为不回退" {
 ///|
 test "parse：mcp 无参数；多余参数/flag 归 Unknown" {
   @debug.assert_eq(@cli.parse(["mcp"]), @cli.Mcp)
-  @debug.assert_eq(@cli.parse(["mcp", "extra"]), @cli.Unknown("extra"))
-  @debug.assert_eq(@cli.parse(["mcp", "--json"]), @cli.Unknown("--json"))
+  @debug.assert_eq(
+    @cli.parse(["mcp", "extra"]),
+    @cli.Invalid("unexpected argument 'extra'"),
+  )
+  @debug.assert_eq(
+    @cli.parse(["mcp", "--json"]),
+    @cli.Invalid("unexpected argument '--json'"),
+  )
 }

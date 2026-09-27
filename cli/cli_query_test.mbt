@@ -21,10 +21,13 @@ test "parse：query 四个 flag" {
 
 ///|
 test "parse：未知 flag 与缺值归 Unknown" {
-  @debug.assert_eq(@cli.parse(["query", "--bogus"]), @cli.Unknown("--bogus"))
+  @debug.assert_eq(
+    @cli.parse(["query", "--bogus"]),
+    @cli.Invalid("unexpected argument '--bogus'"),
+  )
   @debug.assert_eq(
     @cli.parse(["query", "--exclude"]),
-    @cli.Unknown(
+    @cli.Invalid(
       "a value is required for '--exclude <path>' but none was supplied",
     ),
   )
@@ -144,7 +147,7 @@ test "parse：query --limit 组合限制与错误优先级" {
   // 未知 flag 优先于组合校验（bad 优先惯例）
   @debug.assert_eq(
     @cli.parse(["query", "--bogus", "--limit", "2"]),
-    @cli.Unknown("--bogus"),
+    @cli.Invalid("unexpected argument '--bogus'"),
   )
   // 值非法优先于组合校验（invalid 在组合检查前返回）
   @debug.assert_eq(

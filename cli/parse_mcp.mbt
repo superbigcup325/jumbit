@@ -3,10 +3,10 @@
 fn parse_mcp(args : Array[String]) -> Command {
   let mut bad : String? = None
   for a in args {
-    bad = Some(a)
+    bad = Some("unexpected argument '\{a}'")
   }
   match bad {
-    Some(arg) => Unknown(arg)
+    Some(arg) => Invalid(arg)
     None => Mcp
   }
 }

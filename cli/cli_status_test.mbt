@@ -14,13 +14,13 @@ test "parse：status 默认与 --json/--check" {
     }
     other => fail("\{Repr(other)}")
   }
-  // 未知 flag 与位置参数归 Unknown
+  // 未知 flag 与位置参数归 Invalid（unexpected argument）
   match @cli.parse(["status", "--nope"]) {
-    @cli.Unknown(msg) => @debug.assert_eq(msg, "--nope")
+    @cli.Invalid(msg) => @debug.assert_eq(msg, "unexpected argument '--nope'")
     other => fail("\{Repr(other)}")
   }
   match @cli.parse(["status", "extra"]) {
-    @cli.Unknown(msg) => @debug.assert_eq(msg, "extra")
+    @cli.Invalid(msg) => @debug.assert_eq(msg, "unexpected argument 'extra'")
     other => fail("\{Repr(other)}")
   }
 }

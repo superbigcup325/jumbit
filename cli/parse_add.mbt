@@ -37,14 +37,14 @@ fn parse_add(args : Array[String]) -> Command {
           }
       }
     } else if !escaped && raw.has_prefix("-") && raw != "-" {
-      bad = Some(raw)
+      bad = Some("unexpected argument '\{raw}'")
     } else {
       opts.paths.push(raw)
     }
     i += 1
   }
   match bad {
-    Some(msg) => Unknown(msg)
+    Some(msg) => Invalid(msg)
     None => Add(opts)
   }
 }

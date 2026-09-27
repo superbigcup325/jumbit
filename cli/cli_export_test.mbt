@@ -6,11 +6,14 @@ test "parse：export --agents 与坏参" {
   )
   @debug.assert_eq(
     @cli.parse(["export"]),
-    @cli.Unknown("export: missing required argument '--agents'"),
+    @cli.Invalid("export: missing required argument '--agents'"),
   )
-  @debug.assert_eq(@cli.parse(["export", "--bogus"]), @cli.Unknown("--bogus"))
+  @debug.assert_eq(
+    @cli.parse(["export", "--bogus"]),
+    @cli.Invalid("unexpected argument '--bogus'"),
+  )
   @debug.assert_eq(
     @cli.parse(["export", "--agents", "--extra"]),
-    @cli.Unknown("--extra"),
+    @cli.Invalid("unexpected argument '--extra'"),
   )
 }

@@ -35,7 +35,7 @@ fn parse_init(args : Array[String]) -> Command {
     match pair {
       Some((name, _)) =>
         if name != "--cmd" && name != "--hook" {
-          bad = Some(raw)
+          bad = Some("unexpected argument '\{raw}'")
           i += 1
           continue
         }
@@ -90,16 +90,16 @@ fn parse_init(args : Array[String]) -> Command {
               )
             }
         }
-      s => bad = Some(s)
+      s => bad = Some("unexpected argument '\{s}'")
     }
     i += 1
   }
   match bad {
-    Some(msg) => Unknown(msg)
+    Some(msg) => Invalid(msg)
     None =>
       match shell {
         None =>
-          Unknown(
+          Invalid(
             "missing required argument '<SHELL>'\n  [possible values: \{supported}]",
           )
         Some(sh) =>
@@ -112,7 +112,7 @@ fn parse_init(args : Array[String]) -> Command {
             sh != "powershell" &&
             sh != "tcsh" &&
             sh != "xonsh" {
-            Unknown(
+            Invalid(
               "invalid value '\{sh}' for '<SHELL>'\n  [possible values: \{supported}]",
             )
           } else {

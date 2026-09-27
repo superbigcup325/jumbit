@@ -20,11 +20,11 @@ test "parse：describe 基本/显示模式/清除" {
 test "parse：describe 坏参族" {
   @debug.assert_eq(
     @cli.parse(["describe"]),
-    @cli.Unknown("describe: missing required argument '<PATH>'"),
+    @cli.Invalid("describe: missing required argument '<PATH>'"),
   )
   @debug.assert_eq(
     @cli.parse(["describe", "--note"]),
-    @cli.Unknown(
+    @cli.Invalid(
       "a value is required for '--note <text>' but none was supplied",
     ),
   )
@@ -32,9 +32,12 @@ test "parse：describe 坏参族" {
     @cli.parse(["describe", "/a", "--note", "多\n行"]),
     @cli.Invalid("note cannot contain newline or tab"),
   )
-  @debug.assert_eq(@cli.parse(["describe", "/a", "/b"]), @cli.Unknown("/b"))
+  @debug.assert_eq(
+    @cli.parse(["describe", "/a", "/b"]),
+    @cli.Invalid("unexpected argument '/b'"),
+  )
   @debug.assert_eq(
     @cli.parse(["describe", "/a", "--bogus"]),
-    @cli.Unknown("--bogus"),
+    @cli.Invalid("unexpected argument '--bogus'"),
   )
 }

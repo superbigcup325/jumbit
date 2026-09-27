@@ -15,27 +15,27 @@ fn parse_import(args : Array[String]) -> Command {
     if a == "--merge" {
       merge = true
     } else if a.has_prefix("-") && a != "-" {
-      bad = Some(a)
+      bad = Some("unexpected argument '\{a}'")
     } else if plugin is None {
       plugin = Some(a)
     } else {
-      bad = Some(a)
+      bad = Some("unexpected argument '\{a}'")
     }
   }
   match bad {
-    Some(flag) => Unknown(flag)
+    Some(flag) => Invalid(flag)
     None =>
       match plugin {
         Some(p) =>
           if import_plugins().contains(p) {
             Import({ plugin: p, merge, })
           } else {
-            Unknown(
+            Invalid(
               "invalid value '\{p}' for '<PLUGIN>'\n  [possible values: \{import_plugins().join(", ")}]",
             )
           }
         None =>
-          Unknown(
+          Invalid(
             "missing required argument '<PLUGIN>'\n  [possible values: \{import_plugins().join(", ")}]",
           )
       }

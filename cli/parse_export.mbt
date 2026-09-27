@@ -7,16 +7,16 @@ fn parse_export(args : Array[String]) -> Command {
     if a == "--agents" {
       opts.agents = true
     } else {
-      bad = Some(a)
+      bad = Some("unexpected argument '\{a}'")
     }
   }
   match bad {
-    Some(flag) => Unknown(flag)
+    Some(flag) => Invalid(flag)
     None =>
       if opts.agents {
         Export(opts)
       } else {
-        Unknown("export: missing required argument '--agents'")
+        Invalid("export: missing required argument '--agents'")
       }
   }
 }

@@ -29,16 +29,22 @@ test "parse：import 六个插件 + --merge 任意位置" {
 test "parse：import 非法用法归 Unknown" {
   @debug.assert_eq(
     @cli.parse(["import"]),
-    @cli.Unknown(
+    @cli.Invalid(
       "missing required argument '<PLUGIN>'\n  [possible values: atuin, autojump, fasd, z, z.lua, zsh-z]",
     ),
   )
   @debug.assert_eq(
     @cli.parse(["import", "bogus"]),
-    @cli.Unknown(
+    @cli.Invalid(
       "invalid value 'bogus' for '<PLUGIN>'\n  [possible values: atuin, autojump, fasd, z, z.lua, zsh-z]",
     ),
   )
-  @debug.assert_eq(@cli.parse(["import", "z", "extra"]), @cli.Unknown("extra"))
-  @debug.assert_eq(@cli.parse(["import", "--bogus"]), @cli.Unknown("--bogus"))
+  @debug.assert_eq(
+    @cli.parse(["import", "z", "extra"]),
+    @cli.Invalid("unexpected argument 'extra'"),
+  )
+  @debug.assert_eq(
+    @cli.parse(["import", "--bogus"]),
+    @cli.Invalid("unexpected argument '--bogus'"),
+  )
 }

@@ -9,11 +9,11 @@ fn parse_status(args : Array[String]) -> Command {
     } else if a == "--check" {
       opts.check = true
     } else {
-      bad = Some(a)
+      bad = Some("unexpected argument '\{a}'")
     }
   }
   match bad {
-    Some(flag) => Unknown(flag)
+    Some(flag) => Invalid(flag)
     None => Status(opts)
   }
 }

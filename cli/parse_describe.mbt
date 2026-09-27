@@ -28,11 +28,11 @@ fn parse_describe(args : Array[String]) -> Command {
           }
       }
     } else if raw.has_prefix("-") && raw != "-" {
-      bad = Some(raw)
+      bad = Some("unexpected argument '\{raw}'")
     } else if path is None {
       path = Some(raw)
     } else {
-      bad = Some(raw)
+      bad = Some("unexpected argument '\{raw}'")
     }
     i += 1
   }
@@ -43,11 +43,11 @@ fn parse_describe(args : Array[String]) -> Command {
     }
   }
   match bad {
-    Some(flag) => Unknown(flag)
+    Some(flag) => Invalid(flag)
     None =>
       match path {
         Some(p) => Describe({ path: p, note, })
-        None => Unknown("describe: missing required argument '<PATH>'")
+        None => Invalid("describe: missing required argument '<PATH>'")
       }
   }
 }

@@ -128,6 +128,9 @@ pub fn parse(args : Array[String]) -> Command {
     "edit" => parse_edit(rest)
     "mcp" => parse_mcp(rest)
     "help" | "--help" | "-h" => Help
+    // 顶层 flag 形态的未知 token：clap 报 unexpected argument（实测上游
+    // zoxide --bogus 同文案），裸 token 才是 unrecognized subcommand
+    other if other.has_prefix("-") => Invalid("unexpected argument '\{other}'")
     other => Unknown(other)
   }
 }

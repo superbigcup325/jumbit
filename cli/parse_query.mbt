@@ -30,7 +30,7 @@ fn parse_query(args : Array[String]) -> Command {
     match pair {
       Some((name, _)) =>
         if name != "--limit" && name != "--exclude" {
-          bad = Some(raw)
+          bad = Some("unexpected argument '\{raw}'")
           i += 1
           continue
         }
@@ -91,7 +91,7 @@ fn parse_query(args : Array[String]) -> Command {
           }
         s =>
           if s.has_prefix("-") && s != "-" {
-            bad = Some(raw)
+            bad = Some("unexpected argument '\{raw}'")
           } else {
             opts.keywords.push(raw)
           }
@@ -123,7 +123,7 @@ fn parse_query(args : Array[String]) -> Command {
     }
   }
   match bad {
-    Some(flag) => Unknown(flag)
+    Some(flag) => Invalid(flag)
     None => Query(opts)
   }
 }

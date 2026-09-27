@@ -48,7 +48,7 @@ fn parse_edit(args : Array[String]) -> Command {
       opts.prune = true
     } else if bad is None {
       // bad 已设时保留首个错误(后续参数不再覆盖)
-      bad = Some(raw)
+      bad = Some("unexpected argument '\{raw}'")
     }
     i += 1
   }
@@ -57,7 +57,7 @@ fn parse_edit(args : Array[String]) -> Command {
     return Invalid("the argument '--prune' cannot be used with '--rename'")
   }
   match bad {
-    Some(flag) => Unknown(flag)
+    Some(flag) => Invalid(flag)
     None => Edit(opts)
   }
 }
