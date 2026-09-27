@@ -138,10 +138,10 @@ fn mcp_query_tool() -> String {
   "\"title\":\"Search directory history\"," +
   "\"description\":\"\{json_escape(mcp_query_description())}\"," +
   "\"inputSchema\":{\"type\":\"object\",\"properties\":{" +
-  "\"keywords\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"Keywords matched against recorded paths (AND-ed); the last keyword anchors the final path component. Omit to list all entries.\"}," +
+  "\"keywords\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"Keywords matched against recorded paths (AND-ed); the last keyword anchors the final path component.\"}," +
   "\"fuzzy\":{\"type\":\"boolean\",\"default\":false,\"description\":\"Fall back to substring matching of any path component when exact matching finds nothing.\"}," +
   "\"limit\":{\"type\":\"integer\",\"minimum\":0,\"description\":\"Maximum number of results. Omit for all.\"}" +
-  "}}}"
+  "},\"required\":[\"keywords\"]}}"
 }
 
 ///|
@@ -227,8 +227,10 @@ async fn mcp_tools_call(
 fn mcp_query_options(
   args : Map[String, Json],
 ) -> Result[@cli.QueryOptions, String] {
+  // keywords 必填（对齐 inputSchema required 与 USAGE tool 注册草案）：
+  // 缺失走协议层 -32602，不静默按「无关键词查最高分」执行
   let keywords : Array[String] = match args.get("keywords") {
-    None => []
+    None => return Err("Invalid arguments: missing keywords")
     Some(Json::Array(items)) => {
       let kws : Array[String] = []
       for item in items {

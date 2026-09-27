@@ -157,17 +157,19 @@ async test "mcp tools/call jumbit_query：命中/miss/参数校验三路" {
     None => fail("keywords 类型错必须响应")
   }
   assert_true(badkw.contains("\"code\":-32602"))
-  let badlimit = match call("{\"limit\":1.5}") {
+  let badlimit = match call("{\"keywords\":[\"x\"],\"limit\":1.5}") {
     Some(out) => out
     None => fail("limit 小数必须响应")
   }
   assert_true(badlimit.contains("\"code\":-32602"))
-  // 无参数调用（全量列表形态）：单行 JSON 数组
-  let noargs = match call("{}") {
+  // keywords 必填（schema required 同款）：缺失走协议层 -32602，
+  // 不静默按「无关键词查最高分」执行
+  let nokw = match call("{}") {
     Some(out) => out
-    None => fail("无参 query 必须响应")
+    None => fail("缺 keywords 必须响应")
   }
-  assert_true(noargs.contains("\"isError\":false"))
+  assert_true(nokw.contains("\"code\":-32602"))
+  assert_true(nokw.contains("missing keywords"))
   cleanup_test_dir(data)
   cleanup_test_dir(zdir)
 }

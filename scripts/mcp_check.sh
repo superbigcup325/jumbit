@@ -47,11 +47,12 @@ _JB_DATA_DIR="$tmp/db" _Z_DATA="$tmp/dataset.z" "$bin" import z \
   printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
   printf '%s\n' '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"jumbit_query","arguments":{"keywords":["alpha"]}}}'
   printf '%s\n' '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"jumbit_query","arguments":{"keywords":["zzznope"]}}}'
-  printf '%s\n' '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"jumbit_query","arguments":{"limit":1.5}}}'
+  printf '%s\n' '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"jumbit_query","arguments":{"keywords":["alpha"],"limit":1.5}}}'
   printf '%s\n' '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"jumbit_export_agents"}}'
   printf '%s\n' '{"jsonrpc":"2.0","id":"str-id","method":"ping"}'
   printf '%s\n' 'garbage-not-json'
   printf '%s\n' '{"jsonrpc":"2.0","id":7,"method":"resources/list"}'
+  printf '%s\n' '{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"jumbit_query","arguments":{}}}'
 } | _JB_DATA_DIR="$tmp/db" "$bin" mcp > "$tmp/session.raw"
 code=$?
 
