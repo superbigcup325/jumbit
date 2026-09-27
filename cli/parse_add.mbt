@@ -20,17 +20,20 @@ fn parse_add(args : Array[String]) -> Command {
         Some((_, value)) =>
           match parse_double_opt(value) {
             Some(v) => opts.score = v
-            None => bad = Some("--score 必须是数字: \{value}")
+            None => bad = Some("invalid value '\{value}' for '--score <N>'")
           }
         None =>
           if i + 1 < n {
             match parse_double_opt(args[i + 1]) {
               Some(v) => opts.score = v
-              None => bad = Some("--score 必须是数字: \{args[i + 1]}")
+              None =>
+                bad = Some("invalid value '\{args[i + 1]}' for '--score <N>'")
             }
             i += 1
           } else {
-            bad = Some("--score 缺少数值参数")
+            bad = Some(
+              "a value is required for '--score <N>' but none was supplied",
+            )
           }
       }
     } else if !escaped && raw.has_prefix("-") && raw != "-" {

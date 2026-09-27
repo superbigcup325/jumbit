@@ -11,9 +11,9 @@ pub enum StoreError {
 /// Debug 枚举名不外泄到 stderr）
 pub fn codec_error_message(e : @core.CodecError) -> String {
   match e {
-    @core.CorruptedData => "无法解析"
-    @core.UnsupportedVersion(v) => "格式版本不受支持: \{v}"
-    @core.TooLarge => "文件过大"
+    @core.CorruptedData => "unparseable data"
+    @core.UnsupportedVersion(v) => "unsupported format version: \{v}"
+    @core.TooLarge => "data file too large"
   }
 }
 
@@ -22,7 +22,7 @@ pub fn codec_error_message(e : @core.CodecError) -> String {
 /// 数据库失败: 」等）；明文行级错误多行（每行一条，decode 已截断到 8+N）
 pub fn StoreError::message(self : StoreError) -> String {
   match self {
-    Io(msg) => "读写失败: \{msg}"
+    Io(msg) => "io failure: \{msg}"
     Codec(e) => codec_error_message(e)
     Plaintext(e) => e.message()
   }

@@ -12,11 +12,12 @@
 - Windows 支持（x64）：CI probe 全绿（288 测试/smoke 全链路/golden 字节面），路径解析按平台组件模型（盘符/双分隔符，对齐上游 Windows 分支）、关键词与 glob 分隔符判定平台化（glob pattern 以正斜杠书写，`/` 等价匹配 `\` 路径）；moonbitlang/async 升至 0.22.4（`mkdir allow_exist` 消除目录创建竞态）；`_JB_EXCLUDE_DIRS` 冒号分隔与盘符冒号冲突为已知限制
 
 ### Changed
+- **用户可见文案全量英文化**（breaking：解析 stderr 的脚本与 agent 需同步）：对齐上游 zoxide 的消息面——运行错误（exit 1）统一 `jumbit: ` 前缀（对齐上游 `zoxide: `），query miss 与空库合并为 `jumbit: no match found`（对齐上游同文案，不再区分两种情形、不回显关键词）；用法错误（exit 2）走 clap 习语：`error: unrecognized subcommand '<X>'` / `error: invalid value '<X>' for '<FLAG>'`（附 `[possible values: ...]`）/ `error: a value is required for '<FLAG>' but none was supplied` / `error: the argument '<A>' cannot be used with '<B>'`，尾行 `For more information, try 'jumbit help'.`；`jumbit help` 全文重写为英文；`export --agents` 的表头注释与表列改为英文（`| Path | Description |`，贴进 AGENTS.md 的产出形态变化）；`status` human 面标签列改英文（`data file`/`file size`/`format`/`entries`/`notes`/`aging threshold`/`existing`）；import 的 `file:line: invalid entry` 与 `current database is not empty...` 等已与上游字节冻结的消息原样不动。决策记录：双语/环境变量切换不立项（上游与同类工具零先例、双文案表违反单一事实源），中文文案保留于 git 历史（80e3f1c 之前），真有用户反馈再按需评估
 - `_JB_EXCLUDE_DIRS` 的 glob 通配符对齐上游 glob crate 默认匹配语义（require_literal_separator=false，源码级核实）：`*` 与 `**` 跨分隔符匹配任意序列、`?` 与 `[...]` 匹配任意单字符（含分隔符），此前「`*` 语义对齐」的文档声明与实现不符（`*/backend*` 等自然写法静默失效）；`{a,b}` 仍为字面量（与上游差异保留）；大小写敏感与全路径锚定不变（breaking：依赖「不跨分隔符」旧行为的 pattern 需改写）
 - MCP `jumbit_query` 的 `keywords` 为必填参数：`tools/call` 缺失时走协议层 -32602（对齐 inputSchema `required` 与 tool 注册草案），不再静默按「无关键词查最高分」执行；schema 描述删去失实的「Omit to list all entries」（实际行为从未是全量列表）（breaking：依赖缺省调用的 MCP 客户端需显式传 keywords）
 - **存储格式迁移**：`db.zo`（二进制）→ `db.txt`（明文）。旧库在首次写库时自动转换（只读命令不触发），转换后原 `db.zo` 保留可手动删除；迁移时病态数据自动修复：`NaN` rank 归最低权重（0.01）、超界 rank 钳到 [0.01, 9999999.99]、空路径条目丢弃（明文行格式无法表达）
 - `status --json` 的 `format_version`（整数）键更名为 `format`，值为格式标识字符串：`"plaintext"` / `"binary"`（旧库未迁移）/ `null`（无库）；human 面对应行改为「格式」（breaking，消费方需同步）
-- `describe --note` 拒绝 tab（标注持久化于 TSV 侧文件，tab 为列分隔符），文案为「标注不能包含换行或 tab」
+- `describe --note` 拒绝 tab（标注持久化于 TSV 侧文件，tab 为列分隔符），文案为 `note cannot contain newline or tab`
 - 非有限 rank 行为变化：读取遇 `nan` rank 行整库拒绝（按行报错），入库时 `inf` 钳上限、`nan` 归 0.01；上游 0.10.0 的「非 finite 毒库」问题（[zoxide#1280](https://github.com/ajeetdsouza/zoxide/pull/1280)）在明文格式下不再成立，0.1.0 所载「已知问题」随之销账
 
 ## [0.1.1] - 2026-09-22

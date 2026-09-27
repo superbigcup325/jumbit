@@ -40,7 +40,7 @@ async fn run_describe(
       match db.all()[i].note {
         Some(text) => println(text)
         None => {
-          err_line(errs, "describe: \{dopts.path} 无标注")
+          err_line(errs, "jumbit: no note found for \{dopts.path}")
           return 1
         }
       }

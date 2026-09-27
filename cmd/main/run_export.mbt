@@ -38,10 +38,8 @@ async fn export_exec(
   // frecency 降序
   let ranked = @core.Database::from_dirs(noted)
   ranked.sort_by_score(current_second())
-  emit(
-    "<!-- jumbit export --agents：项目地图，按常用度（frecency）降序 -->",
-  )
-  emit("| 路径 | 说明 |")
+  emit("<!-- jumbit export --agents: project map, ordered by frecency -->")
+  emit("| Path | Description |")
   emit("|---|---|")
   let dirs = ranked.all()
   for i in dirs.length()>..0 {

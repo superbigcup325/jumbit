@@ -58,9 +58,12 @@ test "parse：--version/-V 与无参数用法错误（对齐上游 clap 顶层�
   // 版本 flag 后随多余参数 → 用法错误（clap unexpected argument）
   @debug.assert_eq(
     @cli.parse(["--version", "x"]),
-    @cli.Invalid("意外参数: x"),
+    @cli.Invalid("unexpected argument 'x'"),
   )
-  @debug.assert_eq(@cli.parse(["-V", "x"]), @cli.Invalid("意外参数: x"))
+  @debug.assert_eq(
+    @cli.parse(["-V", "x"]),
+    @cli.Invalid("unexpected argument 'x'"),
+  )
   // 无参数 = 用法错误（帮助全文走 stderr、退出码 2，对齐上游）
   @debug.assert_eq(@cli.parse([]), @cli.Usage)
   // 版本 flag 不劫持子命令命名空间：作子命令参数时照常走子命令解析
@@ -158,11 +161,15 @@ test "parse：等号形式边界与原有行为不回退" {
   )
   @debug.assert_eq(
     @cli.parse(["query", "--limit="]),
-    @cli.Invalid("--limit 需要非负整数参数: "),
+    @cli.Invalid(
+      "invalid value '' for '--limit <n>': must be a non-negative integer",
+    ),
   )
   @debug.assert_eq(
     @cli.parse(["init", "bash", "--hook="]),
-    @cli.Unknown("--hook 仅支持 pwd/prompt/none: "),
+    @cli.Unknown(
+      "invalid value '' for '--hook <HOOK>'\n  [possible values: pwd, prompt, none]",
+    ),
   )
   // --= 与 -- 语义不冲突：原样报 Unknown
   @debug.assert_eq(@cli.parse(["add", "--=1"]), @cli.Unknown("--=1"))

@@ -219,7 +219,9 @@ async test "add _JB_RESOLVE_SYMLINKS=1：自环符号链接 → 解析路径失�
   // 前缀文案 + (os error N) 数字后缀（ELOOP 不在 os_error_message 短语集，
   // 若被误并入短语集或退回 Debug 结构会在此挂）
   @debug.assert_eq(
-    errs[0].has_prefix("解析路径失败: \{loop_path}: (os error ") &&
+    errs[0].has_prefix(
+      "jumbit: could not resolve path \{loop_path}: (os error ",
+    ) &&
     errs[0].has_suffix(")"),
     true,
   )

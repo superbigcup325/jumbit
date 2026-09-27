@@ -504,14 +504,14 @@ test "codec_error_message：经真实 decode 产物冻结文案（pub enum 只�
     Err(e) => e
     Ok(_) => fail("unexpected ok")
   }
-  @debug.assert_eq(Codec(corrupted).message(), "无法解析")
+  @debug.assert_eq(Codec(corrupted).message(), "unparseable data")
   let bad_version = match @core.decode(@utf8.encode("garbage-not-a-db")) {
     Err(e) => e
     Ok(_) => fail("unexpected ok")
   }
   @debug.assert_eq(
     Codec(bad_version).message(),
-    "格式版本不受支持: 1651663207",
+    "unsupported format version: 1651663207",
   )
 }
 

@@ -20,15 +20,17 @@ test "parse：describe 基本/显示模式/清除" {
 test "parse：describe 坏参族" {
   @debug.assert_eq(
     @cli.parse(["describe"]),
-    @cli.Unknown("describe: 缺少路径参数"),
+    @cli.Unknown("describe: missing required argument '<PATH>'"),
   )
   @debug.assert_eq(
     @cli.parse(["describe", "--note"]),
-    @cli.Unknown("--note 缺少标注文本"),
+    @cli.Unknown(
+      "a value is required for '--note <text>' but none was supplied",
+    ),
   )
   @debug.assert_eq(
     @cli.parse(["describe", "/a", "--note", "多\n行"]),
-    @cli.Invalid("describe: 标注不能包含换行或 tab"),
+    @cli.Invalid("note cannot contain newline or tab"),
   )
   @debug.assert_eq(@cli.parse(["describe", "/a", "/b"]), @cli.Unknown("/b"))
   @debug.assert_eq(

@@ -72,13 +72,11 @@ async fn query_exec(
     0
   } else if remaining.is_empty() {
     if hits.length() > 0 {
-      // 有命中但全被 --exclude 排除
+      // 有命中但全被 --exclude 排除（上游 query.rs 同文案）
       err_line(errs, "you are already in the only match")
-    } else if qopts.keywords.is_empty() {
-      err_line(errs, "数据库为空，没有可跳转的目录")
     } else {
-      let kw = qopts.keywords.join(" ")
-      err_line(errs, "无匹配: \{kw}")
+      // 对齐上游 query miss/空库同文案（probe 实测均为 no match found）
+      err_line(errs, "jumbit: no match found")
     }
     1
   } else if qopts.json {

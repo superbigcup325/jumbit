@@ -41,22 +41,22 @@ test "parse edit：缺参/重复/互斥矩阵" {
   // 缺 new
   @debug.assert_eq(
     @cli.parse(["edit", "--rename", "/a"]),
-    @cli.Unknown("--rename 缺少 <new> 参数"),
+    @cli.Unknown("--rename requires <new>"),
   )
   // 全缺
   @debug.assert_eq(
     @cli.parse(["edit", "--rename"]),
-    @cli.Unknown("--rename 缺少 <old> <new> 两个参数"),
+    @cli.Unknown("--rename requires <old> <new>"),
   )
   // 重复
   @debug.assert_eq(
     @cli.parse(["edit", "--rename", "/a", "/b", "--rename", "/c", "/d"]),
-    @cli.Unknown("--rename 重复出现"),
+    @cli.Unknown("the argument '--rename' cannot be used multiple times"),
   )
   // 互斥（Invalid 语义错误，exit 2）
   @debug.assert_eq(
     @cli.parse(["edit", "--rename", "/a", "/b", "--prune"]),
-    @cli.Invalid("edit: --rename 与 --prune 互斥"),
+    @cli.Invalid("the argument '--prune' cannot be used with '--rename'"),
   )
   // 未知 flag 与多余位置参数
   @debug.assert_eq(@cli.parse(["edit", "--nope"]), @cli.Unknown("--nope"))

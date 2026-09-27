@@ -1,2 +1,2 @@
---limit 仅在 --list/--json/--tsv 下生效
-运行 jumbit help 查看用法
+error: '--limit' requires '--list', '--json' or '--tsv'
+For more information, try 'jumbit help'.

@@ -23,15 +23,15 @@ fn render_status_human(r : DbStatus) -> Array[String] {
     None => "-"
   }
   let lines = [
-    "数据文件      \{r.data_file}",
-    "文件大小      \{r.file_size} 字节",
-    "格式          \{fmt}",
-    "条目          \{r.entries}",
-    "标注          \{r.notes}",
-    "老化阈值      \{r.maxage}",
+    "data file      \{r.data_file}",
+    "file size      \{r.file_size} bytes",
+    "format         \{fmt}",
+    "entries        \{r.entries}",
+    "notes          \{r.notes}",
+    "aging threshold \{r.maxage}",
   ]
   match r.existing {
-    Some(k) => lines.push("存在          \{k}/\{r.entries}")
+    Some(k) => lines.push("existing        \{k}/\{r.entries}")
     None => ()
   }
   lines
@@ -64,11 +64,11 @@ async fn load_status_dirs(
   let store = match @platform.load(data_dir) {
     Ok(s) => s
     Err(Io(msg)) => {
-      err_line(errs, "无法读取数据文件: \{msg}")
+      err_line(errs, "jumbit: could not read data file: \{msg}")
       return None
     }
     Err(e) => {
-      err_line(errs, "数据文件损坏: \{e.message()}")
+      err_line(errs, "jumbit: corrupted data file: \{e.message()}")
       return None
     }
   }
@@ -108,7 +108,7 @@ async fn run_status(
       err => {
         err_line(
           errs,
-          "无法读取数据文件: \{@platform.os_error_message(err)}",
+          "jumbit: could not read data file: \{@platform.os_error_message(err)}",
         )
         return 1
       }

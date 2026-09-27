@@ -15,7 +15,7 @@ async fn run_edit(
   let store = match @platform.load(data_dir) {
     Ok(s) => s
     Err(e) => {
-      err_line(errs, "打开数据库失败: \{e.message()}")
+      err_line(errs, "jumbit: could not open database: \{e.message()}")
       return 1
     }
   }
@@ -66,7 +66,7 @@ async fn run_edit_rename(
   match store.save() {
     Ok(_) => 0
     Err(e) => {
-      err_line(errs, "保存数据库失败: \{e.message()}")
+      err_line(errs, "jumbit: could not save database: \{e.message()}")
       1
     }
   }
@@ -97,7 +97,7 @@ async fn run_edit_prune(
   match store.save() {
     Ok(_) => 0
     Err(e) => {
-      err_line(errs, "保存数据库失败: \{e.message()}")
+      err_line(errs, "jumbit: could not save database: \{e.message()}")
       1
     }
   }
@@ -122,7 +122,7 @@ async fn run_edit_interactive(
     err => {
       err_line(
         errs,
-        "无法写入临时文件: \{@platform.os_error_message(err)}",
+        "jumbit: could not write temporary file: \{@platform.os_error_message(err)}",
       )
       return 1
     }
@@ -131,7 +131,7 @@ async fn run_edit_interactive(
     err => {
       ignore(err)
       let _ = @afs.remove(tmp)
-      err_line(errs, "无法写入临时文件")
+      err_line(errs, "jumbit: could not write temporary file")
       return 1
     }
   }
@@ -160,7 +160,7 @@ async fn run_edit_interactive(
     err => {
       err_line(
         errs,
-        "无法读取编辑结果: \{@platform.os_error_message(err)}",
+        "jumbit: could not read editor output: \{@platform.os_error_message(err)}",
       )
       let _ = @afs.remove(tmp)
       return 1
@@ -169,7 +169,7 @@ async fn run_edit_interactive(
   let dirs = match @core.decode_plaintext(data.binary()) {
     Ok(dirs) => dirs
     Err(e) => {
-      err_line(errs, "数据文件损坏: \{e.message()}")
+      err_line(errs, "jumbit: corrupted data file: \{e.message()}")
       let _ = @afs.remove(tmp)
       return 1
     }
@@ -192,7 +192,7 @@ async fn run_edit_interactive(
   match store.save() {
     Ok(_) => 0
     Err(e) => {
-      err_line(errs, "保存数据库失败: \{e.message()}")
+      err_line(errs, "jumbit: could not save database: \{e.message()}")
       1
     }
   }

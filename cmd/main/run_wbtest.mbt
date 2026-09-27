@@ -235,7 +235,7 @@ async test "save 失败：数据目录不可写 → 清晰文案 exit 1（Repr �
   @debug.assert_eq(run(["add", target], env_with(data), errs2), 1)
   @debug.assert_eq(
     errs2[0],
-    "保存数据库失败: 读写失败: Permission denied (os error 13)",
+    "jumbit: could not save database: io failure: Permission denied (os error 13)",
   )
   @afs.chmod(data, 0o755)
   cleanup_test_dir(data)

@@ -28,10 +28,10 @@ test "parse：add --score" {
   )
   @debug.assert_eq(
     @cli.parse(["add", "--score", "abc"]),
-    @cli.Unknown("--score 必须是数字: abc"),
+    @cli.Unknown("invalid value 'abc' for '--score <N>'"),
   )
   @debug.assert_eq(
     @cli.parse(["add", "--score"]),
-    @cli.Unknown("--score 缺少数值参数"),
+    @cli.Unknown("a value is required for '--score <N>' but none was supplied"),
   )
 }

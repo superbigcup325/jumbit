@@ -1,2 +1,2 @@
-意外参数: x
-运行 jumbit help 查看用法
+error: unexpected argument 'x'
+For more information, try 'jumbit help'.

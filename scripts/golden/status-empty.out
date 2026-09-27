@@ -1,6 +1,6 @@
-数据文件      @JUMBIT_TMP@/db/db.txt
-文件大小      0 字节
-格式          plaintext
-条目          0
-标注          0
-老化阈值      10000
+data file      @JUMBIT_TMP@/db/db.txt
+file size      0 bytes
+format         plaintext
+entries        0
+notes          0
+aging threshold 10000

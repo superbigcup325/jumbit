@@ -20,7 +20,7 @@ fn run_init(
     "tcsh" => @tpl.render_tcsh(cmd, iopts.hook, echo, resolve_symlinks)
     "xonsh" => @tpl.render_xonsh(cmd, iopts.hook, echo, resolve_symlinks)
     other => {
-      err_line(errs, "init: 不支持的 shell: \{other}")
+      err_line(errs, "invalid value '\{other}' for '<SHELL>'")
       return 2
     }
   }

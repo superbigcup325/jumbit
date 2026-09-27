@@ -31,12 +31,12 @@ fn parse_import(args : Array[String]) -> Command {
             Import({ plugin: p, merge, })
           } else {
             Unknown(
-              "import: 不支持的插件: \{p}（支持 \{import_plugins().join("/")}）",
+              "invalid value '\{p}' for '<PLUGIN>'\n  [possible values: \{import_plugins().join(", ")}]",
             )
           }
         None =>
           Unknown(
-            "import: 缺少插件参数（\{import_plugins().join("/")}）",
+            "missing required argument '<PLUGIN>'\n  [possible values: \{import_plugins().join(", ")}]",
           )
       }
   }

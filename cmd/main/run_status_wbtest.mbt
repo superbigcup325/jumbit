@@ -13,12 +13,12 @@ test "render_status_human：标签列与 --check 追加行（字节面）" {
   @debug.assert_eq(lines.length(), 6)
   @debug.assert_eq(
     lines[0],
-    "数据文件      /home/you/.local/share/jumbit/db.txt",
+    "data file      /home/you/.local/share/jumbit/db.txt",
   )
-  @debug.assert_eq(lines[1], "文件大小      13854848 字节")
-  @debug.assert_eq(lines[2], "格式          plaintext")
-  @debug.assert_eq(lines[4], "标注          12")
-  @debug.assert_eq(lines[5], "老化阈值      10000")
+  @debug.assert_eq(lines[1], "file size      13854848 bytes")
+  @debug.assert_eq(lines[2], "format         plaintext")
+  @debug.assert_eq(lines[4], "notes          12")
+  @debug.assert_eq(lines[5], "aging threshold 10000")
   // 无库：版本位为 -
   let empty : DbStatus = {
     data_file: "/tmp/nodir/db.txt",
@@ -29,12 +29,12 @@ test "render_status_human：标签列与 --check 追加行（字节面）" {
     maxage: 10000.0,
     existing: None,
   }
-  @debug.assert_eq(render_status_human(empty)[2], "格式          -")
+  @debug.assert_eq(render_status_human(empty)[2], "format         -")
   // --check：追加「存在」行
   let checked = { ..r, existing: Some(210000), }
   let lines2 = render_status_human(checked)
   @debug.assert_eq(lines2.length(), 7)
-  @debug.assert_eq(lines2[6], "存在          210000/266618")
+  @debug.assert_eq(lines2[6], "existing        210000/266618")
 }
 
 ///|
@@ -91,7 +91,7 @@ async test "status：空库 / 有库 / 损坏库 / --check 的退出码与 stder
   let errs3 : Array[String] = []
   @debug.assert_eq(run(["status"], env_with(data), errs3), 1)
   @debug.assert_eq(errs3.length(), 1)
-  assert_true(errs3[0].has_prefix("数据文件损坏: "))
+  assert_true(errs3[0].has_prefix("jumbit: corrupted data file: "))
   // 用法错误 → 2（未知 flag）
   let errs4 : Array[String] = []
   @debug.assert_eq(run(["status", "--nope"], env_with(data), errs4), 2)
@@ -112,7 +112,7 @@ async test "status：db.txt 不可读 → 无法读取数据文件 + exit 1（Re
   @debug.assert_eq(run(["status"], env_with(data), errs2), 1)
   @debug.assert_eq(
     errs2[0],
-    "无法读取数据文件: Permission denied (os error 13)",
+    "jumbit: could not read data file: Permission denied (os error 13)",
   )
   @afs.chmod(data + "/db.txt", 0o644)
   cleanup_test_dir(data)

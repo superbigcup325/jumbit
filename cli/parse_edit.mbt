@@ -26,24 +26,24 @@ fn parse_edit(args : Array[String]) -> Command {
             i += 1
             args[i]
           } else {
-            bad = Some("--rename 缺少 <old> <new> 两个参数")
+            bad = Some("--rename requires <old> <new>")
             raw // 占位，bad 已设
           }
       }
       if bad is None {
         if opts.rename_old is Some(_) {
-          bad = Some("--rename 重复出现")
+          bad = Some("the argument '--rename' cannot be used multiple times")
         } else if i + 1 < n {
           opts.rename_old = Some(old)
           i += 1
           opts.rename_new = Some(args[i])
         } else {
-          bad = Some("--rename 缺少 <new> 参数")
+          bad = Some("--rename requires <new>")
         }
       }
     } else if raw == "--prune" {
       if opts.prune {
-        bad = Some("--prune 重复出现")
+        bad = Some("the argument '--prune' cannot be used multiple times")
       }
       opts.prune = true
     } else if bad is None {
@@ -54,7 +54,7 @@ fn parse_edit(args : Array[String]) -> Command {
   }
   // 互斥矩阵
   if bad is None && opts.rename_old is Some(_) && opts.prune {
-    return Invalid("edit: --rename 与 --prune 互斥")
+    return Invalid("the argument '--prune' cannot be used with '--rename'")
   }
   match bad {
     Some(flag) => Unknown(flag)

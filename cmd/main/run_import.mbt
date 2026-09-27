@@ -151,7 +151,7 @@ async fn run_import(
               Err(msg) => Err(msg)
             }
         }
-      other => Err("import: 不支持的插件: \{other}")
+      other => Err("invalid value '\{other}' for '<PLUGIN>'")
     }
     match done {
       Ok(_) => ()

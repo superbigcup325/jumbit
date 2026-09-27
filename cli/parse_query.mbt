@@ -71,7 +71,9 @@ fn parse_query(args : Array[String]) -> Command {
                 }
                 i += 1
               } else {
-                invalid = Some("--limit 缺少非负整数参数")
+                invalid = Some(
+                  "a value is required for '--limit <n>' but none was supplied",
+                )
               }
           }
         "--exclude" =>
@@ -82,7 +84,9 @@ fn parse_query(args : Array[String]) -> Command {
                 opts.exclude = Some(args[i + 1])
                 i += 1
               } else {
-                bad = Some("--exclude 缺少路径参数")
+                bad = Some(
+                  "a value is required for '--exclude <path>' but none was supplied",
+                )
               }
           }
         s =>
@@ -104,16 +108,18 @@ fn parse_query(args : Array[String]) -> Command {
     // 输出通道互斥（jumbit 扩展 flag 两两冲突；--list --tsv 沿用 --list --json
     // 既有先例：--list 胜出，另一通道被忽略，不校验）
     if opts.tsv && opts.json {
-      return Invalid("--tsv 与 --json 互斥")
+      return Invalid("the argument '--tsv' cannot be used with '--json'")
     }
     if opts.tsv && opts.interactive {
-      return Invalid("--tsv 与 --interactive 互斥")
+      return Invalid("the argument '--tsv' cannot be used with '--interactive'")
     }
     if opts.json && opts.interactive {
-      return Invalid("--json 与 --interactive 互斥")
+      return Invalid(
+        "the argument '--json' cannot be used with '--interactive'",
+      )
     }
     if opts.limit is Some(_) && !(opts.list || opts.json || opts.tsv) {
-      return Invalid("--limit 仅在 --list/--json/--tsv 下生效")
+      return Invalid("'--limit' requires '--list', '--json' or '--tsv'")
     }
   }
   match bad {
@@ -127,10 +133,15 @@ fn parse_query(args : Array[String]) -> Command {
 /// 同源——拒前导 +/负数/浮点/垃圾）；超 Int 上限同拒（截断数无更大语义）
 fn parse_limit_value(s : String) -> Result[Int, String] {
   let v = @string.parse_uint64(s) catch {
-    _ => return Err("--limit 需要非负整数参数: \{s}")
+    _ =>
+      return Err(
+        "invalid value '\{s}' for '--limit <n>': must be a non-negative integer",
+      )
   }
   if v.compare(2147483647UL) > 0 {
-    return Err("--limit 需要非负整数参数: \{s}")
+    return Err(
+      "invalid value '\{s}' for '--limit <n>': must be a non-negative integer",
+    )
   }
   Ok(v.to_int())
 }

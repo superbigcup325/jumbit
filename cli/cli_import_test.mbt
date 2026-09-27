@@ -30,13 +30,13 @@ test "parse：import 非法用法归 Unknown" {
   @debug.assert_eq(
     @cli.parse(["import"]),
     @cli.Unknown(
-      "import: 缺少插件参数（atuin/autojump/fasd/z/z.lua/zsh-z）",
+      "missing required argument '<PLUGIN>'\n  [possible values: atuin, autojump, fasd, z, z.lua, zsh-z]",
     ),
   )
   @debug.assert_eq(
     @cli.parse(["import", "bogus"]),
     @cli.Unknown(
-      "import: 不支持的插件: bogus（支持 atuin/autojump/fasd/z/z.lua/zsh-z）",
+      "invalid value 'bogus' for '<PLUGIN>'\n  [possible values: atuin, autojump, fasd, z, z.lua, zsh-z]",
     ),
   )
   @debug.assert_eq(@cli.parse(["import", "z", "extra"]), @cli.Unknown("extra"))

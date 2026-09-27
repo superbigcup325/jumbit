@@ -16,7 +16,7 @@ fn parse_export(args : Array[String]) -> Command {
       if opts.agents {
         Export(opts)
       } else {
-        Unknown("export: 缺少 --agents")
+        Unknown("export: missing required argument '--agents'")
       }
   }
 }

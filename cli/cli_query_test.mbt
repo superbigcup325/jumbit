@@ -24,7 +24,9 @@ test "parse：未知 flag 与缺值归 Unknown" {
   @debug.assert_eq(@cli.parse(["query", "--bogus"]), @cli.Unknown("--bogus"))
   @debug.assert_eq(
     @cli.parse(["query", "--exclude"]),
-    @cli.Unknown("--exclude 缺少路径参数"),
+    @cli.Unknown(
+      "a value is required for '--exclude <path>' but none was supplied",
+    ),
   )
 }
 
@@ -36,11 +38,11 @@ test "parse：query --json 与 --interactive 互斥" {
   )
   @debug.assert_eq(
     @cli.parse(["query", "--json", "--interactive"]),
-    @cli.Invalid("--json 与 --interactive 互斥"),
+    @cli.Invalid("the argument '--json' cannot be used with '--interactive'"),
   )
   @debug.assert_eq(
     @cli.parse(["query", "--interactive", "--json"]),
-    @cli.Invalid("--json 与 --interactive 互斥"),
+    @cli.Invalid("the argument '--json' cannot be used with '--interactive'"),
   )
 }
 
@@ -92,29 +94,39 @@ test "parse：query --limit 合法值与覆盖语义" {
 test "parse：query --limit 非法值与缺值 → Invalid" {
   @debug.assert_eq(
     @cli.parse(["query", "--json", "--limit", "abc"]),
-    @cli.Invalid("--limit 需要非负整数参数: abc"),
+    @cli.Invalid(
+      "invalid value 'abc' for '--limit <n>': must be a non-negative integer",
+    ),
   )
   // 负数/浮点/前导 +（parse_uint64 拒 +，与 import la 同源）/超 Int 上限
   @debug.assert_eq(
     @cli.parse(["query", "--list", "--limit", "-1"]),
-    @cli.Invalid("--limit 需要非负整数参数: -1"),
+    @cli.Invalid(
+      "invalid value '-1' for '--limit <n>': must be a non-negative integer",
+    ),
   )
   @debug.assert_eq(
     @cli.parse(["query", "--list", "--limit", "1.5"]),
-    @cli.Invalid("--limit 需要非负整数参数: 1.5"),
+    @cli.Invalid(
+      "invalid value '1.5' for '--limit <n>': must be a non-negative integer",
+    ),
   )
   @debug.assert_eq(
     @cli.parse(["query", "--list", "--limit", "+2"]),
-    @cli.Invalid("--limit 需要非负整数参数: +2"),
+    @cli.Invalid(
+      "invalid value '+2' for '--limit <n>': must be a non-negative integer",
+    ),
   )
   @debug.assert_eq(
     @cli.parse(["query", "--list", "--limit", "9999999999"]),
-    @cli.Invalid("--limit 需要非负整数参数: 9999999999"),
+    @cli.Invalid(
+      "invalid value '9999999999' for '--limit <n>': must be a non-negative integer",
+    ),
   )
   // 缺值
   @debug.assert_eq(
     @cli.parse(["query", "--json", "--limit"]),
-    @cli.Invalid("--limit 缺少非负整数参数"),
+    @cli.Invalid("a value is required for '--limit <n>' but none was supplied"),
   )
 }
 
@@ -123,11 +135,11 @@ test "parse：query --limit 组合限制与错误优先级" {
   // 裸 query（单结果路）/ --interactive 与 limit 组合 → Invalid
   @debug.assert_eq(
     @cli.parse(["query", "--limit", "2"]),
-    @cli.Invalid("--limit 仅在 --list/--json/--tsv 下生效"),
+    @cli.Invalid("'--limit' requires '--list', '--json' or '--tsv'"),
   )
   @debug.assert_eq(
     @cli.parse(["query", "--interactive", "--limit", "2"]),
-    @cli.Invalid("--limit 仅在 --list/--json/--tsv 下生效"),
+    @cli.Invalid("'--limit' requires '--list', '--json' or '--tsv'"),
   )
   // 未知 flag 优先于组合校验（bad 优先惯例）
   @debug.assert_eq(
@@ -137,7 +149,9 @@ test "parse：query --limit 组合限制与错误优先级" {
   // 值非法优先于组合校验（invalid 在组合检查前返回）
   @debug.assert_eq(
     @cli.parse(["query", "--limit", "abc"]),
-    @cli.Invalid("--limit 需要非负整数参数: abc"),
+    @cli.Invalid(
+      "invalid value 'abc' for '--limit <n>': must be a non-negative integer",
+    ),
   )
 }
 
@@ -146,15 +160,15 @@ test "parse：query --tsv 互斥与 --list 优先先例" {
   // 与 --json/--interactive 两两互斥（顺序无关）
   @debug.assert_eq(
     @cli.parse(["query", "--tsv", "--json"]),
-    @cli.Invalid("--tsv 与 --json 互斥"),
+    @cli.Invalid("the argument '--tsv' cannot be used with '--json'"),
   )
   @debug.assert_eq(
     @cli.parse(["query", "--json", "--tsv"]),
-    @cli.Invalid("--tsv 与 --json 互斥"),
+    @cli.Invalid("the argument '--tsv' cannot be used with '--json'"),
   )
   @debug.assert_eq(
     @cli.parse(["query", "--tsv", "--interactive"]),
-    @cli.Invalid("--tsv 与 --interactive 互斥"),
+    @cli.Invalid("the argument '--tsv' cannot be used with '--interactive'"),
   )
   // --list --tsv：--list 胜出、--tsv 被忽略（沿用 --list --json 先例，不校验）
   @debug.assert_eq(
@@ -173,6 +187,6 @@ test "parse：query --tsv 互斥与 --list 优先先例" {
   // limit 合法集消息随 --tsv 扩展
   @debug.assert_eq(
     @cli.parse(["query", "--limit", "2"]),
-    @cli.Invalid("--limit 仅在 --list/--json/--tsv 下生效"),
+    @cli.Invalid("'--limit' requires '--list', '--json' or '--tsv'"),
   )
 }

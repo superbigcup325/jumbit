@@ -22,7 +22,9 @@ fn parse_describe(args : Array[String]) -> Command {
             note = Some(args[i + 1])
             i += 1
           } else {
-            bad = Some("--note 缺少标注文本")
+            bad = Some(
+              "a value is required for '--note <text>' but none was supplied",
+            )
           }
       }
     } else if raw.has_prefix("-") && raw != "-" {
@@ -37,7 +39,7 @@ fn parse_describe(args : Array[String]) -> Command {
   if bad is None && note is Some(t) {
     // 明文持久化后 note 走 notes.tsv(TSV 列分隔),tab 与换行一并拒绝
     if t.contains("\n") || t.contains("\r") || t.contains("\t") {
-      return Invalid("describe: 标注不能包含换行或 tab")
+      return Invalid("note cannot contain newline or tab")
     }
   }
   match bad {
@@ -45,7 +47,7 @@ fn parse_describe(args : Array[String]) -> Command {
     None =>
       match path {
         Some(p) => Describe({ path: p, note, })
-        None => Unknown("describe: 缺少路径参数")
+        None => Unknown("describe: missing required argument '<PATH>'")
       }
   }
 }

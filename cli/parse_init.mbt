@@ -4,7 +4,7 @@
 /// flag 与 positional 任意穿插（对齐上游 clap：`init --cmd zz bash` 合法）；
 /// 首个非 flag token 为 shell，其余非 flag token 报意外参数；`--` 之后一律按 positional
 fn parse_init(args : Array[String]) -> Command {
-  let supported = "bash/zsh/fish/elvish/nushell/posix/powershell/tcsh/xonsh"
+  let supported = "bash, elvish, fish, nushell, posix, powershell, tcsh, xonsh"
   let mut shell : String? = None
   let mut bad : String? = None
   let mut cmd : String? = Some("j")
@@ -26,7 +26,7 @@ fn parse_init(args : Array[String]) -> Command {
     if !is_flag {
       match shell {
         None => shell = Some(raw)
-        Some(_) => bad = Some("init: 意外参数: \{raw}")
+        Some(_) => bad = Some("unexpected argument '\{raw}'")
       }
       i += 1
       continue
@@ -59,7 +59,9 @@ fn parse_init(args : Array[String]) -> Command {
               cmd = Some(args[i + 1])
               i += 1
             } else {
-              bad = Some("--cmd 缺少命令名参数")
+              bad = Some(
+                "a value is required for '--cmd <C>' but none was supplied",
+              )
             }
         }
       "--hook" =>
@@ -67,18 +69,25 @@ fn parse_init(args : Array[String]) -> Command {
           Some(value) =>
             match parse_hook(value) {
               Some(h) => hook = h
-              None => bad = Some("--hook 仅支持 pwd/prompt/none: \{value}")
+              None =>
+                bad = Some(
+                  "invalid value '\{value}' for '--hook <HOOK>'\n  [possible values: pwd, prompt, none]",
+                )
             }
           None =>
             if i + 1 < n {
               match parse_hook(args[i + 1]) {
                 Some(h) => hook = h
                 None =>
-                  bad = Some("--hook 仅支持 pwd/prompt/none: \{args[i + 1]}")
+                  bad = Some(
+                    "invalid value '\{args[i + 1]}' for '--hook <HOOK>'\n  [possible values: pwd, prompt, none]",
+                  )
               }
               i += 1
             } else {
-              bad = Some("--hook 缺少参数")
+              bad = Some(
+                "a value is required for '--hook <HOOK>' but none was supplied",
+              )
             }
         }
       s => bad = Some(s)
@@ -89,7 +98,10 @@ fn parse_init(args : Array[String]) -> Command {
     Some(msg) => Unknown(msg)
     None =>
       match shell {
-        None => Unknown("init: 缺少 shell 参数（\{supported}）")
+        None =>
+          Unknown(
+            "missing required argument '<SHELL>'\n  [possible values: \{supported}]",
+          )
         Some(sh) =>
           if sh != "bash" &&
             sh != "zsh" &&
@@ -101,7 +113,7 @@ fn parse_init(args : Array[String]) -> Command {
             sh != "tcsh" &&
             sh != "xonsh" {
             Unknown(
-              "init: 不支持的 shell: \{sh}（当前支持 \{supported}）",
+              "invalid value '\{sh}' for '<SHELL>'\n  [possible values: \{supported}]",
             )
           } else {
             // 默认对齐上游 cmd.rs：--cmd 默认定义命令（jumbit → "j"），--hook 默认 pwd

@@ -110,7 +110,7 @@ pub fn parse(args : Array[String]) -> Command {
     if args.length() == 1 {
       return Version
     }
-    return Invalid("意外参数: \{args[1]}")
+    return Invalid("unexpected argument '\{args[1]}'")
   }
   let rest : Array[String] = []
   for i in 1..<args.length() {
@@ -210,37 +210,37 @@ pub fn version() -> String {
 ///|
 pub fn usage() -> String {
   "jumbit \{@jumbit.VERSION} — a MoonBit rewrite of zoxide\n\n" +
-  "用法：\n" +
-  "  jumbit add [--score N] <path>...        记录目录（--score 指定本次增量权重）\n" +
-  "  jumbit remove <path>...                 从数据库移除目录\n" +
-  "  jumbit query [kw]...                    输出最高得分匹配目录\n" +
-  "    --list                                输出全部匹配（按得分降序）\n" +
-  "    --score                               前缀显示得分\n" +
-  "    --all                                 跳过存在性检查\n" +
-  "    --exclude <path>                      排除指定目录（精确路径）\n" +
-  "    --interactive                         fzf 交互式选择\n" +
-  "    --json                                单行 JSON 数组输出全部匹配（agent 通道，与 --interactive 互斥）\n" +
-  "    --fuzzy                               精确零命中时按组件子串兜底（jumbit 扩展）\n" +
-  "    --tsv                                Tab 分隔输出 path/score/last_accessed/matched_by（jumbit 扩展，与 --json/--interactive 互斥）\n" +
-  "    --limit <n>                           只输出前 n 条（与 --list/--json/--tsv 组合，jumbit 扩展）\n" +
-  "  jumbit init <shell>                     生成 shell 集成脚本（默认定义 j/ji，hook=pwd）\n" +
+  "Usage:\n" +
+  "  jumbit add [--score N] <path>...        record directories (--score sets this visit's weight)\n" +
+  "  jumbit remove <path>...                 remove directories from the database\n" +
+  "  jumbit query [kw]...                    print the highest-scoring match\n" +
+  "    --list                                print all matches (by score, descending)\n" +
+  "    --score                               prefix each line with its score\n" +
+  "    --all                                 skip the existence check\n" +
+  "    --exclude <path>                      exclude a path (exact match)\n" +
+  "    --interactive                         select interactively with fzf\n" +
+  "    --json                                print all matches as a single-line JSON array (agent channel, mutually exclusive with --interactive)\n" +
+  "    --fuzzy                               fall back to component substrings when exact matching finds nothing (jumbit extension)\n" +
+  "    --tsv                                 print Tab-separated path/score/last_accessed/matched_by (jumbit extension, mutually exclusive with --json/--interactive)\n" +
+  "    --limit <n>                           print only the first n entries (with --list/--json/--tsv, jumbit extension)\n" +
+  "  jumbit init <shell>                     generate shell integration code (defines j/ji by default, hook=pwd)\n" +
   "    [--cmd C] [--hook pwd|prompt|none] [--no-cmd]\n" +
-  "  jumbit import <plugin> [--merge]        从其他工具导入历史数据（空库直灌，--merge 合并进非空库）\n" +
-  "  jumbit describe <path> [--note text]     查看/设置人工标注（--note \"\" 清除，jumbit 扩展）\n" +
-  "  jumbit export --agents                   输出项目地图 Markdown（贴进 AGENTS.md，jumbit 扩展）\n" +
-  "    plugin ∈ atuin/autojump/fasd/z/z.lua/zsh-z（坏行逐条上报不中止）\n" +
-  "  jumbit status [--json] [--check]         数据库自检：条目/标注/版本/阈值（--check 扫存在性，--json 给 agent，jumbit 扩展）\n" +
-  "  jumbit mcp                              启动 stdio MCP 服务器（agent 通道，tool：jumbit_query / jumbit_export_agents，jumbit 扩展）\n" +
-  "  jumbit edit                             用 $VISUAL/$EDITOR 编辑数据库（jumbit 扩展）\n" +
-  "    [--rename <old> <new>] | [--prune]    改路径（标注跟随）/ 清除不存在条目；三形态互斥\n" +
-  "  jumbit help                             显示本帮助\n" +
-  "  jumbit --version                        显示版本（-V 同义）\n\n" +
-  "环境变量：\n" +
-  "  _JB_DATA_DIR                            数据目录（默认 $HOME/.local/share/jumbit，须绝对路径）\n" +
-  "  _JB_ECHO=1                              add 时回显记录的目录\n" +
-  "  _JB_EXCLUDE_DIRS                        冒号分隔的 glob 列表，命中即从库中移除\n" +
-  "  _JB_FZF_OPTS                            透传给 fzf 的自定义参数\n" +
-  "  _JB_RESOLVE_SYMLINKS=1                  add 时解析符号链接（查询时反向不跟随）\n" +
-  "  _JB_MAXAGE=N                            数据库总分老化阈值（默认 10000）\n" +
-  "import 读取各插件标准数据文件，可经 _Z_DATA/_FASD_DATA/ZSHZ_DATA/_ZL_DATA/XDG_DATA_HOME 定位"
+  "  jumbit import <plugin> [--merge]        import history data from other tools (empty database imports directly, --merge merges into a non-empty one)\n" +
+  "  jumbit describe <path> [--note text]    show or set a human note (--note \"\" clears, jumbit extension)\n" +
+  "  jumbit export --agents                  print the project map as Markdown (paste into AGENTS.md, jumbit extension)\n" +
+  "    plugin ∈ atuin/autojump/fasd/z/z.lua/zsh-z (bad lines are reported one by one, never aborting)\n" +
+  "  jumbit status [--json] [--check]        database self-check: entries/notes/format/threshold (--check scans existence, --json for agents, jumbit extension)\n" +
+  "  jumbit mcp                              start the stdio MCP server (agent channel, tools: jumbit_query / jumbit_export_agents, jumbit extension)\n" +
+  "  jumbit edit                             edit the database with $VISUAL/$EDITOR (jumbit extension)\n" +
+  "    [--rename <old> <new>] | [--prune]    rename a path (notes follow) / drop nonexistent entries; mutually exclusive\n" +
+  "  jumbit help                             print this help\n" +
+  "  jumbit --version                        print version (-V works too)\n\n" +
+  "Environment variables:\n" +
+  "  _JB_DATA_DIR                            data directory (default $HOME/.local/share/jumbit, must be absolute)\n" +
+  "  _JB_ECHO=1                              echo directories as they are recorded\n" +
+  "  _JB_EXCLUDE_DIRS                        colon-separated glob list, matched paths are kept out of the database\n" +
+  "  _JB_FZF_OPTS                            extra arguments passed through to fzf\n" +
+  "  _JB_RESOLVE_SYMLINKS=1                  resolve symlinks when recording (queries do not follow them)\n" +
+  "  _JB_MAXAGE=N                            aging threshold for the database total score (default 10000)\n" +
+  "import reads each plugin's standard data file, located via _Z_DATA/_FASD_DATA/ZSHZ_DATA/_ZL_DATA/XDG_DATA_HOME"
 }

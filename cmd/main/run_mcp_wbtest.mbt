@@ -150,7 +150,7 @@ async test "mcp tools/call jumbit_query：命中/miss/参数校验三路" {
     None => fail("query miss 必须响应")
   }
   assert_true(miss.contains("\"isError\":true"))
-  assert_true(miss.contains("无匹配: zzz"))
+  assert_true(miss.contains("no match found"))
   // 参数校验失败 → 协议层 -32602
   let badkw = match call("{\"keywords\":[1]}") {
     Some(out) => out

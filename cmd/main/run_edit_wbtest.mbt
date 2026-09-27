@@ -62,7 +62,7 @@ async test "edit 交互：正常编辑改 rank → 落盘；编辑器缺失 → 
   let env4 = env_map([("_JB_DATA_DIR", data), ("VISUAL", ed_bad)])
   let errs4 : Array[String] = []
   @debug.assert_eq(run(["edit"], env4, errs4), 1)
-  assert_true(errs4[0].has_prefix("数据文件损坏: line "))
+  assert_true(errs4[0].has_prefix("jumbit: corrupted data file: line "))
   // 无 editor：VISUAL/EDITOR 均空 + PATH 注入空目录（vi 解析失败）
   let env5 = env_map([
     ("_JB_DATA_DIR", data),

@@ -95,7 +95,7 @@ async fn open_store(
   match @platform.load(data_dir) {
     Ok(s) => Some(s)
     Err(err) => {
-      err_line(errs, "打开数据库失败: \{err.message()}")
+      err_line(errs, "jumbit: could not open database: \{err.message()}")
       None
     }
   }
@@ -111,7 +111,7 @@ async fn finish(
   match store.save() {
     Ok(_) => code
     Err(err) => {
-      err_line(errs, "保存数据库失败: \{err.message()}")
+      err_line(errs, "jumbit: could not save database: \{err.message()}")
       1
     }
   }
@@ -141,14 +141,15 @@ pub async fn run(
       2
     }
     @cli.Unknown(cmd) => {
-      err_line(errs, "未知命令: \{cmd}")
-      err_line(errs, "运行 jumbit help 查看用法")
+      // clap 习语（上游 probe：error: unrecognized subcommand 'x' + try 行）
+      err_line(errs, "error: unrecognized subcommand '\{cmd}'")
+      err_line(errs, "For more information, try 'jumbit help'.")
       2
     }
     @cli.Add(aopts) => run_add(aopts, getenv, errs)
     @cli.Invalid(msg) => {
-      err_line(errs, msg)
-      err_line(errs, "运行 jumbit help 查看用法")
+      err_line(errs, "error: \{msg}")
+      err_line(errs, "For more information, try 'jumbit help'.")
       2
     }
     @cli.Query(qopts) => run_query(qopts, getenv, errs)

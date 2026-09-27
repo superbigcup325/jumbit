@@ -9,7 +9,7 @@ async fn run_add(
   errs : Array[String],
 ) -> Int {
   if aopts.paths.is_empty() {
-    err_line(errs, "add: 缺少路径参数")
+    err_line(errs, "add: missing required argument '<PATHS>'")
     return 2
   }
   let data_dir = match cfg(@config.data_dir(getenv), errs) {
@@ -42,7 +42,7 @@ async fn run_add(
           // os_error_message 自带 (os error N) 后缀，用冒号拼接避免括号嵌套
           err_line(
             errs,
-            "解析路径失败: \{resolved}: \{@platform.os_error_message(err)}",
+            "jumbit: could not resolve path \{resolved}: \{@platform.os_error_message(err)}",
           )
           return 1
         }
@@ -87,7 +87,7 @@ async fn run_remove(
   errs : Array[String],
 ) -> Int {
   if paths.is_empty() {
-    err_line(errs, "remove: 缺少路径参数")
+    err_line(errs, "remove: missing required argument '<PATHS>'")
     return 2
   }
   let data_dir = match cfg(@config.data_dir(getenv), errs) {

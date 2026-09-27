@@ -1,5 +1,5 @@
-<!-- jumbit export --agents：项目地图，按常用度（frecency）降序 -->
-| 路径 | 说明 |
+<!-- jumbit export --agents: project map, ordered by frecency -->
+| Path | Description |
 |---|---|
 | /golden/beta | db\|primary |
 | /golden/alpha | Alpha 服务 |
