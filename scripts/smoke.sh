@@ -49,12 +49,27 @@ if [ "$out" != "$(win_path "$target")" ]; then
 fi
 
 echo "== init 模板语法校验（参数矩阵抽样）=="
-for shell in bash zsh fish elvish nushell posix powershell tcsh; do
-  if ! command -v "$shell" >/dev/null; then
-    echo "  跳过 $shell（未安装）"
+# 模板名 → 可执行名映射（旧版直接 command -v 模板名，nushell/posix/
+# powershell 三分支因查不到二进制而从未执行过）
+for shell in bash zsh fish elvish nushell posix powershell tcsh xonsh; do
+  binname=$shell
+  case "$shell" in
+    nushell) binname=nu ;;
+    powershell) binname=pwsh ;;
+    posix) binname=sh ;;
+  esac
+  if ! command -v "$binname" >/dev/null; then
+    echo "  跳过 $shell（未安装 $binname）"
     continue
   fi
   for args in "" "--no-cmd" "--cmd cd" "--hook prompt" "--hook pwd --cmd j"; do
+    # 按 args 派生公开命令名（--no-cmd 断言内部函数 __jumbit_z）
+    no_cmd=0; cmd=j; prev=""
+    for w in $args; do
+      if [ "$prev" = "--cmd" ]; then cmd="$w"; fi
+      [ "$w" = "--no-cmd" ] && no_cmd=1
+      prev="$w"
+    done
     if [ "$shell" = "bash" ]; then
       _JB_ECHO=1 _JB_RESOLVE_SYMLINKS=1 "$bin" init bash $args | bash -n || { echo "✗ bash -n 失败: $args" >&2; exit 1; }
     elif [ "$shell" = "zsh" ]; then
@@ -73,6 +88,42 @@ for shell in bash zsh fish elvish nushell posix powershell tcsh; do
       rm -f "$psfile"
     elif [ "$shell" = "posix" ]; then
       "$bin" init posix $args | sh -n || { echo "✗ sh -n 失败: $args" >&2; exit 1; }
+    elif [ "$shell" = "tcsh" ]; then
+      # tcsh 脚本态真加载（2026-09-26 补课：旧循环 tcsh 掉进 else 分支被当
+      # elvish 源码编译，形同虚设）：source 后断言命令别名/内部别名已定义。
+      # 多行驱动文件必需——tcsh 的别名按行解析，-c 单行里 source 后同行
+      # 调用别名不展开。断言用 alias 全列表 grep（tcsh 的 `alias 名` 查询
+      # 对未定义别名也退出 0，不可用）
+      tcshfile=$scratch/jumbit-tcsh.csh
+      "$bin" init tcsh $args > "$tcshfile"
+      alias_target=$cmd
+      [ "$no_cmd" = 1 ] && alias_target=__jumbit_z
+      printf 'source %s\nalias | grep -q "^%s[ \t]" && echo TCSH-OK\nexit 0\n' \
+        "$tcshfile" "$alias_target" > "$tcshfile.drv"
+      if ! tcsh -f "$tcshfile.drv" 2>/dev/null | grep -q TCSH-OK; then
+        echo "✗ tcsh 加载失败: $args" >&2
+        rm -f "$tcshfile" "$tcshfile.drv"
+        exit 1
+      fi
+      rm -f "$tcshfile" "$tcshfile.drv"
+    elif [ "$shell" = "xonsh" ]; then
+      # xonsh 脚本态真加载：execx 后断言公开别名（--no-cmd 断言内部函数）
+      xshfile=$scratch/jumbit-xonsh.xsh
+      "$bin" init xonsh $args > "$xshfile"
+      printf 'execx(open(r"%s").read())\nimport builtins\n' "$xshfile" > "$xshfile.drv"
+      if [ "$no_cmd" = 1 ]; then
+        # execx 的 def 不落驱动脚本 globals，加载不抛即门禁通过
+        :
+      else
+        printf 'if builtins.aliases.get("%s") is None:\n    exit(1)\n' "$cmd" >> "$xshfile.drv"
+      fi
+      printf 'print("XONSH-OK")\n' >> "$xshfile.drv"
+      if ! xonsh --no-rc "$xshfile.drv" 2>/dev/null | grep -q XONSH-OK; then
+        echo "✗ xonsh 加载失败: $args" >&2
+        rm -f "$xshfile" "$xshfile.drv"
+        exit 1
+      fi
+      rm -f "$xshfile" "$xshfile.drv"
     elif [ "$shell" = "nushell" ]; then
       nufile=$scratch/jumbit-nu.nu
       "$bin" init nushell $args > "$nufile"
