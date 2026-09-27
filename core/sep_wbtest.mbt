@@ -30,17 +30,17 @@ test "win32：is_path_separator 双认与归一" {
 
 ///|
 #cfg(platform="windows")
-#skip("C:/* 对 C:\\a\\b 实测匹配（true），与回溯拦截分隔符的推演不符，待 Windows 真机定位后改回断言")
-test "win32：glob 分隔符不跨与字面量等价" {
+test "win32：glob 通配跨分隔符与字面量等价" {
   // pattern 侧 '\' 恒为转义字符，Windows 形态 pattern 用正斜杠书写
-  // '*' 不跨分隔符（path 侧 '\'）
-  assert_eq(glob_match("C:/*", "C:\\a\\b"), false)
+  // '*' 跨分隔符（glob crate 默认 require_literal_separator=false；
+  // 旧实现拦截分隔符时本用例为 #skip 悬案，对齐默认语义后悬案消解）
+  assert_eq(glob_match("C:/*", "C:\\a\\b"), true)
   assert_eq(glob_match("C:/*/*", "C:\\a\\b"), true)
   // pattern 侧字面 '/' 等价匹配 path 侧 '\'（glob crate Windows 同款）
   assert_eq(glob_match("C:/home/*", "C:\\home\\user"), true)
-  assert_eq(glob_match("C:/home/*", "C:\\home\\a\\b"), false)
-  // '?' 与 [...] 不匹配分隔符（含 '\'）
-  assert_eq(glob_match("C:/?ome", "C:\\home"), false)
+  assert_eq(glob_match("C:/home/*", "C:\\home\\a\\b"), true)
+  // '?' 与 [...] 匹配任意单字符（含分隔符 '\\'）
+  assert_eq(glob_match("C:/?ome", "C:\\home"), true)
   // starts_with 组件级前缀（反斜杠形态）
   assert_eq(starts_with("C:\\foo\\bar\\baz", "C:\\foo\\bar"), true)
   assert_eq(starts_with("C:\\foo\\ba", "C:\\foo\\bar"), false)

@@ -1,22 +1,24 @@
 // glob 匹配器测试
 
 ///|
-test "星号：不跨分隔符" {
+test "星号：跨分隔符（对齐上游 glob crate 默认 require_literal_separator=false）" {
   @debug.assert_eq(@core.glob_match("*", "foo"), true)
   @debug.assert_eq(@core.glob_match("*", ""), true)
-  @debug.assert_eq(@core.glob_match("*", "/foo"), false)
-  @debug.assert_eq(@core.glob_match("*", "foo/bar"), false)
-  @debug.assert_eq(@core.glob_match("**", "a/b"), false)
+  @debug.assert_eq(@core.glob_match("*", "/foo"), true)
+  @debug.assert_eq(@core.glob_match("*", "foo/bar"), true)
+  @debug.assert_eq(@core.glob_match("**", "a/b"), true)
   @debug.assert_eq(@core.glob_match("/foo/*", "/foo/bar"), true)
-  @debug.assert_eq(@core.glob_match("/foo/*", "/foo/bar/baz"), false)
+  @debug.assert_eq(@core.glob_match("/foo/*", "/foo/bar/baz"), true)
   @debug.assert_eq(@core.glob_match("/*/bar", "/foo/bar"), true)
+  // 纯字面量不含通配时仍须逐字对上（跨分隔符 ≠ 字面量穿越）
+  @debug.assert_eq(@core.glob_match("foobar", "/foobar"), false)
 }
 
 ///|
-test "问号：恰好一字且不匹配分隔符" {
+test "问号：恰好一字（含分隔符，glob crate 默认语义）" {
   @debug.assert_eq(@core.glob_match("?", "a"), true)
   @debug.assert_eq(@core.glob_match("?", "ab"), false)
-  @debug.assert_eq(@core.glob_match("?", "/"), false)
+  @debug.assert_eq(@core.glob_match("?", "/"), true)
   @debug.assert_eq(@core.glob_match("?", ""), false)
   @debug.assert_eq(@core.glob_match("a?c", "abc"), true)
 }
@@ -27,7 +29,7 @@ test "字符类：枚举与取反" {
   @debug.assert_eq(@core.glob_match("[abc]", "d"), false)
   @debug.assert_eq(@core.glob_match("[!a]", "b"), true)
   @debug.assert_eq(@core.glob_match("[!a]", "a"), false)
-  @debug.assert_eq(@core.glob_match("[!a]", "/"), false)
+  @debug.assert_eq(@core.glob_match("[!a]", "/"), true)
   @debug.assert_eq(@core.glob_match("[a-z]", "m"), true)
   @debug.assert_eq(@core.glob_match("[a-z]", "M"), false)
   // '-' 在类尾为字面量

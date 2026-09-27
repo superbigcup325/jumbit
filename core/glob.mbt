@@ -59,9 +59,10 @@ pub fn validate_glob(pattern : String) -> GlobError? {
 
 ///|
 /// glob 匹配（pattern 须先过 validate_glob）。
-/// 语义对齐 Rust glob Pattern：`*` 匹配零或多字符、`?` 匹配单字符，但二者与
-/// `[...]` 均不匹配分隔符 `/`；`\` 转义下一字符按字面量匹配；`{a,b}` 不支持，
-/// 视为字面量（与上游差异，README 注明）。
+/// 语义对齐 Rust glob crate 默认 MatchOptions（require_literal_separator=false，
+/// 上游 _ZO_EXCLUDE_DIRS 即此配置）：`*` 与 `**` 跨分隔符匹配任意序列、
+/// `?` 匹配任意单字符（含分隔符）、`[...]` 同理；`\` 转义下一字符按字面量匹配；
+/// `{a,b}` 不支持，视为字面量（与上游差异，README 注明）。
 pub fn glob_match(pattern : String, path : String) -> Bool {
   glob_match_compiled(pattern.to_array(), path)
 }
@@ -75,8 +76,8 @@ fn compile_glob(pattern : String) -> Array[Char] {
 
 ///|
 /// 编译后的 glob 匹配：迭代式双指针 + 单星回溯点，布尔语义与逐字符递归的
-/// 完全回溯搜索等价——星号区不吞 `/` 的约束对任意星号一致，贪心最右星
-/// 回溯可探索全部可行分解。无递归、无分配（path 走 codeunit 索引）。
+/// 完全回溯搜索等价——星号可吞任意字符（含分隔符，glob crate 默认语义），
+/// 贪心最右星回溯可探索全部可行分解。无递归、无分配（path 走 codeunit 索引）。
 fn glob_match_compiled(p : Array[Char], s : String) -> Bool {
   let pn = p.length()
   let sn = s.length()
@@ -103,10 +104,7 @@ fn glob_match_compiled(p : Array[Char], s : String) -> Bool {
       }
     }
     if star_pi >= 0 {
-      // 回溯：最近一个 `*` 多吞一个字符；`*` 不吞分隔符（平台判定）
-      if is_path_separator(s.at(star_si).to_int()) {
-        return false
-      }
+      // 回溯：最近一个 `*` 多吞一个字符（任意字符，含分隔符）
       star_si += 1
       si = star_si
       pi = star_pi + 1
@@ -122,24 +120,17 @@ fn glob_match_compiled(p : Array[Char], s : String) -> Bool {
 
 ///|
 /// 单字符 token 匹配（`*` 之外）：sc 为 s[si] 的 codeunit 值，返回 pattern
-/// 侧推进位置；不匹配返回 None。token 语义与原递归版逐条对应：`?` 与
-/// `[...]` 不匹配分隔符（is_path_separator 平台判定），`\x` 按字面量
-/// （含分隔符）；字面量 token 在 Windows 下与 path 侧分隔符等价匹配
+/// 侧推进位置；不匹配返回 None。token 语义对齐 glob crate 默认选项：
+/// `?` 与 `[...]` 匹配任意单字符（含分隔符）；`\x` 按字面量（含分隔符）；
+/// 字面量 token 在 Windows 下与 path 侧分隔符等价匹配
 fn match_single(p : Array[Char], pi : Int, sc : Int) -> Int? {
   let pn = p.length()
   let c = p[pi].to_int()
   if c == 63 {
     // '?'
-    if !is_path_separator(sc) {
-      Some(pi + 1)
-    } else {
-      None
-    }
+    Some(pi + 1)
   } else if c == 91 {
     // '['
-    if is_path_separator(sc) {
-      return None
-    }
     let mut j = pi + 1
     let mut negated = false
     if j < pn && p[j].to_int() == 33 {

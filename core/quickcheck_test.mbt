@@ -50,7 +50,7 @@ test "property: 明文 codec 往返不变量" {
 }
 
 ///|
-test "property: glob 不跨路径分隔符" {
+test "property: glob 星号跨分隔符（对齐 glob crate 默认 require_literal_separator=false）" {
   @quickcheck.check(
     fn(seed : UInt64) {
       let rand = @random.Rand::chacha8(seed=qc_seed_bytes(seed))
@@ -58,14 +58,21 @@ test "property: glob 不跨路径分隔符" {
       let alphabet = "abcxy*?".to_array()
       let n = 1 + rand.int(limit=8)
       let buf = StringBuilder()
+      let mut has_wild = false
       for _ in 0..<n {
-        buf.write_char(alphabet[rand.int(limit=7)])
+        let ch = alphabet[rand.int(limit=7)]
+        if ch == '*' || ch == '?' {
+          has_wild = true
+        }
+        buf.write_char(ch)
       }
       let pattern = buf.to_string()
       // 控制组：pattern 恒匹配自身（防「恒 false」的空洞性质）
       @core.glob_match(pattern, pattern) &&
-      // 分隔符不跨：pattern 无 `/` 时，含 `/` 的路径必不匹配
-      !@core.glob_match(pattern, "/" + pattern + "/x")
+      // 含通配的 pattern 借首尾星号必可跨分隔符匹配多组件路径
+      (!has_wild || @core.glob_match("*" + pattern + "*", "/" + pattern + "/x")) &&
+      // 纯字面量 pattern（无通配）仍不能匹配分隔符两侧的多组件路径
+      (has_wild || !@core.glob_match(pattern, "/" + pattern + "/x"))
     },
     count=200U,
     seed=20260925UL,

@@ -1,7 +1,8 @@
 ///|
 /// 平台路径分隔符判定（对齐 std::path::is_separator，glob crate 同源）：
-/// POSIX 仅 '/'；Windows 额外认 '\'。关键词末组件锚定/fuzzy 组件子串/
-/// glob 不跨分隔符共用此判定，语义权威单一（上游 stream.rs:90 同款）
+/// POSIX 仅 '/'；Windows 额外认 '\'。关键词末组件锚定/fuzzy 组件子串共用
+/// 此判定（glob 通配符已对齐 glob crate 默认语义、跨分隔符，不再依赖本判定），
+/// 语义权威单一（上游 stream.rs:90 同款）
 #cfg(platform="windows")
 fn is_path_separator(c : Int) -> Bool {
   c == 47 || c == 92

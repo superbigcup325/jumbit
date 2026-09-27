@@ -39,16 +39,18 @@ test "starts_with 组件级前缀" {
 
 ## glob 匹配
 
-`*` / `?` / `[...]` / `[!...]` 均不跨路径分隔符，`\` 转义；`{a,b}` 括号展开
-不支持（与上游 glob crate 的已定差异）。非法 pattern 用 `validate_glob` 前置校验，
-`glob_matches` 返回 `Result`，`glob_match` 供已校验 pattern 的快路径
+`*` / `**` 跨路径分隔符，`?` / `[...]` / `[!...]` 匹配任意单字符（含分隔符），
+对齐上游 glob crate 默认 MatchOptions（require_literal_separator=false）；
+`\` 转义；`{a,b}` 括号展开不支持（与上游 glob crate 的已定差异）。非法 pattern
+用 `validate_glob` 前置校验，`glob_matches` 返回 `Result`，`glob_match` 供
+已校验 pattern 的快路径
 
 ```mbt check
 ///|
-test "glob 不跨分隔符与非法 pattern" {
-  // `*` 只在单组件内展开
+test "glob 跨分隔符与非法 pattern" {
+  // `*` 跨组件展开（glob crate 默认语义，`*` 匹配含分隔符的任意序列）
   inspect(@core.glob_match("/usr/*", "/usr/local"), content="true")
-  inspect(@core.glob_match("/usr/*", "/usr/local/bin"), content="false")
+  inspect(@core.glob_match("/usr/*", "/usr/local/bin"), content="true")
   // 未闭合字符类报错（`{a,b}` 为合法 pattern，按字面量处理不展开）
   inspect(@core.validate_glob("/usr/[ab") is Some(_), content="true")
   // 校验与匹配一步完成
