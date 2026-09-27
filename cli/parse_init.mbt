@@ -1,38 +1,36 @@
 ///|
-/// init 参数解析：shell ∈ {bash, zsh, fish, elvish, nushell, posix, powershell, tcsh, xonsh}；--cmd C / --hook pwd|prompt|none / --no-cmd
+/// init 参数解析：shell ∈ {bash, zsh, fish, elvish, nushell, posix, powershell, tcsh, xonsh}；
+/// --cmd C / --hook pwd|prompt|none / --no-cmd。
+/// flag 与 positional 任意穿插（对齐上游 clap：`init --cmd zz bash` 合法）；
+/// 首个非 flag token 为 shell，其余非 flag token 报意外参数；`--` 之后一律按 positional
 fn parse_init(args : Array[String]) -> Command {
-  if args.is_empty() {
-    return Unknown(
-      "init: 缺少 shell 参数（bash/zsh/fish/elvish/nushell/posix/powershell/tcsh/xonsh）",
-    )
-  }
-  let shell = args[0]
-  if shell != "bash" &&
-    shell != "zsh" &&
-    shell != "fish" &&
-    shell != "elvish" &&
-    shell != "nushell" &&
-    shell != "posix" &&
-    shell != "powershell" &&
-    shell != "tcsh" &&
-    shell != "xonsh" {
-    return Unknown(
-      "init: 不支持的 shell: \{shell}（当前支持 bash/zsh/fish/elvish/nushell/posix/powershell/tcsh/xonsh）",
-    )
-  }
-  // 默认对齐上游 cmd.rs：--cmd 默认定义命令（jumbit → "j"），--hook 默认 pwd
-  let opts : InitOptions = {
-    shell,
-    cmd: Some("j"),
-    hook: HookPwd,
-    no_cmd: false,
-  }
+  let supported = "bash/zsh/fish/elvish/nushell/posix/powershell/tcsh/xonsh"
+  let mut shell : String? = None
   let mut bad : String? = None
+  let mut cmd : String? = Some("j")
+  let mut hook : @tpl.Hook = HookPwd
+  let mut no_cmd = false
   let n = args.length()
-  let mut i = 1
+  let mut i = 0
+  let mut dd = false
   while i < n {
     let raw = args[i]
+    if !dd && raw == "--" {
+      // clap 转义符：其后 token 一律按 positional（首个仍可为 shell）
+      dd = true
+      i += 1
+      continue
+    }
     let pair = split_eq_flag(raw)
+    let is_flag = !dd && (pair is Some(_) || raw.has_prefix("--"))
+    if !is_flag {
+      match shell {
+        None => shell = Some(raw)
+        Some(_) => bad = Some("init: 意外参数: \{raw}")
+      }
+      i += 1
+      continue
+    }
     // 等号形式只认带值 flag；--no-cmd/未知 flag 的等号形式报原文归 Unknown
     match pair {
       Some((name, _)) =>
@@ -52,13 +50,13 @@ fn parse_init(args : Array[String]) -> Command {
       None => None
     }
     match name {
-      "--no-cmd" => opts.no_cmd = true
+      "--no-cmd" => no_cmd = true
       "--cmd" =>
         match eq_val {
-          Some(value) => opts.cmd = Some(value)
+          Some(value) => cmd = Some(value)
           None =>
             if i + 1 < n {
-              opts.cmd = Some(args[i + 1])
+              cmd = Some(args[i + 1])
               i += 1
             } else {
               bad = Some("--cmd 缺少命令名参数")
@@ -68,13 +66,13 @@ fn parse_init(args : Array[String]) -> Command {
         match eq_val {
           Some(value) =>
             match parse_hook(value) {
-              Some(h) => opts.hook = h
+              Some(h) => hook = h
               None => bad = Some("--hook 仅支持 pwd/prompt/none: \{value}")
             }
           None =>
             if i + 1 < n {
               match parse_hook(args[i + 1]) {
-                Some(h) => opts.hook = h
+                Some(h) => hook = h
                 None =>
                   bad = Some("--hook 仅支持 pwd/prompt/none: \{args[i + 1]}")
               }
@@ -89,6 +87,26 @@ fn parse_init(args : Array[String]) -> Command {
   }
   match bad {
     Some(msg) => Unknown(msg)
-    None => Init(opts)
+    None =>
+      match shell {
+        None => Unknown("init: 缺少 shell 参数（\{supported}）")
+        Some(sh) =>
+          if sh != "bash" &&
+            sh != "zsh" &&
+            sh != "fish" &&
+            sh != "elvish" &&
+            sh != "nushell" &&
+            sh != "posix" &&
+            sh != "powershell" &&
+            sh != "tcsh" &&
+            sh != "xonsh" {
+            Unknown(
+              "init: 不支持的 shell: \{sh}（当前支持 \{supported}）",
+            )
+          } else {
+            // 默认对齐上游 cmd.rs：--cmd 默认定义命令（jumbit → "j"），--hook 默认 pwd
+            Init({ shell: sh, cmd, hook, no_cmd, })
+          }
+      }
   }
 }

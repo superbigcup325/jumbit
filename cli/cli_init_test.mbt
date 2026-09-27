@@ -92,3 +92,47 @@ test "parse：init 用法错误归 Unknown" {
     @cli.Unknown("--bogus"),
   )
 }
+
+///|
+test "parse：init flag 与 shell 任意穿插（对齐 clap intermix）" {
+  fn expect(shell : String, cmd : String) -> @cli.Command {
+    @cli.Init({ shell, cmd: Some(cmd), hook: @tpl.HookPwd, no_cmd: false, })
+  }
+  // flag 在 positional 前（本仓旧版报「不支持的 shell: --cmd=zz」，上游 clap 合法）
+  @debug.assert_eq(
+    @cli.parse(["init", "--cmd", "zz", "bash"]),
+    expect("bash", "zz"),
+  )
+  @debug.assert_eq(
+    @cli.parse(["init", "--cmd=zz", "bash"]),
+    expect("bash", "zz"),
+  )
+  @debug.assert_eq(
+    @cli.parse(["init", "--hook", "prompt", "--no-cmd", "zsh"]),
+    @cli.Init({
+      shell: "zsh",
+      cmd: Some("j"),
+      hook: @tpl.HookPrompt,
+      no_cmd: true,
+    }),
+  )
+  // flag 在 positional 后（既有行为回归锁定）
+  @debug.assert_eq(
+    @cli.parse(["init", "bash", "--cmd=zz"]),
+    expect("bash", "zz"),
+  )
+  // `--` 转义：其后 token 一律 positional
+  @debug.assert_eq(@cli.parse(["init", "--", "bash"]), expect("bash", "j"))
+  // 第二个非 flag token 报意外参数
+  @debug.assert_eq(
+    @cli.parse(["init", "bash", "zsh"]),
+    @cli.Unknown("init: 意外参数: zsh"),
+  )
+  // 只有 flag 没有 shell → 缺 shell
+  @debug.assert_eq(
+    @cli.parse(["init", "--cmd", "zz"]),
+    @cli.Unknown(
+      "init: 缺少 shell 参数（bash/zsh/fish/elvish/nushell/posix/powershell/tcsh/xonsh）",
+    ),
+  )
+}
