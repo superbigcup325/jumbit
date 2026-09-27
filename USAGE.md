@@ -27,11 +27,13 @@ jumbit edit                             用 $VISUAL/$EDITOR 编辑数据库（ju
   [--rename <old> <new>] | [--prune]    改路径（标注跟随）/ 清除不存在条目；三形态互斥
 jumbit mcp                              启动 stdio MCP 服务器（agent 通道，jumbit 扩展，见「面向 agent」）
 jumbit help                             显示帮助
+jumbit --version                        显示版本（-V 同义）
 ```
 
 语法与行为速记：
 
-- flag 两形态等价：`--cmd zj` 与 `--cmd=zj`（对齐上游 clap 双形态）
+- flag 两形态等价：`--cmd zj` 与 `--cmd=zj`（对齐上游 clap 双形态）；子命令的 flag 与 positional 参数位置任意穿插（`jumbit init --cmd zj bash` 合法，对齐 clap intermix）
+- 无参数调用输出用法帮助（stderr）并退出 2（对齐上游）；`jumbit help` 显式请求则走 stdout 退出 0
 - 带值 flag（`--score` / `--exclude` / `--limit` / `--note`）重复出现时后者覆盖；`--` 之后不再解析 flag
 - `query` 无关键词 = 输出最高分条目；`query --list` 空结果静默、退出码 0（对齐上游）
 - `describe <path>` 不带 `--note` 为查看模式：打印现有标注，无标注 exit 1
@@ -224,6 +226,8 @@ jumbit import <plugin>
 注：数据库非空时须加 `--merge` 合并导入（如 `jumbit import --merge z`）；坏行逐条上报、不中止导入
 
 注：atuin 经子进程 `atuin history list` 读取，其退出码不检查（对齐上游）：atuin 自身报错时得到空结果且 exit 0，成败以 stderr 为准
+
+注：atuin 18 起 `history list` 输出变为三段制表（追加时长列），上游 0.10.0 的解析器不识别，导入结果全部为 `unknown`（jumbit 与上游逐字节一致，实测 2026-09）；修复属上游（[zoxide#1288](https://github.com/ajeetdsouza/zoxide/pull/1288) 明文方向合并后随行），本侧不做单方面偏离
 
 ## 工作原理
 
