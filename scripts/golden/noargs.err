@@ -1,4 +1,4 @@
-jumbit 0.1.2 — a MoonBit rewrite of zoxide
+jumbit 0.1.3 — a MoonBit rewrite of zoxide
 
 Usage:
   jumbit add [--score N] <path>...        record directories (--score sets this visit's weight)

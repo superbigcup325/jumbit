@@ -1,0 +1,78 @@
+name: Release
+
+# tag（v*）触发：三平台 release 构建 → 压缩包 → 汇总为 draft GitHub Release。
+# draft 形态：发布确认（改 changelog 文案/置 latest）是维护者显式动作，
+# workflow 只负责产物与草稿，不直接 publish。
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  MOONBIT_VERSION: 0.1.20260920
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x86_64
+          - os: macos-latest
+            target: macos-aarch64
+          - os: windows-latest
+            target: windows-x86_64
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/.moon
+          key: moonbit-${{ matrix.os }}-${{ env.MOONBIT_VERSION }}
+      # 版本口径唯一权威与 ci.yml 同源；windows 官方 powershell 安装脚本
+      - name: Install MoonBit
+        shell: bash
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash -s -- "$MOONBIT_VERSION"
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+      - name: Build (release)
+        run: moon build --release
+      - name: Smoke (built binary end-to-end)
+        shell: bash
+        run: bash scripts/smoke.sh
+      - name: Package
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          name="jumbit-${version}-${{ matrix.target }}"
+          mkdir -p dist
+          if [ "${{ matrix.os }}" = windows-latest ]; then
+            cp _build/native/release/build/cmd/main/main.exe "dist/${name}.exe"
+            (cd dist && 7z a -tzip "${name}.zip" "${name}.exe")
+          else
+            cp _build/native/release/build/cmd/main/main.exe "dist/${name}"
+            (cd dist && tar czf "${name}.tar.gz" "${name}")
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jumbit-${{ matrix.target }}
+          path: dist/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: dist
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --draft --title "jumbit ${{ github.ref_name }}" \
+            --generate-notes

@@ -34,7 +34,15 @@ zoxide 用 frecency（频次 × 时间衰减）把「cd 过的地方」变成「
 
 ## 安装
 
-从源码构建（需 [MoonBit 工具链](https://www.moonbitlang.com/)，锚定 `moon 0.1.20260920`，CI 以此钉死可复现构建）：
+**方式一：mooncakes（推荐，需 [MoonBit 工具链](https://www.moonbitlang.com/)）**
+
+```bash
+moon install superbigcup325/jumbit    # 全局安装二进制
+```
+
+**方式二：GitHub Release 预编译二进制**（Linux x86_64 / macOS Apple Silicon / Windows x64，无工具链依赖）：从 [Releases](https://github.com/superbigcup325/jumbit/releases) 下载对应平台压缩包，解压到 PATH 目录即可
+
+**方式三：从源码构建**（锚定 `moon 0.1.20260920`，CI 以此钉死可复现构建）：
 
 ```bash
 git clone https://github.com/superbigcup325/jumbit && cd jumbit
@@ -45,8 +53,6 @@ cp _build/native/release/build/cmd/main/main.exe ~/.local/bin/   # 或任意 PAT
 ```
 
 工具链锚定：CI 以 `.github/workflows/ci.yml` 的 `MOONBIT_VERSION` 常量钉死可复现构建；升级工具链时同步 bump 该常量并重跑全套验证（regression/golden/dataset/chaos/realdata），版本口径以该常量为唯一权威
-
-mooncakes 已发布 `superbigcup325/jumbit 0.1.0`，但滞后于 main（不含近期修复）；预编译二进制在计划中
 
 ## 快速上手
 

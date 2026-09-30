@@ -34,7 +34,15 @@ On that foundation, jumbit extends directory memory beyond the shell: coding age
 
 ## Install
 
-Build from source (requires the [MoonBit toolchain](https://www.moonbitlang.com/), anchored at `moon 0.1.20260920`; CI pins this version for reproducible builds):
+**Option 1: mooncakes (recommended; requires the [MoonBit toolchain](https://www.moonbitlang.com/))**
+
+```bash
+moon install superbigcup325/jumbit    # install the binary globally
+```
+
+**Option 2: prebuilt binaries from GitHub Releases** (Linux x86_64 / macOS Apple Silicon / Windows x64, no toolchain needed): grab the archive for your platform from [Releases](https://github.com/superbigcup325/jumbit/releases) and put it on your PATH
+
+**Option 3: build from source** (anchored at `moon 0.1.20260920`; CI pins this version for reproducible builds):
 
 ```bash
 git clone https://github.com/superbigcup325/jumbit && cd jumbit
@@ -45,8 +53,6 @@ cp _build/native/release/build/cmd/main/main.exe ~/.local/bin/   # or any direct
 ```
 
 Toolchain anchor: CI pins reproducible builds via the `MOONBIT_VERSION` constant in `.github/workflows/ci.yml`; when upgrading the toolchain, bump that constant in the same change and rerun the full verification suite (regression/golden/dataset/chaos/realdata) the constant is the single source of truth for the version
-
-`superbigcup325/jumbit 0.1.0` is published on mooncakes, but it lags behind main (recent fixes not included); prebuilt binaries are planned
 
 ## Quick start
 
