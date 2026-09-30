@@ -198,3 +198,48 @@ async test "mcp tools/call jumbit_export_agents：地图进 content" {
   cleanup_test_dir(data)
   cleanup_test_dir(target)
 }
+
+///|
+test "mcp strip_eol：LF/CRLF/裸行三臂（\\r\\n 为 Windows 客户端真实发送形态）" {
+  assert_eq(strip_eol("ping\n"), "ping")
+  assert_eq(strip_eol("ping\r\n"), "ping")
+  assert_eq(strip_eol("ping"), "ping")
+  // 裸 \r 也剥（先 LF 后 CR 的顺序剥离，行内空白不碰）
+  assert_eq(strip_eol("ping\r"), "ping")
+}
+
+///|
+async test "mcp tools/call 卫士四臂：params 非对象/缺 tool name/arguments 非对象/fuzzy 非布尔（-32602）" {
+  let data = make_test_dir("mcp-guard")
+  let env = env_map([("_JB_DATA_DIR", data)])
+  let call = async fn(raw_params : String) -> String {
+    match
+      mcp_handle_line(
+        "{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"tools/call\",\"params\":\{raw_params}}",
+        env,
+      ) {
+      Some(out) => out
+      None => fail("tools/call 必须响应")
+    }
+  }
+  // params 非对象（数组形态）
+  assert_true(call("[]").contains("\"code\":-32602"))
+  assert_true(call("[]").contains("missing params object"))
+  // 缺 tool name
+  assert_true(call("{\"arguments\":{}}").contains("missing tool name"))
+  // tool name 非字符串
+  assert_true(call("{\"name\":1}").contains("missing tool name"))
+  // arguments 非对象
+  assert_true(
+    call("{\"name\":\"jumbit_query\",\"arguments\":1}").contains(
+      "arguments must be an object",
+    ),
+  )
+  // fuzzy 非布尔
+  assert_true(
+    call(
+      "{\"name\":\"jumbit_query\",\"arguments\":{\"keywords\":[\"x\"],\"fuzzy\":\"yes\"}}",
+    ).contains("fuzzy must be a boolean"),
+  )
+  cleanup_test_dir(data)
+}

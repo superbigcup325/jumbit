@@ -154,3 +154,89 @@ async test "edit --prune：移除不存在条目并输出清单；全存在静�
   cleanup_test_dir(data)
   cleanup_test_dir(target)
 }
+
+///|
+#cfg(not(platform="windows"))
+// 伪 editor 桩同款 chmod 形态；sh -c 臂依赖 PATH 有 sh（测试环境恒有）
+async test "edit 编辑器解析链与执行面：EDITOR 回落/含空格 sh -c/退出码非零" {
+  let data = make_test_dir("edit-chain")
+  let target = make_test_dir("edit-chain-t")
+  let bindir = make_test_dir("edit-chain-bin")
+  let errs : Array[String] = []
+  @debug.assert_eq(run(["add", target], env_with(data), errs), 0)
+  // editor：往文件追加一条合法条目
+  let ed_add = make_fake_editor(
+    bindir, "ed-chain", "printf '0000000001\\t0000002.00\\t/chain-added\\n' >> \"$1\"",
+  )
+  // 回落链：VISUAL 缺失 → EDITOR 生效（resolve_editor 的 match 臂）
+  let env_r = env_map([
+    ("_JB_DATA_DIR", data),
+    ("PATH", bindir + ":/usr/bin:/bin"),
+    ("EDITOR", ed_add),
+  ])
+  @debug.assert_eq(run(["edit"], env_r, errs), 0)
+  // 含空格 EDITOR → sh -c '<值> "$@"' 臂（git EDITOR 惯用法；值带参数）
+  let env_sp = env_map([
+    ("_JB_DATA_DIR", data),
+    ("PATH", bindir + ":/usr/bin:/bin"),
+    ("VISUAL", ed_add + " --quiet"),
+  ])
+  // 假 editor 不认识 --quiet 会失败吗？sh 包装把 "$@" 传给桩，桩用 "$1"，
+  // 多余参数被忽略 → 仍成功；此用例锁的是「含空格值按 shell 命令行拆分」
+  @debug.assert_eq(run(["edit"], env_sp, errs), 0)
+  // 编辑器退出码非零 → Failed(code) 臂，文案 + exit 1
+  let ed_fail = make_fake_editor(bindir, "ed-fail", "exit 3")
+  let env_f = env_map([
+    ("_JB_DATA_DIR", data),
+    ("PATH", bindir + ":/usr/bin:/bin"),
+    ("VISUAL", ed_fail),
+  ])
+  let errs_f : Array[String] = []
+  @debug.assert_eq(run(["edit"], env_f, errs_f), 1)
+  assert_true(errs_f[0].contains("editor exited with code 3"))
+  cleanup_test_dir(data)
+  cleanup_test_dir(target)
+}
+
+///|
+async test "edit 落盘失败族：tmp 创建被拒 + --rename/--prune save 被拒 → exit 1" {
+  // 交互编辑的 tmp 建在数据目录内（db.txt.edit）：目录只读死在更早的
+  // could not write temporary file 臂（到不了 save），顺手锁该臂
+  let data = make_test_dir("edit-save-ro")
+  let target = make_test_dir("edit-save-ro-t")
+  let bindir = make_test_dir("edit-save-ro-bin")
+  let errs : Array[String] = []
+  @debug.assert_eq(run(["add", target], env_with(data), errs), 0)
+  let ed_touch = make_fake_editor(
+    bindir, "ed-touch", "printf '0000000001\\t0000002.00\\t/edited-ro\\n' >> \"$1\"",
+  )
+  @afs.chmod(data, 0o555)
+  let env_e = env_map([("_JB_DATA_DIR", data), ("VISUAL", ed_touch)])
+  let errs2 : Array[String] = []
+  @debug.assert_eq(run(["edit"], env_e, errs2), 1)
+  assert_true(errs2[0].has_prefix("jumbit: could not write temporary file: "))
+  @afs.chmod(data, 0o755)
+  // --rename 落盘被拒
+  @afs.chmod(data, 0o555)
+  let errs3 : Array[String] = []
+  @debug.assert_eq(
+    run(["edit", "--rename", target, "/moved"], env_with(data), errs3),
+    1,
+  )
+  assert_true(errs3[0].has_prefix("jumbit: could not save database: "))
+  @afs.chmod(data, 0o755)
+  // --prune 落盘被拒：先入库一个随后消失的路径（无变化时 prune 提前返回
+  // 不落盘，只读目录下回 0，须先造成「有可清条目」的状态）
+  @afs.chmod(data, 0o755)
+  let gone = make_test_dir("edit-save-ro-gone")
+  let errs5 : Array[String] = []
+  @debug.assert_eq(run(["add", gone], env_with(data), errs5), 0)
+  cleanup_test_dir(gone)
+  @afs.chmod(data, 0o555)
+  let errs4 : Array[String] = []
+  @debug.assert_eq(run(["edit", "--prune"], env_with(data), errs4), 1)
+  assert_true(errs4[0].has_prefix("jumbit: could not save database: "))
+  @afs.chmod(data, 0o755)
+  cleanup_test_dir(data)
+  cleanup_test_dir(target)
+}

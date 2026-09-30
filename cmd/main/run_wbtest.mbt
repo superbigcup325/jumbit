@@ -272,3 +272,60 @@ async test "顶层面分发：--version/-V/无参数/顶层坏 flag/run 层接�
   assert_true(errs6[0].contains("unexpected argument '--bogus'"))
   cleanup_test_dir(data)
 }
+
+///|
+async test "子命令头部配置失败臂抽样：坏 _JB_DATA_DIR 各分发臂 → exit 1" {
+  // 相对路径 data_dir 被 config 层拒：每子命令的 None => return 1 臂同构，
+  // 抽 query/add/status/import 四代表（其余 edit/describe/export 共享同款 cfg 链）
+  let bad = env_map([("_JB_DATA_DIR", "relative-not-absolute")])
+  @debug.assert_eq(run(["query"], bad, []), 1)
+  @debug.assert_eq(run(["add", "/tmp"], bad, []), 1)
+  @debug.assert_eq(run(["status"], bad, []), 1)
+  @debug.assert_eq(run(["import", "z"], bad, []), 1)
+}
+
+///|
+async test "run 层分发：import 未知插件臂与 init 七模板臂" {
+  let data = make_test_dir("dispatch")
+  // import 未知插件（parse 层已拦，此处锁 run 层兜底臂不达也不崩）
+  let errs : Array[String] = []
+  @debug.assert_eq(run(["init", "zsh"], env_with(data), errs), 0)
+  @debug.assert_eq(run(["init", "fish"], env_with(data), errs), 0)
+  @debug.assert_eq(run(["init", "elvish"], env_with(data), errs), 0)
+  @debug.assert_eq(run(["init", "nushell"], env_with(data), errs), 0)
+  @debug.assert_eq(run(["init", "posix"], env_with(data), errs), 0)
+  @debug.assert_eq(run(["init", "powershell"], env_with(data), errs), 0)
+  @debug.assert_eq(run(["init", "tcsh"], env_with(data), errs), 0)
+  @debug.assert_eq(run(["init", "xonsh"], env_with(data), errs), 0)
+  cleanup_test_dir(data)
+}
+
+///|
+test "cli 层单臂补遗：--hook pwd 显式/-- 双剥/等号坏值/--prune 重复" {
+  // parse_hook 的 pwd 臂（默认值路径不触发 match，须显式传参）
+  @debug.assert_eq(
+    @cli.parse(["init", "bash", "--hook", "pwd"]),
+    @cli.Init({
+      shell: "bash",
+      cmd: Some("j"),
+      hook: @tpl.HookPwd,
+      no_cmd: false,
+    }),
+  )
+  // strip_double_dash 的 dropped=true 臂：-- 后参数按 positional 收
+  @debug.assert_eq(@cli.parse(["remove", "--", "/a"]), @cli.Remove(["/a"]))
+  @debug.assert_eq(
+    @cli.parse(["remove", "/a", "--", "--b"]),
+    @cli.Remove(["/a", "--b"]),
+  )
+  // --score=abc 等号形态坏值（空格形态已有）
+  @debug.assert_eq(
+    @cli.parse(["add", "--score=abc", "/tmp"]),
+    @cli.Invalid("invalid value 'abc' for '--score <N>'"),
+  )
+  // --prune 重复（--rename 重复已有）
+  @debug.assert_eq(
+    @cli.parse(["edit", "--prune", "--prune"]),
+    @cli.Invalid("the argument '--prune' cannot be used multiple times"),
+  )
+}
