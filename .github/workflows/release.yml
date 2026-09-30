@@ -69,12 +69,15 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           name="jumbit-${version}-${{ matrix.target }}"
           mkdir -p dist
+          # 只留压缩包（裸文件曾随 dist 一起上传造成 asset 双份，已实证清理）
           if [ "${{ matrix.os }}" = windows-latest ]; then
-            cp _build/native/release/build/cmd/main/main.exe "dist/${name}.exe"
-            (cd dist && 7z a -tzip "${name}.zip" "${name}.exe")
+            cp _build/native/release/build/cmd/main/main.exe "${name}.exe"
+            7z a -tzip "dist/${name}.zip" "${name}.exe"
+            rm "${name}.exe"
           else
-            cp _build/native/release/build/cmd/main/main.exe "dist/${name}"
-            (cd dist && tar czf "${name}.tar.gz" "${name}")
+            cp _build/native/release/build/cmd/main/main.exe "${name}"
+            tar czf "dist/${name}.tar.gz" "${name}"
+            rm "${name}"
           fi
       - uses: actions/upload-artifact@v4
         with:
