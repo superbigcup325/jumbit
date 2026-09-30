@@ -32,12 +32,32 @@ jobs:
         with:
           path: ~/.moon
           key: moonbit-${{ matrix.os }}-${{ env.MOONBIT_VERSION }}
-      # 版本口径唯一权威与 ci.yml 同源；windows 官方 powershell 安装脚本
-      - name: Install MoonBit
+      # 安装姿势与 ci.yml（unix）/windows-probe.yml（powershell）逐字同款：
+      # unix.sh 的版本位置参数拼出的钉版 URL 实测 CDN 403，两份既有 workflow
+      # 均装 latest + verify 钉版（不符即红，逼出显式升级），release 同口径
+      - name: Install MoonBit (unix)
+        if: matrix.os != 'windows-latest'
+        run: curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+      - name: Install MoonBit (windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: irm https://cli.moonbitlang.com/install/powershell.ps1 | iex
+      - name: Add MoonBit to PATH
+        if: matrix.os != 'windows-latest'
+        run: echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+      - name: Add MoonBit to PATH (windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: Add-Content $env:GITHUB_PATH "$env:USERPROFILE\.moon\bin"
+      - name: Verify pinned toolchain version
         shell: bash
         run: |
-          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash -s -- "$MOONBIT_VERSION"
-          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+          moon version --all
+          moon version | grep -F "$MOONBIT_VERSION"
+      - name: Fetch dependencies
+        run: |
+          moon update
+          moon install
       - name: Build (release)
         run: moon build --release
       - name: Smoke (built binary end-to-end)
