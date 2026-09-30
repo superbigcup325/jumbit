@@ -241,3 +241,34 @@ async test "save 失败：数据目录不可写 → 清晰文案 exit 1（Repr �
   cleanup_test_dir(data)
   cleanup_test_dir(target)
 }
+
+///|
+async test "顶层面分发：--version/-V/无参数/顶层坏 flag/run 层接缝" {
+  let data = make_test_dir("toplevel")
+  // --version / -V：版本行走 stdout，退出 0，无 stderr
+  let errs1 : Array[String] = []
+  @debug.assert_eq(run(["--version"], env_with(data), errs1), 0)
+  @debug.assert_eq(errs1.length(), 0)
+  let errs2 : Array[String] = []
+  @debug.assert_eq(run(["-V"], env_with(data), errs2), 0)
+  @debug.assert_eq(errs2.length(), 0)
+  // 无参数：帮助全文走 stderr（errs 批量写通道），退出 2
+  let errs3 : Array[String] = []
+  @debug.assert_eq(run([], env_with(data), errs3), 2)
+  // usage 全文是单条消息（内含 \n），走 errs 批量写通道
+  @debug.assert_eq(errs3.length(), 1)
+  assert_true(errs3[0].has_prefix("jumbit \{@jumbit.VERSION}"))
+  assert_true(errs3[0].contains("Usage:"))
+  // 版本 flag 后随多余参数：用法错误（clap unexpected argument）
+  let errs4 : Array[String] = []
+  @debug.assert_eq(run(["--version", "x"], env_with(data), errs4), 2)
+  assert_true(errs4[0].contains("unexpected argument 'x'"))
+  // 顶层裸 token：unrecognized subcommand；flag 形态：unexpected argument
+  let errs5 : Array[String] = []
+  @debug.assert_eq(run(["frobnicate"], env_with(data), errs5), 2)
+  assert_true(errs5[0].contains("unrecognized subcommand 'frobnicate'"))
+  let errs6 : Array[String] = []
+  @debug.assert_eq(run(["--bogus"], env_with(data), errs6), 2)
+  assert_true(errs6[0].contains("unexpected argument '--bogus'"))
+  cleanup_test_dir(data)
+}
