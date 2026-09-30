@@ -34,13 +34,15 @@ zoxide 用 frecency（频次 × 时间衰减）把「cd 过的地方」变成「
 
 ## 安装
 
-**方式一：mooncakes（推荐，需 [MoonBit 工具链](https://www.moonbitlang.com/)）**
+**方式一：GitHub Release 预编译二进制（推荐，无工具链依赖）**：Linux x86_64 / macOS Apple Silicon / Windows x64，从 [Releases](https://github.com/superbigcup325/jumbit/releases) 下载对应平台压缩包，解压到 PATH 目录即可（可执行文件名即 `jumbit`）
+
+**方式二：mooncakes（需 [MoonBit 工具链](https://www.moonbitlang.com/)）**
 
 ```bash
-moon install superbigcup325/jumbit    # 全局安装二进制
+moon install superbigcup325/jumbit/cmd/main   # 全局安装二进制
 ```
 
-**方式二：GitHub Release 预编译二进制**（Linux x86_64 / macOS Apple Silicon / Windows x64，无工具链依赖）：从 [Releases](https://github.com/superbigcup325/jumbit/releases) 下载对应平台压缩包，解压到 PATH 目录即可
+注：mooncakes 以包路径安装，二进制落在 `~/.moon/bin/main`，需自行改名或别名为 `jumbit`（`mv ~/.moon/bin/main ~/.moon/bin/jumbit`）
 
 **方式三：从源码构建**（锚定 `moon 0.1.20260920`，CI 以此钉死可复现构建）：
 

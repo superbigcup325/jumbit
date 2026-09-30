@@ -34,13 +34,15 @@ On that foundation, jumbit extends directory memory beyond the shell: coding age
 
 ## Install
 
-**Option 1: mooncakes (recommended; requires the [MoonBit toolchain](https://www.moonbitlang.com/))**
+**Option 1: prebuilt binaries from GitHub Releases (recommended, no toolchain needed)**: Linux x86_64 / macOS Apple Silicon / Windows x64; grab the archive for your platform from [Releases](https://github.com/superbigcup325/jumbit/releases) and put it on your PATH (the executable is named `jumbit`)
+
+**Option 2: mooncakes (requires the [MoonBit toolchain](https://www.moonbitlang.com/))**
 
 ```bash
-moon install superbigcup325/jumbit    # install the binary globally
+moon install superbigcup325/jumbit/cmd/main   # install the binary globally
 ```
 
-**Option 2: prebuilt binaries from GitHub Releases** (Linux x86_64 / macOS Apple Silicon / Windows x64, no toolchain needed): grab the archive for your platform from [Releases](https://github.com/superbigcup325/jumbit/releases) and put it on your PATH
+Note: mooncakes installs by package path, so the binary lands at `~/.moon/bin/main`; rename or alias it to `jumbit` (`mv ~/.moon/bin/main ~/.moon/bin/jumbit`)
 
 **Option 3: build from source** (anchored at `moon 0.1.20260920`; CI pins this version for reproducible builds):
 
