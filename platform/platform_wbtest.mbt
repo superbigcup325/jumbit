@@ -545,3 +545,39 @@ test "os_error_message：ENOENT 短语 + (os error N) 后缀，非 OSError 兜�
     "File exists (os error \{eexist})",
   )
 }
+
+///|
+/// [#2] 回归：legacy 库载入后未修改，save 不得迁移落盘（读路径不置脏）。
+/// 红色验证：修复前 load(legacy) mark_dirty → save 写出 db.txt
+async test "store：legacy 未修改 save 不迁移" {
+  let dir = make_tmp_dir()
+  let db = @core.Database::new()
+  db.add_update("/legacy/a", 2.0, 100L)
+  write_atomic(dir + "/db.zo", @core.encode(db.all()))
+  let store = match load(dir) {
+    Ok(s) => s
+    Err(e) => fail("\{Repr(e)}")
+  }
+  match store.save() {
+    Ok(_) => ()
+    Err(e) => fail("\{Repr(e)}")
+  }
+  @debug.assert_eq(@afs.exists(dir + "/db.txt"), false)
+  @debug.assert_eq(@afs.exists(dir + "/db.zo"), true)
+  // 真实写（add_update 置脏）→ save 迁移为明文，内容保持
+  store.database().add_update("/legacy/b", 1.0, 200L)
+  match store.save() {
+    Ok(_) => ()
+    Err(e) => fail("\{Repr(e)}")
+  }
+  @debug.assert_eq(@afs.exists(dir + "/db.txt"), true)
+  let reloaded = match load(dir) {
+    Ok(s) => s
+    Err(e) => fail("\{Repr(e)}")
+  }
+  @debug.assert_eq(reloaded.database().all().length(), 2)
+  @afs.chmod(dir, 0o755)
+  @afs.rmdir(dir, recursive=true) catch {
+    err => ignore(err)
+  }
+}

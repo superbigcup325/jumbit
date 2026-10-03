@@ -5,6 +5,8 @@
 ## [Unreleased]
 
 ### Changed
+- query 不再无条件落盘（[#2]）：`sort_by_score` 去掉无条件置脏（纯展示序不是数据变更），`load` 的 legacy 分支去掉读路径 `mark_dirty`；query 仅在过滤链真实懒删（glob 命中 / TTL 到期）后 save。行为变化：纯读 query 不再重写 db.txt（上游 query 每次重写库文件，此处有意偏离、对齐自家「只读命令不触发迁移」承诺，USAGE 差异清单同步注记）；legacy 库纯读不迁移，首个真实数据变更（写命令 / 懒删）才转明文且内容保持；只读数据目录 query 退出 0（原先因「无变更也 save」撞 EACCES 报 could not save 退出 1）
+
 - 错误文案收口（对齐 0.1.3「统一 `jumbit: ` 前缀 / 全量英文化」既定口径，黑盒对拍真 zoxide 0.10.0 发现的遗漏，[#1]；breaking：解析 stderr 的脚本与 agent 需同步）：
   - 补 `jumbit: ` 前缀（上游均带 `zoxide: `，逐条对拍核实）：`not a directory` / `path not found in database`（remove/describe/edit 三处）/ `current database is not empty, specify --merge to continue anyway` / `you are already in the only match` / `could not find fzf, is it installed?` / `could not read selection from fzf`
   - 同口径补前缀的 jumbit 扩展与单行改写文案：`could not read <path>` / ``failed to run `atuin` ``（import）、`path already in database` / `no editor: set $EDITOR or $VISUAL` / `editor exited with code N`（edit）
