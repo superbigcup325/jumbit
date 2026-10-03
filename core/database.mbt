@@ -18,6 +18,32 @@ pub fn Database::from_dirs(dirs : Array[Dir]) -> Database {
 }
 
 ///|
+/// rank 下限（上游 MIN_RANK=0.01：两位小数格式下不塌 0）
+pub const RANK_MIN : Double = 0.01
+
+///|
+/// rank 上限（上游 MAX_RANK=9_999_999.99）
+pub const RANK_MAX : Double = 9999999.99
+
+///|
+/// 非 finite 与越界 rank 的入库归一（[#3]）：nan / -inf → 下限，+inf → 上限，
+/// 有限值 clamp [RANK_MIN, RANK_MAX]。在入库口（add_update / add_unchecked）
+/// 执行而非编码层：老化以 total 参与分母，inf 混进 total 会把 factor 归零、
+/// rank 相乘成 NaN（黑盒实测归 0.01，与「inf 钳到上限」的文档口径相反）；
+/// 钳位前移后两条入库路（add/import）与手改库的物化保存路行为一致
+fn sanitize_rank(r : Double) -> Double {
+  if r != r {
+    RANK_MIN
+  } else if r > RANK_MAX {
+    RANK_MAX
+  } else if r < RANK_MIN {
+    RANK_MIN
+  } else {
+    r
+  }
+}
+
+///|
 /// 改路径（edit --rename 专用）：note/权重/时间全保留；new 撞既有条目返回
 /// false（不合并，调用方报错——语义裁定见规格 §1.4）
 pub fn Database::rename(self : Database, old : String, new : String) -> Bool {
@@ -61,16 +87,12 @@ pub fn Database::add(
   match self.find_idx(path) {
     Some(i) => {
       let d = self.dirs[i]
-      d.rank = if d.rank + by > 0.0 { d.rank + by } else { 0.0 }
+      d.rank = sanitize_rank(if d.rank + by > 0.0 { d.rank + by } else { 0.0 })
     }
     None =>
       self.dirs.push({
         path,
-        rank: if by > 0.0 {
-          by
-        } else {
-          0.0
-        },
+        rank: sanitize_rank(if by > 0.0 { by } else { 0.0 }),
         last_accessed: now,
         note: None,
       })
@@ -89,17 +111,13 @@ pub fn Database::add_update(
   match self.find_idx(path) {
     Some(i) => {
       let d = self.dirs[i]
-      d.rank = if d.rank + by > 0.0 { d.rank + by } else { 0.0 }
+      d.rank = sanitize_rank(if d.rank + by > 0.0 { d.rank + by } else { 0.0 })
       d.last_accessed = now
     }
     None =>
       self.dirs.push({
         path,
-        rank: if by > 0.0 {
-          by
-        } else {
-          0.0
-        },
+        rank: sanitize_rank(if by > 0.0 { by } else { 0.0 }),
         last_accessed: now,
         note: None,
       })
@@ -193,7 +211,12 @@ pub fn Database::add_unchecked(
   rank : Double,
   now : Int64,
 ) -> Unit {
-  self.dirs.push({ path, rank, last_accessed: now, note: None, })
+  self.dirs.push({
+    path,
+    rank: sanitize_rank(rank),
+    last_accessed: now,
+    note: None,
+  })
   self.dirty = true
 }
 
