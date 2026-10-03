@@ -77,7 +77,7 @@ pub fn zlua_fish_path(get : (String) -> String?) -> Result[String, String] {
 fn home_path(get : (String) -> String?, sub : String) -> Result[String, String] {
   match get("HOME") {
     Some(h) => Ok(h + "/" + sub)
-    None => Err("could not find home directory")
+    None => Err("jumbit: could not find home directory")
   }
 }
 

@@ -55,12 +55,12 @@ async fn run_edit_rename(
   // old==new 视为撞自身，同样拒绝——重命名到自身无意义且语义含糊）
   let new_norm = @core.resolve_path(new, cwd)
   if db.find_idx(new_norm) is Some(_) {
-    err_line(errs, "path already in database: \{new}")
+    err_line(errs, "jumbit: path already in database: \{new}")
     return 1
   }
   let renamed = try_twice(db, old, cwd, fn(db, p) { db.rename(p, new) })
   if !renamed {
-    err_line(errs, "path not found in database: \{old}")
+    err_line(errs, "jumbit: path not found in database: \{old}")
     return 1
   }
   match store.save() {
@@ -139,12 +139,12 @@ async fn run_edit_interactive(
   // 起编辑器（继承终端；退出码非 0 = 用户取消/编辑器故障，不落库）
   match @platform.run_editor(tmp, getenv) {
     Err(NotFound) => {
-      err_line(errs, "no editor: set $EDITOR or $VISUAL")
+      err_line(errs, "jumbit: no editor: set $EDITOR or $VISUAL")
       let _ = @afs.remove(tmp)
       return 1
     }
     Err(Failed(code)) => {
-      err_line(errs, "editor exited with code \{code}")
+      err_line(errs, "jumbit: editor exited with code \{code}")
       let _ = @afs.remove(tmp)
       return 1
     }

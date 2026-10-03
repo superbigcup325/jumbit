@@ -7,12 +7,13 @@ pub fn data_dir(get : (String) -> String?) -> Result[String, String] {
       if is_absolute(dir) {
         Ok(dir)
       } else {
-        Err("_JB_DATA_DIR 必须是绝对路径: \{dir}")
+        Err("jumbit: _JB_DATA_DIR must be an absolute path: \{dir}")
       }
     None =>
       match get("HOME") {
         Some(home) => Ok(home + "/.local/share/jumbit")
-        None => Err("无法确定数据目录：请设置 _JB_DATA_DIR")
+        None =>
+          Err("jumbit: cannot determine the data directory: set _JB_DATA_DIR")
       }
   }
 }
@@ -61,7 +62,8 @@ pub fn exclude_dirs(
         let pattern = part.to_owned()
         if pattern != "" {
           match @core.validate_glob(pattern) {
-            Some(_) => return Err("非法 glob in _JB_EXCLUDE_DIRS: \{pattern}")
+            Some(_) =>
+              return Err("jumbit: invalid glob in _JB_EXCLUDE_DIRS: \{pattern}")
             None => out.push(pattern)
           }
         }
@@ -107,7 +109,10 @@ pub fn maxage(get : (String) -> String?) -> Result[Double, String] {
     Some(value) => {
       let body = if value.has_prefix("+") { value[1:] } else { value }
       let n = @string.parse_uint(body) catch {
-        _ => return Err("_JB_MAXAGE 必须是非负整数: \{value}")
+        _ =>
+          return Err(
+            "jumbit: _JB_MAXAGE must be a non-negative integer: \{value}",
+          )
       }
       Ok(n.to_double())
     }

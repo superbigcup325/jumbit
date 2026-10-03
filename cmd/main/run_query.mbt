@@ -73,7 +73,7 @@ async fn query_exec(
   } else if remaining.is_empty() {
     if hits.length() > 0 {
       // 有命中但全被 --exclude 排除（上游 query.rs 同文案）
-      err_line(errs, "you are already in the only match")
+      err_line(errs, "jumbit: you are already in the only match")
     } else {
       // 对齐上游 query miss/空库同文案（probe 实测均为 no match found）
       err_line(errs, "jumbit: no match found")

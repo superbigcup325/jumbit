@@ -33,4 +33,5 @@ Environment variables:
   _JB_FZF_OPTS                            extra arguments passed through to fzf
   _JB_RESOLVE_SYMLINKS=1                  resolve symlinks when recording (queries do not follow them)
   _JB_MAXAGE=N                            aging threshold for the database total score (default 10000)
+  _JB_DOCTOR=0                            disable the shell configuration diagnostic hint (bash/zsh/posix only)
 import reads each plugin's standard data file, located via _Z_DATA/_FASD_DATA/ZSHZ_DATA/_ZL_DATA/XDG_DATA_HOME

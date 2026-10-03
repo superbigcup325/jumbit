@@ -43,17 +43,27 @@
 | 文案 | 含义与处置 |
 |---|---|
 | `jumbit: no match found` | 没查到，不是故障；确认关键词能锚定末组件（如 `projects` 匹配的是末组件含 projects 的目录），或先 `query --list --score` 看库里有什么 |
-| `not a directory: <path>` | `add` 的目标不存在或不是目录 |
-| `path not found in database: <path>` | `remove`/`describe` 的路径不在库里（可能已被 `_JB_EXCLUDE_DIRS` 查询懒删、或超 3 个月未访问的 TTL 懒删清出；`--exclude` 只过滤输出、不删库） |
+| `jumbit: not a directory: <path>` | `add` 的目标不存在或不是目录 |
+| `jumbit: path not found in database: <path>` | `remove`/`describe` 的路径不在库里（可能已被 `_JB_EXCLUDE_DIRS` 查询懒删、或超 3 个月未访问的 TTL 懒删清出；`--exclude` 只过滤输出、不删库） |
+| `jumbit: you are already in the only match` | 唯一命中被 `--exclude` 排除（对齐上游同文案） |
 | `jumbit: no note found for <path>` | 该条目没有人工标注（查看模式正常返回） |
-| `could not find fzf, is it installed?` | fzf 未安装或不可执行；装 fzf 或改用非交互查询 |
+| `error: note cannot contain newline or tab` + 退出码 2 | `describe --note` 的标注含换行或 tab（解析层拒绝） |
+| `jumbit: could not find fzf, is it installed?` | fzf 未安装或不可执行；装 fzf 或改用非交互查询 |
 | `fzf returned an error` / `fzf was terminated` / `fzf returned an unknown error` | fzf 自身异常退出；其 stderr 原文会一并打印，按 fzf 侧排查（常见：无可用终端） |
-| `could not read <path>: <errno 短语> (os error N)` | import 读不到插件数据文件（如 `No such file or directory`）；核对 `$_Z_DATA` 等探测路径 |
+| `jumbit: could not read <path>: <errno 短语> (os error N)` | import 读不到插件数据文件（如 `No such file or directory`）；核对 `$_Z_DATA` 等探测路径 |
+| `jumbit: failed to run `atuin`; is it installed and on PATH?` | `import atuin` 找不到 atuin 可执行文件；安装 atuin 或改导入其他插件 |
 | `jumbit: could not resolve path <path>: <errno 短语> (os error N)` | `_JB_RESOLVE_SYMLINKS=1` 时目标无法 realpath（如符号链接自环）；修链接或去掉该环境变量 |
 | `jumbit: could not save database: io failure: <errno 短语> (os error N)` | 库文件写不进去（磁盘满/目录只读/权限）；解除后重试 |
-| `current database is not empty, specify --merge to continue anyway` | 导入目标库非空，确认后加 `--merge` |
+| `jumbit: current database is not empty, specify --merge to continue anyway` | 导入目标库非空，确认后加 `--merge` |
 | `<file>:<行号>: invalid entry: <行>` | import 坏行逐条上报（不中止导入）；该行不符合插件标准格式 |
 | `jumbit: corrupted data file: <原因>` / `jumbit: could not open database: <原因>` | 库文件无法解析，见下节处置 |
+| `jumbit: _JB_DATA_DIR must be an absolute path: <path>` | `_JB_DATA_DIR` 给了相对路径；改用绝对路径 |
+| `jumbit: cannot determine the data directory: set _JB_DATA_DIR` | HOME 未设置且未给 `_JB_DATA_DIR`；设置其一 |
+| `jumbit: invalid glob in _JB_EXCLUDE_DIRS: <pattern>` | `_JB_EXCLUDE_DIRS` 含非法 glob（未闭合 `[`、倒序区间等）；修正 pattern |
+| `jumbit: _JB_MAXAGE must be a non-negative integer: <value>` | `_JB_MAXAGE` 不是非负整数；修正取值（写命令运行时校验，query 不消费该变量） |
+| `jumbit: no editor: set $EDITOR or $VISUAL` | `jumbit edit` 找不到编辑器；设置 `VISUAL` 或 `EDITOR` |
+| `jumbit: editor exited with code N` | 编辑器退出非零（未改库）；修编辑器侧后重试 |
+| `jumbit: path already in database: <path>` | `edit --rename` 的目标路径已在库中（拒绝，不合并） |
 
 ## 数据损坏处置
 

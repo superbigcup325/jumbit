@@ -16,7 +16,8 @@ pub async fn for_each_import_line(
   f : (Int, Result[String, String]) -> Unit,
 ) -> Result[Unit, String] {
   let data = @afs.read_file(path) catch {
-    err => return Err("could not read \{path}: \{os_error_message(err)}")
+    err =>
+      return Err("jumbit: could not read \{path}: \{os_error_message(err)}")
   }
   for_each_record(data.binary(), b'\n', true, f)
   Ok(())
@@ -58,7 +59,8 @@ async fn records_from_process(
   args : Array[String],
 ) -> Result[(Array[ImportRecord], String), String] {
   let (_code, stdout, stderr) = @process.collect_output(cmd, args) catch {
-    _ => return Err("failed to run `\{cmd}`; is it installed and on PATH?")
+    _ =>
+      return Err("jumbit: failed to run `\{cmd}`; is it installed and on PATH?")
   }
   let err_text : String = stderr.text() catch { _ => "" }
   let out : Array[ImportRecord] = []

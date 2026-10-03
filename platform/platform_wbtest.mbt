@@ -200,7 +200,7 @@ async test "read_import_lines：坏 UTF-8 逐类文案对齐 std 定位语义" {
 ///|
 async test "read_import_lines：文件缺失报 could not read" {
   match read_import_lines("/nonexistent-import-file-xyz") {
-    Err(msg) => assert_true(msg.has_prefix("could not read "))
+    Err(msg) => assert_true(msg.has_prefix("jumbit: could not read "))
     Ok(_) => fail("expected error")
   }
 }
@@ -229,7 +229,7 @@ async test "records_from_process：命令不存在报可读错误" {
   match records_from_process("definitely-not-a-real-cmd-xyz", []) {
     Err(msg) =>
       @debug.assert_eq(
-        msg, "failed to run `definitely-not-a-real-cmd-xyz`; is it installed and on PATH?",
+        msg, "jumbit: failed to run `definitely-not-a-real-cmd-xyz`; is it installed and on PATH?",
       )
     Ok(_) => fail("expected error")
   }
@@ -428,7 +428,7 @@ async test "for_each_import_line：文件缺失报 could not read（与 read_imp
     ()
   })
   match via_cb {
-    Err(msg) => assert_true(msg.has_prefix("could not read "))
+    Err(msg) => assert_true(msg.has_prefix("jumbit: could not read "))
     Ok(_) => fail("expected error")
   }
   let via_array = read_import_lines("/nonexistent-import-file-xyz")

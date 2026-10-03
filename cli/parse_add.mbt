@@ -45,6 +45,24 @@ fn parse_add(args : Array[String]) -> Command {
   }
   match bad {
     Some(msg) => Invalid(msg)
-    None => Add(opts)
+    // 缺必选位置参数属用法错误：parse 层统一走 Invalid（run.mbt 集中加
+    // `error: ` 前缀，对齐 TROUBLESHOOTING 文案表），不在运行时层自行输出
+    None =>
+      if opts.paths.is_empty() {
+        Invalid("add: missing required argument '<PATHS>'")
+      } else {
+        Add(opts)
+      }
+  }
+}
+
+///|
+/// remove 参数解析：裸 `--` 剥离后全部为路径；空集为用法错误（同 add）
+fn parse_remove(args : Array[String]) -> Command {
+  let paths = strip_double_dash(args)
+  if paths.is_empty() {
+    Invalid("remove: missing required argument '<PATHS>'")
+  } else {
+    Remove(paths)
   }
 }

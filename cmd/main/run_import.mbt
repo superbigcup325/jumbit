@@ -30,7 +30,7 @@ async fn run_import(
   }
   if !iopts.merge && !store.database().is_empty() {
     err_line(
-      errs, "current database is not empty, specify --merge to continue anyway",
+      errs, "jumbit: current database is not empty, specify --merge to continue anyway",
     )
     return 1
   }

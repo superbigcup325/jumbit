@@ -45,6 +45,26 @@ test "parse：add/query 收集参数" {
 }
 
 ///|
+test "parse：add/remove 缺必选位置参数走 Invalid（error: 前缀由 run 层统一加）" {
+  @debug.assert_eq(
+    @cli.parse(["add"]),
+    @cli.Invalid("add: missing required argument '<PATHS>'"),
+  )
+  @debug.assert_eq(
+    @cli.parse(["add", "--"]),
+    @cli.Invalid("add: missing required argument '<PATHS>'"),
+  )
+  @debug.assert_eq(
+    @cli.parse(["remove"]),
+    @cli.Invalid("remove: missing required argument '<PATHS>'"),
+  )
+  @debug.assert_eq(
+    @cli.parse(["remove", "--"]),
+    @cli.Invalid("remove: missing required argument '<PATHS>'"),
+  )
+}
+
+///|
 test "parse：help 三种写法" {
   @debug.assert_eq(@cli.parse(["help"]), @cli.Help)
   @debug.assert_eq(@cli.parse(["--help"]), @cli.Help)
@@ -88,7 +108,7 @@ test "parse：remove 收集路径" {
     @cli.parse(["remove", "/a", "/b"]),
     @cli.Remove(["/a", "/b"]),
   )
-  @debug.assert_eq(@cli.parse(["remove"]), @cli.Remove([]))
+  // 空集为用法错误（缺参消息走 Invalid，见「parse：add/remove 缺必选位置参数」）
 }
 
 ///|
