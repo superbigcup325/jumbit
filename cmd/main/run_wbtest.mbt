@@ -401,3 +401,25 @@ async test "只读数据目录加 query 退出 0" {
   cleanup_test_dir(data)
   cleanup_test_dir(hit)
 }
+
+///|
+/// [#3] 回归：add --score inf 落库为上限 9999999.99（文档口径），
+/// 不再经老化毒化落到下限 0.01。红色验证：修复前 rank == 0.01
+async test "add score inf 钳到上限" {
+  let data = make_test_dir("inf-score")
+  let target = make_test_dir("inf-target")
+  let errs : Array[String] = []
+  @debug.assert_eq(
+    run(["add", "--score", "inf", target], env_with(data), errs),
+    0,
+  )
+  let store = match @platform.load(data) {
+    Ok(s) => s
+    Err(e) => fail("\{Repr(e)}")
+  }
+  // 入库钳到上限 9999999.99，写库前老化（total=MAX > 10000）健康缩放：
+  // factor = 0.9×10000/MAX，rank = MAX×factor = 9000 整（明文两位小数无损）
+  @debug.assert_eq(store.database().all()[0].rank, 9000.0)
+  cleanup_test_dir(data)
+  cleanup_test_dir(target)
+}

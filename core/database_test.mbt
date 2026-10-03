@@ -12,14 +12,14 @@ test "add：新建与累加，不更新 last_accessed" {
 }
 
 ///|
-test "add：负增量 clamp 到 0（新建与已有两路）" {
+test "add：负增量 clamp 到下限 0.01（[#3] 入库归一，新建与已有两路）" {
   let db = @core.Database::new()
   db.add("/a", -5.0, 0L)
-  @debug.assert_eq(db.all()[0].rank, 0.0)
+  @debug.assert_eq(db.all()[0].rank, 0.01)
   db.add("/b", 1.0, 0L)
   db.add("/b", -5.0, 0L)
   @debug.assert_eq(db.all().length(), 2)
-  @debug.assert_eq(db.all()[1].rank, 0.0)
+  @debug.assert_eq(db.all()[1].rank, 0.01)
 }
 
 ///|
@@ -121,7 +121,8 @@ test "age：超阈值全体缩放，rank<1 删除" {
 ///|
 test "age：total=0 不触发（防除零）" {
   let db = @core.Database::new()
-  db.add("/a", 0.0, 0L)
+  // 入库归一后 rank 恒 ≥ 0.01（[#3]），total=0 只能经 Dir 字面量构造
+  db.dirs.push({ path: "/a", rank: 0.0, last_accessed: 0L, note: None, })
   db.age(0.0)
   @debug.assert_eq(db.all().length(), 1)
 }
@@ -142,7 +143,8 @@ test "age：缩放后 rank 恰好 1.0 保留（严格 <，factor 精确为 0.5 �
   let db = @core.Database::new()
   db.add_unchecked("/exact", 2.0, 0L)
   db.add_unchecked("/pad", m + m - 2.0, 0L)
-  db.add_unchecked("/zero", 0.0, 0L)
+  // rank 0 经入库归一会变 0.01（[#3]），精确 0 用 Dir 字面量构造
+  db.dirs.push({ path: "/zero", rank: 0.0, last_accessed: 0L, note: None, })
   db.age(10000.0)
   // 2.0 × 0.5 = 1.0，不满足 < 1.0 → 保留
   @debug.assert_eq(db.find_idx("/exact") is Some(_), true)
@@ -338,4 +340,45 @@ test "dedup：la 合并对齐上游 u64 域语义（负 epoch 胜出）" {
   ])
   b.dedup()
   @debug.assert_eq(b.all()[0].last_accessed, -1L)
+}
+
+///|
+/// [#3] 回归：入库口归一非 finite——inf 钳上限、nan/-inf 归下限；
+/// 红色验证：修复前 inf 经 age() 毒化成 NaN 最终落 0.01
+test "入库归一：inf 钳上限、nan 与 -inf 归下限（add/add_update/add_unchecked 三口）" {
+  let inf = @string.parse_double("inf") catch { _ => 0.0 }
+  let nan = @string.parse_double("nan") catch { _ => 0.0 }
+  let db = @core.Database::new()
+  db.add_update("/a", inf, 0L)
+  @debug.assert_eq(db.all()[0].rank, 9999999.99)
+  db.add_update("/b", nan, 0L)
+  @debug.assert_eq(db.all()[1].rank, 0.01)
+  db.add_unchecked("/c", inf, 0L)
+  @debug.assert_eq(db.all()[2].rank, 9999999.99)
+  db.add_unchecked("/d", 0.0 - inf, 0L)
+  @debug.assert_eq(db.all()[3].rank, 0.01)
+  // 累加路同样归一：有限值 + inf → 上限（而非 NaN）
+  db.add_update("/a", 1.0, 0L)
+  @debug.assert_eq(db.all()[0].rank, 9999999.99)
+}
+
+///|
+/// [#3] 回归：inf 入库后老化不再毒化——total 有限，其余条目不被清出。
+/// 修复前：total=inf → factor=0 → rank 相乘成 NaN → 其余条目消失
+test "入库归一后老化健康：inf 条目不毒化 total" {
+  let inf = @string.parse_double("inf") catch { _ => 0.0 }
+  let db = @core.Database::new()
+  db.add_update("/hot", inf, 0L)
+  // 权重足够大，老化缩放后仍 ≥ 1 存活（修复前 factor=0：normal 归零删除、
+  // hot 变 NaN 幸存——「毒化」形态）
+  db.add_update("/normal", 20000.0, 0L)
+  db.age(10000.0)
+  @debug.assert_eq(db.find_idx("/normal") is Some(_), true)
+  @debug.assert_eq(db.find_idx("/hot") is Some(_), true)
+  let hot = match db.find_idx("/hot") {
+    Some(i) => db.all()[i].rank
+    None => fail("unreachable")
+  }
+  // finite 判定：NaN 自比较为 true（MoonBit Double 无 is_finite 谓词）
+  @debug.assert_eq(hot != hot, false)
 }

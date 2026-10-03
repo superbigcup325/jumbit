@@ -11,14 +11,6 @@
 const PLAINTEXT_COL_WIDTH : Int = 10
 
 ///|
-/// 明文可容纳的最小 rank（上游 MIN_RANK=0.01：两位小数格式下不塌 0）
-const PLAINTEXT_MIN_RANK : Double = 0.01
-
-///|
-/// 明文可容纳的最大 rank（上游 MAX_RANK=9_999_999.99）
-const PLAINTEXT_MAX_RANK : Double = 9999999.99
-
-///|
 /// 行级错误聚合上限：最多列出 8 行，超出折叠为 "... and N more"
 /// （对齐上游 deserialize 的 MAX_ERRORS=8）
 const PLAINTEXT_MAX_ERRORS : Int = 8
@@ -121,7 +113,7 @@ fn plaintext_pad_str(s : String) -> String {
 /// 明文序列化：每行 `timestamp\trank\tpath\n`（上游 serialize 同款结构；
 /// 预分配省略——StringBuilder 单趟拼接已是线性）。
 ///
-/// rank NaN 归 PLAINTEXT_MIN_RANK：上游经 deserialize_line 已拒 NaN 不会有
+/// rank NaN 归 RANK_MIN：上游经 deserialize_line 已拒 NaN 不会有
 /// 此态；jumbit legacy bincode 解码不拒，明文迁移时兜底为最低权重（救库语义，
 /// 规格文档 §1.3）——即 CHANGELOG 已知问题（非 finite 毒库）的销账路径
 pub fn encode_plaintext(dirs : Array[Dir]) -> Bytes {
@@ -134,9 +126,9 @@ pub fn encode_plaintext(dirs : Array[Dir]) -> Bytes {
       continue
     }
     let rank = if dir.rank.is_nan() {
-      PLAINTEXT_MIN_RANK
+      RANK_MIN
     } else {
-      dir.rank.clamp(min=PLAINTEXT_MIN_RANK, max=PLAINTEXT_MAX_RANK)
+      dir.rank.clamp(min=RANK_MIN, max=RANK_MAX)
     }
     sb.write_string(plaintext_pad10(dir.last_accessed))
     sb.write_char('\t')
@@ -284,7 +276,7 @@ fn decode_plaintext_line(
   if rank.is_nan() {
     return Err("could not parse rank: \{rank_str}")
   }
-  let rank = rank.clamp(min=PLAINTEXT_MIN_RANK, max=PLAINTEXT_MAX_RANK)
+  let rank = rank.clamp(min=RANK_MIN, max=RANK_MAX)
   Ok(Some({ path, rank, last_accessed, note: None, }))
 }
 

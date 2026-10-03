@@ -16,6 +16,8 @@
 ### Documentation
 - USAGE「与 zoxide 的差异」补五处黑盒对拍（真 zoxide 0.10.0）发现的未记载分歧（[#4]）：重复 `--exclude` 后者覆盖（上游报错 exit 2）、interactive 关键词 miss 不启动 fzf（上游先拉起）、fzf argv 缺上游的 `--bind` 组、`help <未知子命令>` 输出通用帮助 exit 0、纯读 query 不重写库文件（上游每次保存重写）；fzf spawn 失败文案同步 `jumbit: ` 前缀
 
+- 非 finite rank 归一上移到入库口（[#3]）：`add`/`import` 入库（add/add_update/add_unchecked 三口）统一 `nan/-inf → 0.01、+inf/溢出 → 9999999.99、有限值 clamp [0.01, 9999999.99]`，rank 常量提升为 core pub（RANK_MIN/RANK_MAX，与编码层共用单一事实源）。行为修正：此前 inf 先被老化毒化成 NaN（total=inf → factor=0）再在编码层落到 0.01，与文档「inf 钳到上限」口径相反、且与手改库物化保存路径不一致；现在各路径一致按文档口径钳位，老化 total 恢复健康（因子正常衰减，其余条目不再被误清）
+
 ## [0.1.3] - 2026-09-30
 
 ### Added
