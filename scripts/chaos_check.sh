@@ -237,7 +237,11 @@ has_panic_mark() { # stderr-file
 
 # run_scenario <名> <插件> <env串> <数据文件> <nl|nul>
 run_scenario() {
-  local name="$1" plugin="$2" envs="$3" file="$4" sep="$5"
+  # $6 可选 "no-score-parity"：跳过 query 内容容差、保留退出码/降序/自检面。
+  # 用于含 non-finite rank 行的场景（[#3] 入库归一后，nan 不再毒化 total、
+  # inf 钳上限，两侧老化行为必然分歧——上游 0.10.0 靠 NaN 毒库跳过老化，
+  # jumbit 已按 USAGE 差异清单文档化 diverge；import 三流对拍与自检面保留）
+  local name="$1" plugin="$2" envs="$3" file="$4" sep="$5" score_parity="${6:-score-parity}"
   local jd="$tmp/jb-$name" zd="$tmp/zo-$name"
   mkdir -p "$jd" "$zd"
   local bin_env="env _JB_DATA_DIR=$jd $envs"
@@ -292,8 +296,10 @@ run_scenario() {
     sort -o "$tmp/jb-$name.$q.s" "$tmp/jb-$name.$q"
     sort -o "$tmp/zo-$name.$q.s" "$tmp/zo-$name.$q"
     # 窗口期判定:路径集合(空 path 豁免) + score 容差(NaN 单侧豁免)
-    if ! python3 scripts/score_tolerance_check.py "$tmp/jb-$name.$q" "$tmp/zo-$name.$q" 0.1001 --allow-missing-empty --allow-zo-nan >"$tmp/$name.$q.tol" 2>&1; then
-      ok=0 why="$why $q.内容分歧($(tail -1 "$tmp/$name.$q.tol"))"
+    if [ "$score_parity" != "no-score-parity" ]; then
+      if ! python3 scripts/score_tolerance_check.py "$tmp/jb-$name.$q" "$tmp/zo-$name.$q" 0.1001 --allow-missing-empty --allow-zo-nan >"$tmp/$name.$q.tol" 2>&1; then
+        ok=0 why="$why $q.内容分歧($(tail -1 "$tmp/$name.$q.tol"))"
+      fi
     fi
     # jumbit 侧 score 非递增（NaN 行豁免）
     if ! awk 'NR>1 && $1 !~ /NaN/ && p1 !~ /NaN/ && $1+0 > p1+0 { exit 1 } { p1=$1 }' "$tmp/jb-$name.$q"; then
@@ -318,7 +324,7 @@ run_scenario() {
 
 echo "== D7 混沌语料（seed=$seed）=="
 run_scenario z-utf8    z   "_Z_DATA=$tmp/z-utf8.dat"    "$tmp/z-utf8.dat"    nl
-run_scenario z-field   z   "_Z_DATA=$tmp/z-field.dat"   "$tmp/z-field.dat"   nl
+run_scenario z-field   z   "_Z_DATA=$tmp/z-field.dat"   "$tmp/z-field.dat"   nl no-score-parity
 run_scenario z-shape   z   "_Z_DATA=$tmp/z-shape.dat"   "$tmp/z-shape.dat"   nl
 run_scenario z-newlines z  "_Z_DATA=$tmp/z-newlines.dat" "$tmp/z-newlines.dat" nl
 run_scenario z-empty   z   "_Z_DATA=$tmp/z-empty.dat"   "$tmp/z-empty.dat"   nl
