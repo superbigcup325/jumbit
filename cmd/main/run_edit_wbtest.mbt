@@ -169,8 +169,7 @@ async test "edit 编辑器解析链与执行面：EDITOR 回落/含空格 sh -c/
   // 额外参数排在库文件之前，"$1" 会命中 editor 自己的旗标位、把内容写到
   // 进程 cwd 的同名文件（历史遗留的仓库根 --quiet 残留即此产生，[#5]）
   let ed_add = make_fake_editor(
-    bindir, "ed-chain",
-    "for last; do :; done\nprintf '0000000001\\t0000002.00\\t/chain-added\\n' >> \"$last\"",
+    bindir, "ed-chain", "for last; do :; done\nprintf '0000000001\\t0000002.00\\t/chain-added\\n' >> \"$last\"",
   )
   // 回落链：VISUAL 缺失 → EDITOR 生效（resolve_editor 的 match 臂）
   let env_r = env_map([
