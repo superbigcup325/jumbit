@@ -4,6 +4,9 @@
 
 ## [Unreleased]
 
+### Documentation
+- USAGE「与 zoxide 的差异」补五处黑盒对拍（真 zoxide 0.10.0）发现的未记载分歧（[#4]）：重复 `--exclude` 后者覆盖（上游报错 exit 2）、interactive 关键词 miss 不启动 fzf（上游先拉起）、fzf argv 缺上游的 `--bind` 组、`help <未知子命令>` 输出通用帮助 exit 0、纯读 query 不重写库文件（上游每次保存重写）；fzf spawn 失败文案同步 `jumbit: ` 前缀
+
 ## [0.1.3] - 2026-09-30
 
 ### Added
