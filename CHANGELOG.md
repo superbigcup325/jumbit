@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Changed
+- 非 finite rank 归一上移到入库口（[#3]）：`add`/`import` 入库（add/add_update/add_unchecked 三口）统一 `nan/-inf → 0.01、+inf/溢出 → 9999999.99、有限值 clamp [0.01, 9999999.99]`，rank 常量提升为 core pub（RANK_MIN/RANK_MAX，与编码层共用单一事实源）。行为修正：此前 inf 先被老化毒化成 NaN（total=inf → factor=0）再在编码层落到 0.01，与文档「inf 钳到上限」口径相反、且与手改库物化保存路径不一致；现在各路径一致按文档口径钳位，老化 total 恢复健康（因子正常衰减，其余条目不再被误清）
 - query 不再无条件落盘（[#2]）：`sort_by_score` 去掉无条件置脏（纯展示序不是数据变更），`load` 的 legacy 分支去掉读路径 `mark_dirty`；query 仅在过滤链真实懒删（glob 命中 / TTL 到期）后 save。行为变化：纯读 query 不再重写 db.txt（上游 query 每次重写库文件，此处有意偏离、对齐自家「只读命令不触发迁移」承诺，USAGE 差异清单同步注记）；legacy 库纯读不迁移，首个真实数据变更（写命令 / 懒删）才转明文且内容保持；只读数据目录 query 退出 0（原先因「无变更也 save」撞 EACCES 报 could not save 退出 1）
 
 - 错误文案收口（对齐 0.1.3「统一 `jumbit: ` 前缀 / 全量英文化」既定口径，黑盒对拍真 zoxide 0.10.0 发现的遗漏，[#1]；breaking：解析 stderr 的脚本与 agent 需同步）：
@@ -15,8 +16,6 @@
 
 ### Documentation
 - USAGE「与 zoxide 的差异」补五处黑盒对拍（真 zoxide 0.10.0）发现的未记载分歧（[#4]）：重复 `--exclude` 后者覆盖（上游报错 exit 2）、interactive 关键词 miss 不启动 fzf（上游先拉起）、fzf argv 缺上游的 `--bind` 组、`help <未知子命令>` 输出通用帮助 exit 0、纯读 query 不重写库文件（上游每次保存重写）；fzf spawn 失败文案同步 `jumbit: ` 前缀
-
-- 非 finite rank 归一上移到入库口（[#3]）：`add`/`import` 入库（add/add_update/add_unchecked 三口）统一 `nan/-inf → 0.01、+inf/溢出 → 9999999.99、有限值 clamp [0.01, 9999999.99]`，rank 常量提升为 core pub（RANK_MIN/RANK_MAX，与编码层共用单一事实源）。行为修正：此前 inf 先被老化毒化成 NaN（total=inf → factor=0）再在编码层落到 0.01，与文档「inf 钳到上限」口径相反、且与手改库物化保存路径不一致；现在各路径一致按文档口径钳位，老化 total 恢复健康（因子正常衰减，其余条目不再被误清）
 
 ### Fixed
 - edit 的「含空格 EDITOR 按命令行拆分」测试用例沙箱泄漏（[#5]）：假编辑器用 `"$1"` 取库文件，拆分后 editor 自身旗标（用例里的 `--quiet`）占据 `$1`，内容被追加到进程 cwd 的同名文件（仓库根历史残留的 `--quiet` 即此产生，每次 `moon test` 重新生成）；假编辑器改取最后一个参数，写进真正的库文件
