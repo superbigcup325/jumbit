@@ -25,7 +25,7 @@ async fn run_describe(
       let note = if text == "" { None } else { Some(text) }
       let ok = try_twice(db, dopts.path, cwd, fn(db, p) { db.set_note(p, note) })
       if !ok {
-        err_line(errs, "path not found in database: \{dopts.path}")
+        err_line(errs, "jumbit: path not found in database: \{dopts.path}")
         return 1
       }
     }
@@ -33,7 +33,7 @@ async fn run_describe(
       let i = match find_twice(db, dopts.path, cwd) {
         Some(i) => i
         None => {
-          err_line(errs, "path not found in database: \{dopts.path}")
+          err_line(errs, "jumbit: path not found in database: \{dopts.path}")
           return 1
         }
       }

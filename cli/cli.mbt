@@ -119,7 +119,7 @@ pub fn parse(args : Array[String]) -> Command {
   match args[0] {
     "add" => parse_add(rest)
     "query" => parse_query(rest)
-    "remove" => Remove(strip_double_dash(rest))
+    "remove" => parse_remove(rest)
     "init" => parse_init(rest)
     "import" => parse_import(rest)
     "describe" => parse_describe(rest)
@@ -245,5 +245,6 @@ pub fn usage() -> String {
   "  _JB_FZF_OPTS                            extra arguments passed through to fzf\n" +
   "  _JB_RESOLVE_SYMLINKS=1                  resolve symlinks when recording (queries do not follow them)\n" +
   "  _JB_MAXAGE=N                            aging threshold for the database total score (default 10000)\n" +
+  "  _JB_DOCTOR=0                            disable the shell configuration diagnostic hint (bash/zsh/posix only)\n" +
   "import reads each plugin's standard data file, located via _Z_DATA/_FASD_DATA/ZSHZ_DATA/_ZL_DATA/XDG_DATA_HOME"
 }

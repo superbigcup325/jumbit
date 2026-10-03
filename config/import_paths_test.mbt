@@ -25,7 +25,7 @@ test "z_data_path：_Z_DATA 优先，否则 $HOME/.z" {
 ///|
 test "z_data_path：无 HOME 报错" {
   match @config.z_data_path(fake_env([])) {
-    Err(e) => @debug.assert_eq(e, "could not find home directory")
+    Err(e) => @debug.assert_eq(e, "jumbit: could not find home directory")
     Ok(p) => fail("expected error, got \{p}")
   }
 }

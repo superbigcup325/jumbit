@@ -8,10 +8,6 @@ async fn run_add(
   getenv : (String) -> String?,
   errs : Array[String],
 ) -> Int {
-  if aopts.paths.is_empty() {
-    err_line(errs, "add: missing required argument '<PATHS>'")
-    return 2
-  }
   let data_dir = match cfg(@config.data_dir(getenv), errs) {
     Some(data_dir) => data_dir
     None => return 1
@@ -65,7 +61,7 @@ async fn run_add(
       }
     }
     if kind != @afs.Directory {
-      err_line(errs, "not a directory: \{resolved}")
+      err_line(errs, "jumbit: not a directory: \{resolved}")
       return 1
     }
     store.database().add_update(resolved, aopts.score, now)
@@ -86,10 +82,6 @@ async fn run_remove(
   getenv : (String) -> String?,
   errs : Array[String],
 ) -> Int {
-  if paths.is_empty() {
-    err_line(errs, "remove: missing required argument '<PATHS>'")
-    return 2
-  }
   let data_dir = match cfg(@config.data_dir(getenv), errs) {
     Some(data_dir) => data_dir
     None => return 1
@@ -107,7 +99,7 @@ async fn run_remove(
       db.remove(p)
     })
     if !removed {
-      err_line(errs, "path not found in database: \{path}")
+      err_line(errs, "jumbit: path not found in database: \{path}")
       return 1
     }
   }

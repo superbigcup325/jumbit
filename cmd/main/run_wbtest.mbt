@@ -97,7 +97,8 @@ async test "未知命令与缺参数 → 退出码 2" {
   let errs : Array[String] = []
   @debug.assert_eq(run(["frobnicate"], env_with(data), errs), 2)
   @debug.assert_eq(run(["add"], env_with(data), errs), 2)
-  @debug.assert_eq(errs.length(), 3)
+  // 缺参消息上移 parse 层后走 Invalid 渲染，与未知命令一样带 For more information 尾行（各 2 条）
+  @debug.assert_eq(errs.length(), 4)
   cleanup_test_dir(data)
 }
 
@@ -138,7 +139,7 @@ test "finish_interactive：fzf 结果映射表（上游探针矩阵 2026-09-13 �
   let e4 : Array[String] = []
   @debug.assert_eq(finish_interactive(Ok("abc\n"), false, e4, o4), 1)
   @debug.assert_eq(o4.length(), 0)
-  @debug.assert_eq(e4[0], "could not read selection from fzf")
+  @debug.assert_eq(e4[0], "jumbit: could not read selection from fzf")
   // NotFound
   let o5 : Array[String] = []
   let e5 : Array[String] = []
@@ -146,7 +147,7 @@ test "finish_interactive：fzf 结果映射表（上游探针矩阵 2026-09-13 �
     finish_interactive(Err(@platform.NotFound), false, e5, o5),
     1,
   )
-  @debug.assert_eq(e5[0], "could not find fzf, is it installed?")
+  @debug.assert_eq(e5[0], "jumbit: could not find fzf, is it installed?")
   @debug.assert_eq(o5.length(), 0)
   // NoMatch：静默 exit 1（与上游的差异，README 注明）
   let o6 : Array[String] = []

@@ -43,7 +43,7 @@ async test "import 空库检查：非空库无 --merge 拒绝，--merge 合并" 
   @debug.assert_eq(run(["import", "z"], env, errs), 1)
   @debug.assert_eq(
     errs[errs.length() - 1],
-    "current database is not empty, specify --merge to continue anyway",
+    "jumbit: current database is not empty, specify --merge to continue anyway",
   )
   // --merge 合并
   @debug.assert_eq(run(["import", "--merge", "z"], env, errs), 0)
@@ -179,7 +179,7 @@ async test "import z：文件缺失 → could not read + 退出码 1，不落盘
   ])
   @debug.assert_eq(run(["import", "z"], env, errs), 1)
   @debug.assert_eq(errs.length(), 1)
-  assert_true(errs[0].has_prefix("could not read "))
+  assert_true(errs[0].has_prefix("jumbit: could not read "))
   cleanup_test_dir(data)
 }
 

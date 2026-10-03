@@ -45,13 +45,13 @@ fn finish_interactive(
       } else if s.length() >= 7 {
         outs.push(s[7:].to_owned())
       } else {
-        err_line(errs, "could not read selection from fzf")
+        err_line(errs, "jumbit: could not read selection from fzf")
         return 1
       }
       0
     }
     Err(@platform.NotFound) => {
-      err_line(errs, "could not find fzf, is it installed?")
+      err_line(errs, "jumbit: could not find fzf, is it installed?")
       1
     }
     Err(@platform.NoMatch) => 1

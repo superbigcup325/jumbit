@@ -54,7 +54,7 @@ async test "edit 交互：正常编辑改 rank → 落盘；编辑器缺失 → 
   let env3 = env_map([("_JB_DATA_DIR", data), ("VISUAL", ed_fail)])
   let errs3 : Array[String] = []
   @debug.assert_eq(run(["edit"], env3, errs3), 1)
-  @debug.assert_eq(errs3[0], "editor exited with code 3")
+  @debug.assert_eq(errs3[0], "jumbit: editor exited with code 3")
   // editor D：写入坏行 → 数据文件损坏（行号），不落库
   let ed_bad = make_fake_editor(
     bindir, "ed-bad", "printf 'garbage-line\\n' >> \"$1\"",
@@ -72,7 +72,7 @@ async test "edit 交互：正常编辑改 rank → 落盘；编辑器缺失 → 
   ])
   let errs5 : Array[String] = []
   @debug.assert_eq(run(["edit"], env5, errs5), 1)
-  @debug.assert_eq(errs5[0], "no editor: set $EDITOR or $VISUAL")
+  @debug.assert_eq(errs5[0], "jumbit: no editor: set $EDITOR or $VISUAL")
   cleanup_test_dir(data)
   cleanup_test_dir(target)
   cleanup_test_dir(bindir)
