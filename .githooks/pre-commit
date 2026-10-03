@@ -1,3 +1,12 @@
 #!/bin/sh
 
+set -e
+
 moon check
+
+# 格式闸门与 CI 的 Format check 同源(moon fmt --check,拒绝式不自动改文件):
+# 本地漏跑 fmt 会在这一步拦下,而不是等 CI 咬(PR #10 的教训)
+if ! moon fmt --check; then
+  echo "pre-commit: 格式检查未过,运行 'moon fmt' 后重新 git add 再提交" >&2
+  exit 1
+fi
