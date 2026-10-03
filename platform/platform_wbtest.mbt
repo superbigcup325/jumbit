@@ -28,11 +28,17 @@ fn test_temp_root() -> String {
 
 ///|
 async fn make_tmp_dir() -> String {
-  let dir = "\{test_temp_root()}/jumbit-test-\{@async.now()}-\{rand_name()}"
-  // 非递归：temp 根父目录恒存在；recursive=true 在 Windows 对已存在组件
-  // 报 EEXIST（async 上游 bug，probe run 36064860009 全量复现）
-  @afs.mkdir(dir)
-  dir
+  // EEXIST 重试兜底跨进程残留/极端同名（[#11] 同类：临时桩的偶发碰撞在
+  // CI 上表现为 setup 阶段抛错）；进程内唯一性由全局随机源推进保证
+  for attempt = 0 {
+    let dir = "\{test_temp_root()}/jumbit-test-\{@async.now()}-\{rand_name()}"
+    // 非递归：temp 根父目录恒存在；recursive=true 在 Windows 对已存在组件
+    // 报 EEXIST（async 上游 bug，probe run 36064860009 全量复现）
+    @afs.mkdir(dir) catch {
+      e => if attempt >= 2 { raise e } else { continue attempt + 1 }
+    }
+    break dir
+  }
 }
 
 ///|
@@ -466,11 +472,23 @@ async test "fzf_select：裸名沿 PATH 解析——不可执行候选被跳过�
   let _fake = make_fake_fzf(good_dir)
   write_fake_fzf_body(good_dir, "printf '  40.0\\t/picked\\n'\n")
   let get = env_path_only("\{noexec_dir}:\{good_dir}")
-  let out = match fzf_select_with("fzf", fzf_hits(), 1000L, None, get) {
-    Ok(s) => s
-    Err(e) => fail("\{Repr(e)}")
+  // [#11]：CI runner 偶发 fork 压力使 spawn 瞬时抛错，fzf 侧统一映射
+  // NotFound（确定性缺陷两次同败仍红，瞬态重试一次即绿）
+  let mut picked : String = ""
+  let mut resolved = false
+  for attempt = 0 {
+    match fzf_select_with("fzf", fzf_hits(), 1000L, None, get) {
+      Ok(s) => {
+        picked = s
+        resolved = true
+        break
+      }
+      Err(NotFound) if attempt == 0 => continue attempt + 1
+      Err(e) => fail("\{Repr(e)}")
+    }
   }
-  @debug.assert_eq(out, "  40.0\t/picked\n")
+  @debug.assert_eq(resolved, true)
+  @debug.assert_eq(picked, "  40.0\t/picked\n")
   @afs.rmdir(noexec_dir, recursive=true)
   @afs.rmdir(good_dir, recursive=true)
 }

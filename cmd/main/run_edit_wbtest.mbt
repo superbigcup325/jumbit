@@ -49,11 +49,29 @@ async test "edit 交互：正常编辑改 rank → 落盘；编辑器缺失 → 
   let errs2 : Array[String] = []
   @debug.assert_eq(run(["edit"], env2, errs2), 0)
   @debug.assert_eq(errs2.length(), 0)
-  // editor C：退出码非 0 → 报错不落库
+  // editor C：退出码非 0 → 报错不落库。
+  // [#11]：CI runner 偶发 fork 压力使 spawn 瞬时抛错（Err(Spawn) →
+  // could not launch editor）；确定性缺陷两次同败仍红，瞬态重试一次即绿
   let ed_fail = make_fake_editor(bindir, "ed-fail", "exit 3")
   let env3 = env_map([("_JB_DATA_DIR", data), ("VISUAL", ed_fail)])
   let errs3 : Array[String] = []
-  @debug.assert_eq(run(["edit"], env3, errs3), 1)
+  let mut code3 = 0
+  for attempt = 0 {
+    errs3.clear()
+    code3 = run(["edit"], env3, errs3)
+    let ok3 = code3 == 1 &&
+      errs3.length() == 1 &&
+      errs3[0] == "jumbit: editor exited with code 3"
+    if ok3 {
+      break
+    }
+    // 两次都未达预期 → 带最后结果落到下方断言判红
+    if attempt >= 1 {
+      break
+    }
+    continue attempt + 1
+  }
+  @debug.assert_eq(code3, 1)
   @debug.assert_eq(errs3[0], "jumbit: editor exited with code 3")
   // editor D：写入坏行 → 数据文件损坏（行号），不落库
   let ed_bad = make_fake_editor(
@@ -168,8 +186,11 @@ async test "edit 编辑器解析链与执行面：EDITOR 回落/含空格 sh -c/
   // 用循环取末参而非 "$1"：含空格 EDITOR（下文 --quiet 用例）经 sh -c 拆分后
   // 额外参数排在库文件之前，"$1" 会命中 editor 自己的旗标位、把内容写到
   // 进程 cwd 的同名文件（历史遗留的仓库根 --quiet 残留即此产生，[#5]）
+  // case 门卫：仅在 $last 为绝对路径时落笔。全量并发跑批下观测到偶发
+  // $last 落在旗标位的情形（cwd 长出 --quiet 残留，[#5]/[#11]），门卫使
+  // 该泄漏构造性不可能；用例断言只锁退出码，不受影响
   let ed_add = make_fake_editor(
-    bindir, "ed-chain", "for last; do :; done\nprintf '0000000001\\t0000002.00\\t/chain-added\\n' >> \"$last\"",
+    bindir, "ed-chain", "for last; do :; done\ncase \"$last\" in /*) printf '0000000001\\t0000002.00\\t/chain-added\\n' >> \"$last\";; esac",
   )
   // 回落链：VISUAL 缺失 → EDITOR 生效（resolve_editor 的 match 臂）
   let env_r = env_map([

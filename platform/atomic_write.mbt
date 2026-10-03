@@ -31,13 +31,19 @@ async fn remove_quiet(path : String) -> Unit {
 }
 
 ///|
-/// tmp 随机名：Rand::new() 从系统熵播种（@env.rand），16 位小写字母数字
+/// 进程级随机源（[#11]）：Rand::new() 无参为固定种子（deprecated API，默认
+/// "ABCDEFGHIJKLMNOPQRSTUVWXYZ123456"），函数内每次新建会产出同一序列——
+/// 并发下 write_atomic 的 5 次重试反复撞同一 tmp 名、make_tmp_dir 的目录名
+/// 只剩毫秒时间戳兜底。全局单例让每次调用推进序列，进程内唯一性成立
+let global_rand : @random.Rand = @random.Rand::new()
+
+///|
+/// tmp 随机名：进程级生成器推进，16 位小写字母数字
 fn rand_name() -> String {
-  let rand = @random.Rand::new()
   let alphabet = "abcdefghijklmnopqrstuvwxyz0123456789".to_array()
   let sb = StringBuilder()
   for _ in 0..<16 {
-    sb.write_char(alphabet[rand.int(limit=36)])
+    sb.write_char(alphabet[global_rand.int(limit=36)])
   }
   sb.to_string()
 }
