@@ -112,8 +112,9 @@ async fn attach_notes(data_dir : String, dirs : Array[@core.Dir]) -> Unit {
 ///|
 /// 打开数据库（规格 docs/spec-plaintext-edit.md §1.3）：
 /// 1. db.txt 存在 → 明文解码（note 经 notes.tsv 附着），dirty=false
-/// 2. db.txt 不存在、legacy db.zo 存在 → 二进制解码 + 强制标脏（下次 save
-///    落成明文 db.txt，即迁移；只读命令不 save 故不触发）
+/// 2. db.txt 不存在、legacy db.zo 存在 → 二进制解码（不置脏：迁移由首个
+///    真实数据变更触发——写命令置脏或 query 懒删置脏，save 时落成明文
+///    db.txt 且内容保持；纯读路径不落盘，[#2]）
 /// 3. 均不存在 → 建数据目录返回空库（上游 open 语义）
 /// 磁盘文件与内存 Database 的唯一交汇点。
 pub async fn load(data_dir : String) -> Result[Store, StoreError] {
@@ -135,13 +136,11 @@ pub async fn load(data_dir : String) -> Result[Store, StoreError] {
       err => return Err(Io(os_error_message(err)))
     }
     match @core.decode(data.binary()) {
-      Ok(dirs) => {
-        // legacy 迁移态：只读命令不落盘，首个写命令 save 时转明文；
+      Ok(dirs) =>
+        // legacy 态：不在读路径标脏（纯读不迁移，[#2]）；首个真实数据变更
+        // （写命令 / query 懒删）置脏后 save 转明文，内容保持；
         // note 随 bincode 读入（v2），save 时汇入 notes.tsv
-        let db = @core.Database::from_dirs(dirs)
-        db.mark_dirty()
-        Ok({ db, data_dir, })
-      }
+        Ok({ db: @core.Database::from_dirs(dirs), data_dir, })
       Err(e) => Err(Codec(e))
     }
   } else {

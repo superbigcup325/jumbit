@@ -330,3 +330,74 @@ test "cli 层单臂补遗：--hook pwd 显式/-- 双剥/等号坏值/--prune 重
     @cli.Invalid("the argument '--prune' cannot be used multiple times"),
   )
 }
+
+///|
+/// [#2] 回归：纯读 query 不落盘——legacy 库读时不迁移、空目录不物化。
+/// 旧实现 sort_by_score 无条件置脏 + load(legacy) mark_dirty，query 每次带脏
+/// 退出：legacy 首查即迁移（违反「只读命令不触发迁移」）、只读数据目录
+/// 直接查询失败、空目录长出空 db.txt/notes.tsv。
+/// 红色验证：修复前本测试在三个断言处失败（db.txt 被创建）
+async test "query 纯读不落盘：legacy 不迁移、空目录不物化" {
+  // legacy 态：db.zo（经 core.encode 造，与 legacy 格式同版本互通）、无 db.txt；
+  // 条目指向真实目录，query 命中且过滤链零删除
+  let data = make_test_dir("legacy-readonly")
+  let hit = make_test_dir("legacy-hit")
+  let db = @core.Database::new()
+  db.add_update(hit, 2.0, 1791000000L)
+  @platform.write_atomic(data + "/db.zo", @core.encode(db.all()))
+  let errs : Array[String] = []
+  @debug.assert_eq(run(["query", "legacy-hit"], env_with(data), errs), 0)
+  @debug.assert_eq(@afs.exists(data + "/db.txt"), false)
+  // 空数据目录：miss 不物化任何文件
+  let empty = make_test_dir("empty-readonly")
+  let errs2 : Array[String] = []
+  @debug.assert_eq(run(["query", "nope"], env_with(empty), errs2), 1)
+  @debug.assert_eq(@afs.exists(empty + "/db.txt"), false)
+  @debug.assert_eq(@afs.exists(empty + "/notes.tsv"), false)
+  cleanup_test_dir(data)
+  cleanup_test_dir(hit)
+  cleanup_test_dir(empty)
+}
+
+///|
+/// [#2] 回归：legacy + query 懒删（真实数据变更）→ 迁移落盘且内容保持；
+/// db.zo 保留（迁移惯例，可手动删除）
+async test "legacy 加 query 懒删迁移落盘内容保持" {
+  let keep = make_test_dir("legacy-migrate-keep")
+  let data = make_test_dir("legacy-migrate")
+  let db = @core.Database::new()
+  db.add_update(keep, 9.0, 1791000000L)
+  db.add_update("/nonexistent/stale", 1.0, 1791000000L - 100L * 86400L)
+  @platform.write_atomic(data + "/db.zo", @core.encode(db.all()))
+  let errs : Array[String] = []
+  // stale 不存在且超 3 个月 TTL → 懒删 → 置脏 → save 迁移为明文。
+  // 用 --list 让 stale 进入候选（带关键词时过滤链先按关键词裁剪，
+  // 不命中的条目走不到 exists/TTL 检查）
+  @debug.assert_eq(run(["query", "--list"], env_with(data), errs), 0)
+  @debug.assert_eq(@afs.exists(data + "/db.txt"), true)
+  let reloaded = match @platform.load(data) {
+    Ok(s) => s
+    Err(e) => fail("\{Repr(e)}")
+  }
+  @debug.assert_eq(reloaded.database().all().length(), 1)
+  @debug.assert_eq(reloaded.database().all()[0].path, keep)
+  @debug.assert_eq(@afs.exists(data + "/db.zo"), true)
+  cleanup_test_dir(data)
+  cleanup_test_dir(keep)
+}
+
+///|
+/// [#2] 回归：只读数据目录 + query（过滤链零删除）→ 退出 0，不再因
+/// 「无变更也 save」撞 EACCES。红色验证：修复前 exit 1 + could not save
+#cfg(not(platform="windows"))
+async test "只读数据目录加 query 退出 0" {
+  let data = make_test_dir("ro-query")
+  let hit = make_test_dir("ro-query-hit")
+  let errs : Array[String] = []
+  @debug.assert_eq(run(["add", hit], env_with(data), errs), 0)
+  @afs.chmod(data, 0o555)
+  @debug.assert_eq(run(["query", "ro-query-hit"], env_with(data), errs), 0)
+  @afs.chmod(data, 0o755)
+  cleanup_test_dir(data)
+  cleanup_test_dir(hit)
+}

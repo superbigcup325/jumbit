@@ -1,6 +1,6 @@
 data file      @JUMBIT_TMP@/db/db.txt
 file size      0 bytes
-format         plaintext
+format         -
 entries        0
 notes          0
 aging threshold 10000

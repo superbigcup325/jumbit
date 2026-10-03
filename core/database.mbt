@@ -141,10 +141,12 @@ pub fn Database::mark_clean(self : Database) -> Unit {
 }
 
 ///|
-/// 按得分升序原地排序（对齐上游：Stream 从尾部倒序取最高分）
+/// 按得分升序原地排序（对齐上游：Stream 从尾部倒序取最高分）。
+/// 纯展示序不置脏：排序不是数据变更，query 据此保持「无懒删不落盘」
+/// （[#2]：此前无条件置脏让只读 query 每次都带脏退出，legacy 库被读时
+/// 迁移、只读数据目录直接查询失败）
 pub fn Database::sort_by_score(self : Database, now : Int64) -> Unit {
   self.dirs.sort_by(fn(a, b) { total_cmp(a.score(now), b.score(now)) })
-  self.dirty = true
 }
 
 ///|
