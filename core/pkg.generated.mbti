@@ -132,6 +132,7 @@ pub(all) struct StreamOptions {
   exists : Bool
   resolve_symlinks : Bool
   ttl : Int64
+  fuzzy_superset : Array[Dir]?
 }
 
 // Type aliases

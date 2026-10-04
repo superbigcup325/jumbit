@@ -13,6 +13,10 @@ pub(all) struct StreamOptions {
   resolve_symlinks : Bool
   /// 不存在且 last_accessed < ttl → 懒删除（默认 now - 3*MONTH）
   ttl : Int64
+  /// Some → 收集链路通过集（关键词未命中但 base_dir/exclude/exists 全过的
+  /// 条目），供 --fuzzy 兜底在单趟内完成：懒删语义与兜底二趟一致（glob/TTL
+  /// 命中同删），普通查询传 None 保持关键词短路零成本
+  fuzzy_superset : Array[Dir]?
 }
 
 ///|
@@ -41,7 +45,10 @@ pub async fn Database::query_all(
     // exists 路（默认查询）：循环含 await 点，保持原形态
     for i in len>..0 {
       let dir = self.dirs[i]
-      if !filter_by_keywords_lower(kws, dir.path) {
+      let kw_ok = filter_by_keywords_lower(kws, dir.path)
+      // 关键词未命中且未收集兜底集：短路跳过（上游 Stream 顺序语义，
+      // 懒删/存在性检查不生效）
+      if !kw_ok && opts.fuzzy_superset is None {
         continue
       }
       if !filter_base_dir(opts, dir.path) {
@@ -60,7 +67,7 @@ pub async fn Database::query_all(
         }
         continue
       }
-      out.push(dir)
+      push_out_or_superset(opts, out, kw_ok, dir)
     }
   } else {
     // --all 热路：无 await 点。async 下沉对循环内含 await 点的迭代有
@@ -68,7 +75,8 @@ pub async fn Database::query_all(
     // 条目 filter 6ms ↔ 2034ms），短路布尔挡不住下沉，必须拆出纯同步循环
     for i in len>..0 {
       let dir = self.dirs[i]
-      if !filter_by_keywords_lower(kws, dir.path) {
+      let kw_ok = filter_by_keywords_lower(kws, dir.path)
+      if !kw_ok && opts.fuzzy_superset is None {
         continue
       }
       if !filter_base_dir(opts, dir.path) {
@@ -78,12 +86,28 @@ pub async fn Database::query_all(
         self.swap_remove(i)
         continue
       }
-      out.push(dir)
+      push_out_or_superset(opts, out, kw_ok, dir)
     }
   }
   // 降序输出：原实现为升序排序 + 倒序遍历，此处直接以反向比较器排出降序
   out.sort_by(fn(a, b) { total_cmp(b.score(opts.now), a.score(opts.now)) })
   out
+}
+
+///|
+/// 关键词命中进结果集；未命中（仅兜底收集模式可达）进 superset，
+/// 供 --fuzzy 在零命中时就地过滤，免去重跑一整趟过滤链 + 全库排序
+fn push_out_or_superset(
+  opts : StreamOptions,
+  out : Array[Dir],
+  kw_ok : Bool,
+  dir : Dir,
+) -> Unit {
+  if kw_ok {
+    out.push(dir)
+  } else {
+    opts.fuzzy_superset.unwrap().push(dir)
+  }
 }
 
 ///|

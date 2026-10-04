@@ -34,31 +34,45 @@ async fn query_exec(
   let now = current_second()
   // exists 回调：kind 检查；resolve_symlinks=true 时不跟随符号链接（上游反向逻辑）
   let exists = async fn(path : String) { dir_exists(path, resolve_symlinks) }
+  // --fuzzy 兜底在单趟内完成：开启 superset 收集后，关键词未命中但过滤链
+  // 通过的条目就地留存，精确路零命中时直接在其上模糊过滤——替代原「空关键词
+  // 重跑一整趟 query_all」（免二趟链路扫描 + 全库排序，exists 统计减半）
+  let superset : Array[@core.Dir] = []
+  let collect = qopts.fuzzy && !qopts.keywords.is_empty()
   let hits = store
     .database()
     .query_all(
-      make_stream_opts(now, globs, resolve_symlinks, qopts.keywords, qopts.all),
+      make_stream_opts(
+        now,
+        globs,
+        resolve_symlinks,
+        qopts.keywords,
+        qopts.all,
+        if collect {
+          Some(superset)
+        } else {
+          None
+        },
+      ),
       exists,
     )
   // --exclude 为精确路径过滤（对齐上游 query_first/list 的跳过循环）
   let mut matched_by = "exact"
   let mut remaining = apply_exclude(hits, qopts.exclude)
-  if hits.is_empty() && qopts.fuzzy && !qopts.keywords.is_empty() {
-    // 模糊兜底路（jumbit 扩展）：仅精确路零命中时启用；同一过滤链
-    // （exclude glob 命中懒删 / exists / TTL 懒删）照常生效
-    let candidates = store
-      .database()
-      .query_all(
-        make_stream_opts(now, globs, resolve_symlinks, [], qopts.all),
-        exists,
-      )
+  if hits.is_empty() && collect {
     let fuzzy_hits : Array[@core.Dir] = []
-    for d in candidates {
+    for d in superset {
       if @core.filter_by_keywords_fuzzy(qopts.keywords, d.path) {
         fuzzy_hits.push(d)
       }
     }
-    remaining = apply_exclude(fuzzy_hits, qopts.exclude)
+    // superset 为库内遍历序（无序）：命中集显式排降序，复用临时 Database 的
+    // sort_by_score（与 export 同款，含 NaN total_cmp 语义）
+    @core.Database::from_dirs(fuzzy_hits).sort_by_score(now)
+    remaining = apply_exclude(
+      @core.Database::from_dirs(fuzzy_hits).all(),
+      qopts.exclude,
+    )
     if !remaining.is_empty() {
       matched_by = "fuzzy"
     }
@@ -136,6 +150,7 @@ fn make_stream_opts(
   resolve_symlinks : Bool,
   keywords : Array[String],
   all : Bool,
+  fuzzy_superset : Array[@core.Dir]?,
 ) -> @core.StreamOptions {
   {
     now,
@@ -145,6 +160,7 @@ fn make_stream_opts(
     exists: !all,
     resolve_symlinks,
     ttl: now - 3L * @core.MONTH,
+    fuzzy_superset,
   }
 }
 

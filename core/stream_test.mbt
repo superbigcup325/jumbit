@@ -18,6 +18,7 @@ fn opts(
     exists,
     resolve_symlinks,
     ttl: now - 3L * @core.MONTH,
+    fuzzy_superset: None,
   }
 }
 
@@ -182,4 +183,34 @@ test "starts_with：组件级前缀语义" {
   @debug.assert_eq(@core.starts_with("/foo/bar", "/"), true)
   @debug.assert_eq(@core.starts_with("/foo/bar", ""), true)
   @debug.assert_eq(@core.starts_with("/foo", "/foo/bar"), false)
+}
+
+///|
+/// --fuzzy 兜底单趟收集：关键词全未命中时 out 空，链路通过集进 superset；
+/// glob 懒删对未命中条目同样生效（与原兜底二趟语义一致）
+async test "fuzzy_superset 收集：关键词未命中留链路通过集，glob 懒删同删" {
+  let db = @core.Database::new()
+  db.add("/a/hit", 2.0, 0L)
+  db.add("/b/two", 1.0, 0L)
+  db.add("/c/three", 1.0, 0L)
+  db.mark_clean()
+  let superset : Array[@core.Dir] = []
+  let o = {
+    ..opts(1000L, keywords=["hit"], exclude=["/c/*"]),
+    fuzzy_superset: Some(superset),
+  }
+  // 关键词 "hit" 命中 /hit/one，其余两条进 superset（/del/three 先被 glob 懒删）
+  let hits = db.query_all(o, fixed_exists(true))
+  @debug.assert_eq(hits.length(), 1)
+  @debug.assert_eq(hits[0].path, "/a/hit")
+  @debug.assert_eq(superset.length(), 1)
+  @debug.assert_eq(superset[0].path, "/b/two")
+  @debug.assert_eq(db.all().length(), 2)
+  @debug.assert_eq(db.is_dirty(), true)
+  // 收集开启时精确命中路径的懒删行为不变
+  let superset2 : Array[@core.Dir] = []
+  let o2 = { ..opts(1000L), fuzzy_superset: Some(superset2), }
+  let hits2 = db.query_all(o2, fixed_exists(true))
+  @debug.assert_eq(hits2.length(), 2)
+  @debug.assert_eq(superset2.length(), 0)
 }
