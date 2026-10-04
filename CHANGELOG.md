@@ -13,6 +13,7 @@
   - 同口径补前缀的 jumbit 扩展与单行改写文案：`could not read <path>` / ``failed to run `atuin` ``（import）、`path already in database` / `no editor: set $EDITOR or $VISUAL` / `editor exited with code N`（edit）
   - config 层中文文案改英文并加前缀：`_JB_DATA_DIR must be an absolute path` / `cannot determine the data directory: set _JB_DATA_DIR` / `invalid glob in _JB_EXCLUDE_DIRS` / `_JB_MAXAGE must be a non-negative integer` / `could not find home directory`
   - 维持无前缀（上游原文如此，USAGE 差异清单已注）：`fzf returned an error` / `fzf was terminated` / `fzf returned an unknown error`
+- 主包改名 `cmd/main` → `cmd/jumbit`：mooncakes 安装命令变为 `moon install superbigcup325/jumbit/cmd/jumbit`，二进制落名 `~/.moon/bin/jumbit` 与可执行名一致，不再需要手工改名（旧安装命令 `.../cmd/main` 在 registry 版本不可覆盖的约束下停留 0.1.3）
 
 ### Documentation
 - USAGE「与 zoxide 的差异」补五处黑盒对拍（真 zoxide 0.10.0）发现的未记载分歧（[#4]）：重复 `--exclude` 后者覆盖（上游报错 exit 2）、interactive 关键词 miss 不启动 fzf（上游先拉起）、fzf argv 缺上游的 `--bind` 组、`help <未知子命令>` 输出通用帮助 exit 0、纯读 query 不重写库文件（上游每次保存重写）；fzf spawn 失败文案同步 `jumbit: ` 前缀
@@ -127,6 +128,8 @@
 
 - Database 封装收敛：字段改为外部不可构造/原地修改，`all()` 返回数组副本，保证 dirty 标志一致性
 
-[Unreleased]: https://github.com/superbigcup325/jumbit/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/superbigcup325/jumbit/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/superbigcup325/jumbit/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/superbigcup325/jumbit/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/superbigcup325/jumbit/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/superbigcup325/jumbit
