@@ -77,6 +77,11 @@ timed qkw.zo zoxide query src -a
 TIMED_ENV=("--env=_JB_DATA_DIR=$tmp/jb-{rep}")
 timed qtsv.jb "$bin" query --tsv --all
 
+# --fuzzy 兜底路（jumbit 扩展，上游无 fuzzy）：必 miss 关键词触发兜底，
+# 单趟双出口形态（0.2.0 前为空关键词二趟全库扫描+排序，见 BENCHMARKS）
+TIMED_ENV=("--env=_JB_DATA_DIR=$tmp/jb-{rep}")
+timed qfz.jb "$bin" query zzzznomatch --all --fuzzy
+
 # 汇总：每场景取最优 wall（噪声下界）；RSS 为该场景子进程峰值（ru_maxrss，KB）
 row() { # <场景显示名> <tag>
   awk '{ if (NR == 1 || $2 < minw) minw = $2; rss = $3; if ($4 != 0) bad = 1 }
@@ -97,6 +102,7 @@ row "query all" qall.zo
 row "query kw" qkw.jb
 row "query kw" qkw.zo
 row "query tsv" qtsv.jb
+row "query fuzzy" qfz.jb
 
 jb_n=$(wc -l < "$tmp/qall.jb.out")
 zo_n=$(wc -l < "$tmp/qall.zo.out")

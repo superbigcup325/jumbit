@@ -18,6 +18,7 @@
   - 维持无前缀（上游原文如此，USAGE 差异清单已注）：`fzf returned an error` / `fzf was terminated` / `fzf returned an unknown error`
 - 主包改名 `cmd/main` → `cmd/jumbit`：mooncakes 安装命令变为 `moon install superbigcup325/jumbit/cmd/jumbit`，二进制落名 `~/.moon/bin/jumbit` 与可执行名一致，不再需要手工改名（旧安装命令 `.../cmd/main` 在 registry 版本不可覆盖的约束下停留 0.1.3）
 - query 载入解码快路径：明文 db.txt 按行解码命中 encode 产物形态（纯数字时间戳、整数/恰两位定点 rank、值 ≤ 2^53）时免整行 UTF-8 解码与 parse_f64（定点用整数装配 + 单次 IEEE 除法，与 parse_f64 位级一致）；任何非常规形态（符号/指数/inf/nan/超界/其他空白）整体回落原慢路径，错误文案与优先级零变化。百万行压力域（27 万条）query 关键词 0.193 → 0.135s、全量列表 0.277 → 0.219s，与上游比值 11x → 6.8x / 2.0x → 1.6x；函数级解码约 5x（moon bench codec 往返 5.06 → 2.82ms/万条）。等价性由新增白盒对拍套件锁定（快慢路径逐案例 + writer 形态命中断言 + 路由全链），既有 quickcheck 往返性质测试随套件覆盖快路径
+- query 热路径第二轮优化：关键词匹配零归一化分配（`to_lower` 仅 ASCII 归一 → ASCII 大写预扫，无大写零分配；关键词归一提升到每查询一次）+ 排序后置（先过滤后排序，miss 型查询免全量排序；并列分以稳定序保持库内相对序，与先排后滤一致）；`--fuzzy` 兜底单趟化（`StreamOptions` 增 `fuzzy_superset` 收集口替代空关键词重跑全趟过滤链，glob/TTL 懒删集合不变，普通查询零成本）。百万行压力域（27 万条）query 关键词 0.135 → 0.060s（对上游 6.8x → 3.2x）、`--fuzzy` 兜底 miss 0.22 → 0.12s、全量列表 0.219 → 0.210s；perf_check 新增 fuzzy 兜底场景看护
 
 ### Documentation
 - BENCHMARKS.md 全表重录（2026-10-05，快路径落地后构建）：此前数字停留 09-13 旧二进制格式构建（明文格式与字典序比较器落地后性能基准未再跑，query 行失真最高 2.5 倍）；边际分析改写为当前真相（query 大头=明文解码、import=dedup 排序 + lex 比较器 + 明文编码），补 [#3] 口径分歧注记（stress 域条目数差 ~2%，语义对拍 dataset_check 19/19 绿）
