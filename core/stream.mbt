@@ -25,12 +25,15 @@ pub async fn Database::query_all(
   opts : StreamOptions,
   exists : async (String) -> Bool,
 ) -> Array[Dir] {
-  self.sort_by_score(opts.now)
   // exclude glob 编译一次反复用（全库逐条目过滤，pattern 重复物化是热点）
   let globs : Array[Array[Char]] = []
   for pattern in opts.exclude {
     globs.push(compile_glob(pattern))
   }
+  // 关键词预归一一次（逐条目匹配零分配）；排序挪到过滤后：score 为逐条目
+  // 确定性函数、懒删除集合与遍历顺序无关，先滤后排只排命中集（miss 型查询
+  // 省全量排序），稳定排序下并列分保持库内相对序，与先排后滤一致
+  let kws = keywords_lower(opts.keywords)
   let out : Array[Dir] = []
   // 倒序遍历：swap_remove 把尾部元素挪到 idx，其一定已被访问过，索引安全
   let len = self.dirs.length()
@@ -38,7 +41,7 @@ pub async fn Database::query_all(
     // exists 路（默认查询）：循环含 await 点，保持原形态
     for i in len>..0 {
       let dir = self.dirs[i]
-      if !filter_by_keywords(opts.keywords, dir.path) {
+      if !filter_by_keywords_lower(kws, dir.path) {
         continue
       }
       if !filter_base_dir(opts, dir.path) {
@@ -65,7 +68,7 @@ pub async fn Database::query_all(
     // 条目 filter 6ms ↔ 2034ms），短路布尔挡不住下沉，必须拆出纯同步循环
     for i in len>..0 {
       let dir = self.dirs[i]
-      if !filter_by_keywords(opts.keywords, dir.path) {
+      if !filter_by_keywords_lower(kws, dir.path) {
         continue
       }
       if !filter_base_dir(opts, dir.path) {
@@ -78,6 +81,8 @@ pub async fn Database::query_all(
       out.push(dir)
     }
   }
+  // 降序输出：原实现为升序排序 + 倒序遍历，此处直接以反向比较器排出降序
+  out.sort_by(fn(a, b) { total_cmp(b.score(opts.now), a.score(opts.now)) })
   out
 }
 

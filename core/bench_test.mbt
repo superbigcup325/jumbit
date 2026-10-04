@@ -48,7 +48,9 @@ test "bench filter_by_keywords 10k" (it : @bench.T) {
     paths.push(d.path)
   }
   it.bench(fn() {
-    // 真实查询形态：对全库逐条做末组件锚定过滤
+    // 逐条调用公共入口的口径：每次调用含关键词预归一检查（小写零分配）。
+    // 真实查询热路径在 core/stream：关键词归一每查询提升一次，逐条目只走
+    // 内部匹配函数，端到端口径看 perf_check 的 query 场景
     let mut hits = 0
     for p in paths {
       if @core.filter_by_keywords(["user", "work"], p) {
