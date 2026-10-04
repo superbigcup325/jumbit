@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "superbigcup325/jumbit/cmd/main"
+package "superbigcup325/jumbit/cmd/jumbit"
 
 import {
   "moonbitlang/core/debug",
