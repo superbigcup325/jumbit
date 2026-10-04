@@ -34,7 +34,13 @@ On that foundation, jumbit extends directory memory beyond the shell: coding age
 
 ## Install
 
-**Option 1: prebuilt binaries from GitHub Releases (recommended, no toolchain needed)**: Linux x86_64 / macOS Apple Silicon / Windows x64; grab the archive for your platform from [Releases](https://github.com/superbigcup325/jumbit/releases) and put it on your PATH (the executable is named `jumbit`)
+**Option 1: one-line install script (recommended, no toolchain needed)**: prebuilt coverage: Linux x86_64 / macOS Apple Silicon / Windows x64
+
+```bash
+curl -fsSL https://github.com/superbigcup325/jumbit/releases/latest/download/install.sh | sh
+```
+
+Installs to `~/.local/bin` (the script hints if it is not on your PATH; `JUMBIT_INSTALL_DIR` picks another directory, `JUMBIT_VERSION` or a positional argument pins a version, defaults to latest); Windows does not use the script — grab the windows-x86_64 zip from [Releases](https://github.com/superbigcup325/jumbit/releases), unzip, and put it on your PATH (the executable is named `jumbit`)
 
 **Option 2: mooncakes (requires the [MoonBit toolchain](https://www.moonbitlang.com/))**
 

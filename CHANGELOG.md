@@ -4,6 +4,9 @@
 
 ## [Unreleased]
 
+### Added
+- 一键安装脚本 `scripts/install.sh`：平台检测（Linux x86_64 / macOS Apple Silicon；Windows 提示走 Releases zip）→ 下载对应 release 压缩包 → 装到 `~/.local/bin`（`JUMBIT_INSTALL_DIR` 换目录、`JUMBIT_VERSION`/位置参数定版本，缺省经 releases/latest 的 302 落点取 latest，免 API/jq 依赖）；POSIX sh 兼容，`curl | sh` 可用；release workflow 并入资产分发，README 方式一从手工下载解压改写为一条命令
+
 ### Changed
 - 非 finite rank 归一上移到入库口（[#3]）：`add`/`import` 入库（add/add_update/add_unchecked 三口）统一 `nan/-inf → 0.01、+inf/溢出 → 9999999.99、有限值 clamp [0.01, 9999999.99]`，rank 常量提升为 core pub（RANK_MIN/RANK_MAX，与编码层共用单一事实源）。行为修正：此前 inf 先被老化毒化成 NaN（total=inf → factor=0）再在编码层落到 0.01，与文档「inf 钳到上限」口径相反、且与手改库物化保存路径不一致；现在各路径一致按文档口径钳位，老化 total 恢复健康（因子正常衰减，其余条目不再被误清）
 - query 不再无条件落盘（[#2]）：`sort_by_score` 去掉无条件置脏（纯展示序不是数据变更），`load` 的 legacy 分支去掉读路径 `mark_dirty`；query 仅在过滤链真实懒删（glob 命中 / TTL 到期）后 save。行为变化：纯读 query 不再重写 db.txt（上游 query 每次重写库文件，此处有意偏离、对齐自家「只读命令不触发迁移」承诺，USAGE 差异清单同步注记）；legacy 库纯读不迁移，首个真实数据变更（写命令 / 懒删）才转明文且内容保持；只读数据目录 query 退出 0（原先因「无变更也 save」撞 EACCES 报 could not save 退出 1）

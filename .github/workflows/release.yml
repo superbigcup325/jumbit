@@ -93,6 +93,10 @@ jobs:
         with:
           merge-multiple: true
           path: dist
+      # install.sh 随资产分发（README 一键安装的落点）；只在 release job 加一次，
+      # build 矩阵三 artifact 合并后各带一份会撞同名
+      - name: Attach install script
+        run: cp scripts/install.sh dist/install.sh
       # Release notes = CHANGELOG 对应版本节（与仓库文档单一事实源对齐，
       # 不用 --generate-notes 的 PR 列表）
       - name: Extract release notes from CHANGELOG
