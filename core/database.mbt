@@ -2,7 +2,7 @@
 /// 数据库：条目数组 + dirty 标志（对齐上游 src/db/mod.rs；MoonBit 无借用约束，直接持数组）
 /// pub struct：外部可读字段但不可构造/原地修改，变更一律走方法（保 dirty 一致性）
 pub struct Database {
-  dirs : Array[Dir]
+  mut dirs : Array[Dir]
   mut dirty : Bool
 } derive(Debug)
 
@@ -61,10 +61,7 @@ pub fn Database::rename(self : Database, old : String, new : String) -> Bool {
 /// 整库替换（edit 交互形态专用：编辑后的全量条目集替换现有集合；note 已由
 /// 调用方按 path 附着），置 dirty
 pub fn Database::replace_all(self : Database, dirs : Array[Dir]) -> Unit {
-  self.dirs.clear()
-  for d in dirs {
-    self.dirs.push(d)
-  }
+  self.dirs = dirs
   self.dirty = true
 }
 

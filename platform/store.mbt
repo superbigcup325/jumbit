@@ -86,25 +86,24 @@ async fn attach_notes(data_dir : String, dirs : Array[@core.Dir]) -> Unit {
     _ => return // notes 读失败不阻塞主库加载（best-effort 标注）
   }
   let text = data.text()
+  // note 行先入 Map（同 path 后行覆盖前行，与逐行扫描语义一致），再对条目
+  // 单趟附着：O(条目 + note 行)，替代逐行全库扫描的 O(条目 × note 行)
+  let notes : Map[String, String] = Map([])
   for line in text.split("\n") {
     let line = line.to_owned()
     if line.is_empty() {
       continue
     }
     match line.find("\t") {
-      Some(tab) => {
-        let p = line[0:tab].to_owned()
-        let note = line[tab + 1:].to_owned()
-        for d in dirs {
-          if d.path == p {
-            if note != "" {
-              d.note = Some(note)
-            }
-            break
-          }
-        }
-      }
+      Some(tab) => notes[line[0:tab].to_owned()] = line[tab + 1:].to_owned()
       None => () // 无 tab 的行不是合法条目，忽略
+    }
+  }
+  for d in dirs {
+    match notes.get(d.path) {
+      // 空串行 = 清除标记，跳过附着
+      Some(note) => if note != "" { d.note = Some(note) }
+      None => () // 未命中 db 条目的行宽松跟随（remove/懒删后的孤儿标注）
     }
   }
 }

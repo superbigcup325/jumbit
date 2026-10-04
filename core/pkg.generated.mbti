@@ -73,7 +73,7 @@ pub enum CodecError {
 } derive(@debug.Debug)
 
 pub struct Database {
-  dirs : Array[Dir]
+  mut dirs : Array[Dir]
   mut dirty : Bool
 } derive(@debug.Debug)
 pub fn Database::add(Self, String, Double, Int64) -> Unit
