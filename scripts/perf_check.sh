@@ -29,7 +29,7 @@
 set -u
 cd "$(dirname "$0")/.."
 
-bin=_build/native/release/build/cmd/main/main.exe
+bin=_build/native/release/build/cmd/jumbit/jumbit.exe
 lines=1000000 unique=300000 reps=3
 if [ "${1:-}" = "--quick" ]; then
   lines=100000 unique=30000 reps=1

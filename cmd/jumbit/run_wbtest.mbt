@@ -258,7 +258,7 @@ async test "顶层面分发：--version/-V/无参数/顶层坏 flag/run 层接�
   @debug.assert_eq(run([], env_with(data), errs3), 2)
   // usage 全文是单条消息（内含 \n），走 errs 批量写通道
   @debug.assert_eq(errs3.length(), 1)
-  assert_true(errs3[0].has_prefix("jumbit \{@jumbit.VERSION}"))
+  assert_true(errs3[0].has_prefix("jumbit \{@root.VERSION}"))
   assert_true(errs3[0].contains("Usage:"))
   // 版本 flag 后随多余参数：用法错误（clap unexpected argument）
   let errs4 : Array[String] = []

@@ -5,7 +5,7 @@ import {
   "moonbitlang/core/env",
   "moonbitlang/core/json",
   "moonbitlang/x/sys",
-  "superbigcup325/jumbit",
+  "superbigcup325/jumbit" @root,
   "superbigcup325/jumbit/cli",
   "superbigcup325/jumbit/config",
   "superbigcup325/jumbit/core",

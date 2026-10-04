@@ -39,10 +39,10 @@ On that foundation, jumbit extends directory memory beyond the shell: coding age
 **Option 2: mooncakes (requires the [MoonBit toolchain](https://www.moonbitlang.com/))**
 
 ```bash
-moon install superbigcup325/jumbit/cmd/main   # install the binary globally
+moon install superbigcup325/jumbit/cmd/jumbit   # install the binary globally
 ```
 
-Note: mooncakes installs by package path, so the binary lands at `~/.moon/bin/main`; rename or alias it to `jumbit` (`mv ~/.moon/bin/main ~/.moon/bin/jumbit`)
+Note: the binary lands at `~/.moon/bin/jumbit`, matching the executable name, ready to use right away (`~/.moon/bin` is already on your PATH, otherwise the `moon` command itself would not run)
 
 **Option 3: build from source** (anchored at `moon 0.1.20260920`; CI pins this version for reproducible builds):
 
@@ -51,7 +51,7 @@ git clone https://github.com/superbigcup325/jumbit && cd jumbit
 export PATH="$HOME/.moon/bin:$PATH"   # MoonBit toolchain
 moon check && moon test               # optional pre-build self-check
 moon build --release
-cp _build/native/release/build/cmd/main/main.exe ~/.local/bin/   # or any directory on your PATH
+cp _build/native/release/build/cmd/jumbit/jumbit.exe ~/.local/bin/   # or any directory on your PATH
 ```
 
 Toolchain anchor: CI pins reproducible builds via the `MOONBIT_VERSION` constant in `.github/workflows/ci.yml`; when upgrading the toolchain, bump that constant in the same change and rerun the full verification suite (regression/golden/dataset/chaos/realdata) the constant is the single source of truth for the version

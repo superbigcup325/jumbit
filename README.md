@@ -39,10 +39,10 @@ zoxide 用 frecency（频次 × 时间衰减）把「cd 过的地方」变成「
 **方式二：mooncakes（需 [MoonBit 工具链](https://www.moonbitlang.com/)）**
 
 ```bash
-moon install superbigcup325/jumbit/cmd/main   # 全局安装二进制
+moon install superbigcup325/jumbit/cmd/jumbit   # 全局安装二进制
 ```
 
-注：mooncakes 以包路径安装，二进制落在 `~/.moon/bin/main`，需自行改名或别名为 `jumbit`（`mv ~/.moon/bin/main ~/.moon/bin/jumbit`）
+注：二进制落在 `~/.moon/bin/jumbit`，与可执行名一致，装完即用（`~/.moon/bin` 已在 PATH，否则 `moon` 命令本身无法运行）
 
 **方式三：从源码构建**（锚定 `moon 0.1.20260920`，CI 以此钉死可复现构建）：
 
@@ -51,7 +51,7 @@ git clone https://github.com/superbigcup325/jumbit && cd jumbit
 export PATH="$HOME/.moon/bin:$PATH"   # MoonBit 工具链
 moon check && moon test               # 构建前自检（可选）
 moon build --release
-cp _build/native/release/build/cmd/main/main.exe ~/.local/bin/   # 或任意 PATH 目录
+cp _build/native/release/build/cmd/jumbit/jumbit.exe ~/.local/bin/   # 或任意 PATH 目录
 ```
 
 工具链锚定：CI 以 `.github/workflows/ci.yml` 的 `MOONBIT_VERSION` 常量钉死可复现构建；升级工具链时同步 bump 该常量并重跑全套验证（regression/golden/dataset/chaos/realdata），版本口径以该常量为唯一权威

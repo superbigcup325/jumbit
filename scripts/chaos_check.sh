@@ -28,7 +28,7 @@
 set -u
 cd "$(dirname "$0")/.."
 
-bin=_build/native/release/build/cmd/main/main.exe
+bin=_build/native/release/build/cmd/jumbit/jumbit.exe
 seed=20260909
 
 need() { command -v "$1" >/dev/null || { echo "✗ 缺依赖: $1" >&2; exit 2; }

@@ -14,7 +14,7 @@ trap 'rm -rf "$data" "$target" "$scratch"' EXIT
 
 echo "== 构建发布二进制 =="
 moon build --release
-bin=_build/native/release/build/cmd/main/main.exe
+bin=_build/native/release/build/cmd/jumbit/jumbit.exe
 
 # MSYS/Git Bash 会把 argv 里的 POSIX 路径自动转成 Windows 形态传给 jumbit
 # （环境变量不做转换），jumbit 记录与回显均为 Windows 形态；断言前把期望值

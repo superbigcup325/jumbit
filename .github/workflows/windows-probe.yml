@@ -59,7 +59,7 @@ jobs:
         continue-on-error: true
         run: |
           moon build --release
-          _build/native/release/build/cmd/main/main.exe help > $null
+          _build/native/release/build/cmd/jumbit/jumbit.exe help > $null
 
       # Git Bash 下的 POSIX 假设探底：mktemp/PATH/裸名调用/钩子链路
       - name: End-to-end smoke (scripts/smoke.sh, Git Bash)

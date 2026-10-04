@@ -25,7 +25,7 @@
 set -u
 cd "$(dirname "$0")/.."
 
-bin=_build/native/release/build/cmd/main/main.exe
+bin=_build/native/release/build/cmd/jumbit/jumbit.exe
 seed=20260908
 zlines=20000 ajlines=12000 atlines=8000
 if [ "${1:-}" = "--quick" ]; then

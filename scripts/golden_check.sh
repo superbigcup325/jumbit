@@ -22,7 +22,7 @@ cd "$(dirname "$0")/.."
 export MSYS_NO_PATHCONV=1
 export MSYS2_ARG_CONV_EXCL='*'.
 
-bin=_build/native/release/build/cmd/main/main.exe
+bin=_build/native/release/build/cmd/jumbit/jumbit.exe
 golden=scripts/golden
 mode=check
 if [ "${1:-}" = "--update" ]; then

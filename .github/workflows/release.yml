@@ -71,11 +71,11 @@ jobs:
           mkdir -p dist
           # 只留压缩包（裸文件曾随 dist 一起上传造成 asset 双份，已实证清理）
           if [ "${{ matrix.os }}" = windows-latest ]; then
-            cp _build/native/release/build/cmd/main/main.exe "${name}.exe"
+            cp _build/native/release/build/cmd/jumbit/jumbit.exe "${name}.exe"
             7z a -tzip "dist/${name}.zip" "${name}.exe"
             rm "${name}.exe"
           else
-            cp _build/native/release/build/cmd/main/main.exe "${name}"
+            cp _build/native/release/build/cmd/jumbit/jumbit.exe "${name}"
             tar czf "dist/${name}.tar.gz" "${name}"
             rm "${name}"
           fi

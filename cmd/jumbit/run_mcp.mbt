@@ -119,7 +119,7 @@ fn mcp_initialize(id : Json, entries : Map[String, Json]) -> String {
   }
   // serverInfo 只带 name/version（对齐 atuin Implementation::new 两参形态）；
   // capabilities 只声明 tools 且无 listChanged（工具集静态，不发变更通知）
-  "{\"jsonrpc\":\"2.0\",\"id\":\{id.stringify()},\"result\":{\"protocolVersion\":\"\{negotiated}\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"jumbit\",\"version\":\"\{@jumbit.VERSION}\"},\"instructions\":\"\{json_escape(mcp_instructions())}\"}}"
+  "{\"jsonrpc\":\"2.0\",\"id\":\{id.stringify()},\"result\":{\"protocolVersion\":\"\{negotiated}\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"jumbit\",\"version\":\"\{@root.VERSION}\"},\"instructions\":\"\{json_escape(mcp_instructions())}\"}}"
 }
 
 ///|

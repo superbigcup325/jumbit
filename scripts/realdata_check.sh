@@ -20,7 +20,7 @@
 set -u
 cd "$(dirname "$0")/.."
 
-bin=_build/native/release/build/cmd/main/main.exe
+bin=_build/native/release/build/cmd/jumbit/jumbit.exe
 real_db="$HOME/.local/share/zoxide/db.zo"
 histfile="${HISTFILE:-$HOME/.bash_history}"
 

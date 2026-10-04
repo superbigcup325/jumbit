@@ -18,7 +18,7 @@
 set -u
 cd "$(dirname "$0")/.."
 
-bin=_build/native/release/build/cmd/main/main.exe
+bin=_build/native/release/build/cmd/jumbit/jumbit.exe
 golden=scripts/golden-mcp
 mode=check
 if [ "${1:-}" = "--update" ]; then
