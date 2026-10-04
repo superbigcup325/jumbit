@@ -1,58 +1,51 @@
 # BENCHMARKS
 
-jumbit 与上游 zoxide 的百万行规模对拍基准。裁判是上游真二进制（zoxide 0.10.0），数据集固定种子可复现，所有场景位级一致性随表给出
+jumbit 与上游 zoxide 的百万行规模对拍基准。裁判是上游真二进制（zoxide 0.10.0），数据集固定种子可复现，一致性看护随表给出。本表记录于 2026-10-05（明文库解码快路径落地后的主线 release 构建）
 
-> **English summary.** jumbit vs upstream zoxide 0.10.0 on a 1M-line synthetic z-format dataset (300k unique paths, fixed seed). Judge = the real upstream binary; byte-level parity is verified per run (entry count, import stderr, database file). jumbit is 2.4–5.0x slower in wall time and ~2x in peak memory at this scale; the margin analysis below explains where the time goes and why. Real-world directories hold hundreds to thousands of entries, two to three orders of magnitude below this stress dataset
+> **English summary.** jumbit vs upstream zoxide 0.10.0 on a 1M-line synthetic z-format dataset (300k unique paths, fixed seed). Judge = the real upstream binary. jumbit is 5.6x slower in wall time on import (dedup sort dominated) and 1.6-6.8x on queries (plaintext db decode dominated, fast path shipped this round); peak memory ~2.5x on import, ~1.3x on query. Entry counts legitimately diverge ~2% under the stress aging regime (jumbit clamps rank at entry per its documented policy, upstream does not); semantic parity is guarded by the boundary-row suite (dataset_check, 19/19) and perf_check carries a 5% tolerance band. Real-world directories hold hundreds to thousands of entries, two to three orders of magnitude below this stress dataset
 
 ## 方法学
 
 | 项 | 值 |
 |---|---|
+| 记录日期 | 2026-10-05 |
 | 硬件 | Intel i5-12500H（12th Gen，16 线程）/ 15 GiB / x86_64 |
-| 系统 | CachyOS，kernel 7.2.4-3-cachyos |
-| jumbit | release 构建，工具链 moon 0.1.20260920（与 ci.yml `MOONBIT_VERSION` 一致） |
+| 系统 | CachyOS，kernel 7.2.8-2-cachyos |
+| jumbit | release 构建（2026-10-05 主线，快路径落地后），工具链 moon 0.1.20260920（与 ci.yml `MOONBIT_VERSION` 一致） |
 | 裁判 | zoxide 0.10.0（PATH 真二进制，非 mock） |
 | 数据集 | z 格式 1,000,000 行 / 300,000 唯一路径 / 43,822,540 字节（`scripts/gen_dataset.py`，seed=20260908，Zipf 访问分布 + 时间衰减 + 边界行 + 确定性坏行） |
 | 环境压脚 | `_JB_MAXAGE`/`_ZO_MAXAGE` = u32::MAX（压住老化削库；1M 行 rank 累计远超默认阈值，不压则两侧同样清库） |
 | 计时 | 每场景 3 轮取最优 wall；RSS = 子进程 getrusage 峰值（`scripts/perf_run.py`） |
-| 判定 | 不求快过上游，只求数字健康（同量级）；位级看护 = 条目数 / import stderr / db 文件字节逐字节 |
+| 判定 | 不求快过上游，只求数字健康（同量级）；看护 = 条目数容差带（5%）/ import stderr 逐字节 / dataset_check 语义套件 |
 
 ## 结果
 
-数据集 1M 行，入库约 26.7 万唯一条目（老化削边后，两侧一致）：
+数据集 1M 行，入库约 27 万唯一条目（老化削边后）：
 
 | 场景 | jumbit | zoxide | 时间比 |
 |---|---|---|---|
-| import z（1M 行全量导入） | 1.764s / 203.3 MB | 0.352s / 101.2 MB | 5.01x |
-| query --list --score --all（全量输出） | 0.311s / 85.1 MB | 0.129s / 41.7 MB | 2.41x |
-| query 关键词（单结果） | 0.080s / 85.3 MB | 0.020s / 41.8 MB | 4.00x |
-| query --tsv --all（jumbit 扩展，上游无对应） | 0.143s / 85.2 MB | 无 | 无 |
+| import z（1M 行全量导入） | 2.102s / 251.1 MB | 0.376s / 101.4 MB | 5.59x |
+| query --list --score --all（全量输出） | 0.219s / 55.5 MB | 0.139s / 41.9 MB | 1.58x |
+| query 关键词（单结果） | 0.135s / 55.5 MB | 0.020s / 41.9 MB | 6.75x |
+| query --tsv --all（jumbit 扩展，上游无对应） | 0.218s / 55.6 MB | 无 | 无 |
 
-位级一致性（每轮 perf_check 校验）：
+一致性看护（每轮 perf_check 校验）：
 
-- 库条目数：jumbit 266618 = zoxide 266618
+- 库条目数：jumbit 272133 vs zoxide 266618（差 ~2%）。这是 [#3] 的口径分歧非缺陷：jumbit 入库口钳位 rank（文档口径），上游不钳，u32::MAX 压脚域下边缘条目去留判定不同；语义一致性由 dataset_check 边界行套件把关（19/19 绿），perf_check 以 5% 容差带防灾难偏差
 - import stderr（坏行上报）：423845 = 423845 字节，逐字节
-- 数据库文件：13,854,848 vs 13,854,856 字节（8 字节差异 = 上游头部多一个条目计数字段，内容条目一一对应）
+- 库文件：jumbit 明文 db.txt 13,869,258 字节 vs 上游二进制 db.zo 13,854,856 字节（条目多集有上述 ~2% 差异，文件不再逐字节可比）
 
 ## 边际由什么决定（What decides the margin）
 
-**时间大头在 dedup 的前置排序，不在读取或写盘**。import 的 1.76s 里约 1.1s 是对 1M 条
-`add_unchecked` 产物做 `sort_by_path`（2000 万+ 次 UTF-16 字符串比较）+ 1M 次
-swap_remove。读取段已是单趟流式（对齐上游 import.rs::run 的惰性迭代结构），写盘段
-（预分配编码 + 原子替换）占 ~0.25s。1M 行是一次性导入场景，秒级足够，进一步压缩
-（哈希聚合替代排序）有 f64 求和顺序的字节级对拍代价，不做
+**query 的大头是明文库解码**。0.1.2 起库格式为明文 db.txt（对齐上游 #1288 分支，换取 `edit` 人工编辑与 human-readable），代价是每次载入把 13.8MB 文本逐行解析（时间戳整数 + 定点 rank + 路径串）。本轮落地解码快路径：命中 encode 产物形态（纯数字时间戳 + 整数/恰两位定点 rank、值 ≤ 2^53）时免整行 UTF-8 解码与 parse_f64，函数级解码约 5x（moon bench codec 往返 5.06 → 2.82ms/万条），端到端 qkw 0.193 → 0.135s、qall 0.277 → 0.219s。剩余差距来自 27 万条 path 串物化与文本行结构本身；上游二进制格式解码 ~15ms 量级，该差距是格式特性的固有代价
 
-**内存 2x 的构成**：pre-dedup 全量条目物化（~170MB，上游结构相同、Rust 对象更紧凑）
-+ MoonBit String 为 UTF-16（每字符 2 字节，相对 Rust 的 UTF-8 有 ×~1.8 的字符串带宽
-差）。优化链（单趟流式 / 惰性错误串 / 位置串按需构造 / 预分配编码）已把 import 峰值
-从 499MB 压到 203MB（-59%）；query 侧 85MB 与上游 42MB 的差距同源
+**import 的 2.1s 由 dedup 前置排序主导**：对 1M 条 `add_unchecked` 产物做 `sort_by_path`（`path_lex_cmp` 纯字典序比较器，MoonBit 层逐码元，2000 万+ 次比较）+ 1M 次 swap_remove，外加明文编码。读取段是单趟流式（对齐上游 import.rs::run 惰性迭代结构）。哈希聚合替代排序有 f64 求和顺序的字节级对拍代价，不做
 
-**规模感**：这是压力测试集。真实目录库是几百到几千条，比数据集小 2-3 个数量级，
-全场景都在毫秒级，选型不应以本表为依据，表的价值在可复现与位级一致性证明
+**内存构成**：import 251MB = pre-dedup 全量条目物化（~170MB，上游结构相同、Rust 对象更紧凑）+ MoonBit String 为 UTF-16（每字符 2 字节，相对 Rust UTF-8 有 ×~1.8 的字符串带宽差）；历史优化链已把 import 峰值从 499MB 压到 200MB 量级。query 55MB = 解码产物物化（[#2] 去掉无条件落盘后不再持有 13.8MB 编码缓冲，从 85MB 降下来）vs 上游 42MB
 
-**jumbit 的差异面不在速度**：`--json`/`--tsv`/`--limit`/`--fuzzy`/`describe`/
-`export --agents`/`status` 是上游没有的通道（agent/脚本消费面），本表仅确认这些
-通道在大库下同量级健康
+**规模感**：这是压力测试集。真实目录库是几百到几千条，比数据集小 2-3 个数量级，全场景都在毫秒级，选型不应以本表为依据，表的价值在可复现与一致性看护证明
+
+**jumbit 的差异面不在速度**：`--json`/`--tsv`/`--limit`/`--fuzzy`/`describe`/`export --agents`/`status` 是上游没有的通道（agent/脚本消费面），本表仅确认这些通道在大库下同量级健康
 
 ## 复现
 
@@ -60,5 +53,5 @@ swap_remove。读取段已是单趟流式（对齐上游 import.rs::run 的惰�
 git clone https://github.com/superbigcup325/jumbit && cd jumbit
 export PATH="$HOME/.moon/bin:$PATH"
 moon build --release
-bash scripts/perf_check.sh          # 数据集生成 + 计时 + 位级看护，全程自动
+bash scripts/perf_check.sh          # 数据集生成 + 计时 + 一致性看护，全程自动
 ```
