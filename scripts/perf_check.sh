@@ -101,17 +101,20 @@ row "query tsv" qtsv.jb
 jb_n=$(wc -l < "$tmp/qall.jb.out")
 zo_n=$(wc -l < "$tmp/qall.zo.out")
 echo
-echo "库条目数（qall 输出行数）: jumbit=$jb_n zoxide=$zo_n（≈ $unique 减老化削边，两侧应一致）"
+echo "库条目数（qall 输出行数）: jumbit=$jb_n zoxide=$zo_n（≈ $unique 减老化削边）"
 echo "import stderr 字节: jb=$(wc -c < "$tmp/imp.jb.err") zo=$(wc -c < "$tmp/imp.zo.err")"
-echo "DB 条目: jb=$(wc -l < "$tmp/jb-0/db.txt") zo=$(wc -l < "$tmp/zo-0/db.zo")"
+echo "库文件字节: jb=$(wc -c < "$tmp/jb-0/db.txt") zo=$(wc -c < "$tmp/zo-0/db.zo")（zo 为二进制格式，勿按行数解读）"
 
 fail=0
 if [ "$jb_n" -lt $((unique * 8 / 10)) ] || [ "$zo_n" -lt $((unique * 8 / 10)) ]; then
   echo "✗ 条目数远低于唯一路径数——老化清库了？查 MAXAGE" >&2
   fail=1
 fi
-if [ "$jb_n" != "$zo_n" ]; then
-  echo "✗ 两侧条目数不一致" >&2
+# 两侧不要求相等：jumbit 按 [#3] 口径入库口钳位 rank，上游不钳，u32::MAX 压脚域
+# 下边缘条目去留判定不同（2026-10-05 实测差 ~2%）；语义一致性由 dataset_check.sh 的
+# 边界行套件把关，这里只防灾难性偏差（上述 8 成下限 + 5% 容差带）
+if [ "$jb_n" -gt $((zo_n * 105 / 100)) ] || [ "$jb_n" -lt $((zo_n * 95 / 100)) ]; then
+  echo "✗ 两侧条目数偏差超 5%（jb=$jb_n zo=$zo_n）——查老化/钳位语义" >&2
   fail=1
 fi
 if [ "$(wc -l < "$tmp/qkw.jb.out")" -ne 1 ] || [ "$(wc -l < "$tmp/qkw.zo.out")" -ne 1 ]; then
