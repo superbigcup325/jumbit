@@ -17,6 +17,7 @@
   - config 层中文文案改英文并加前缀：`_JB_DATA_DIR must be an absolute path` / `cannot determine the data directory: set _JB_DATA_DIR` / `invalid glob in _JB_EXCLUDE_DIRS` / `_JB_MAXAGE must be a non-negative integer` / `could not find home directory`
   - 维持无前缀（上游原文如此，USAGE 差异清单已注）：`fzf returned an error` / `fzf was terminated` / `fzf returned an unknown error`
 - 主包改名 `cmd/main` → `cmd/jumbit`：mooncakes 安装命令变为 `moon install superbigcup325/jumbit/cmd/jumbit`，二进制落名 `~/.moon/bin/jumbit` 与可执行名一致，不再需要手工改名（旧安装命令 `.../cmd/main` 在 registry 版本不可覆盖的约束下停留 0.1.3）
+- query 载入解码快路径：明文 db.txt 按行解码命中 encode 产物形态（纯数字时间戳、整数/恰两位定点 rank、值 ≤ 2^53）时免整行 UTF-8 解码与 parse_f64（定点用整数装配 + 单次 IEEE 除法，与 parse_f64 位级一致）；任何非常规形态（符号/指数/inf/nan/超界/其他空白）整体回落原慢路径，错误文案与优先级零变化。百万行压力域（27 万条）query 关键词 0.193 → 0.135s、全量列表 0.277 → 0.219s，与上游比值 11x → 6.8x / 2.0x → 1.6x；函数级解码约 5x（moon bench codec 往返 5.06 → 2.82ms/万条）。等价性由新增白盒对拍套件锁定（快慢路径逐案例 + writer 形态命中断言 + 路由全链），既有 quickcheck 往返性质测试随套件覆盖快路径
 
 ### Documentation
 - USAGE「与 zoxide 的差异」补五处黑盒对拍（真 zoxide 0.10.0）发现的未记载分歧（[#4]）：重复 `--exclude` 后者覆盖（上游报错 exit 2）、interactive 关键词 miss 不启动 fzf（上游先拉起）、fzf argv 缺上游的 `--bind` 组、`help <未知子命令>` 输出通用帮助 exit 0、纯读 query 不重写库文件（上游每次保存重写）；fzf spawn 失败文案同步 `jumbit: ` 前缀

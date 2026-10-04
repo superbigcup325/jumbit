@@ -281,6 +281,128 @@ fn decode_plaintext_line(
 }
 
 ///|
+/// 行内字节空白判定（plaintext_is_ws 同一集合作用于字节：全 ASCII，字节即码元）
+fn plaintext_is_ws_byte(b : Byte) -> Bool {
+  let c = b.to_int()
+  c == 32 || c == 9 || (c >= 11 && c <= 13)
+}
+
+///|
+/// 行级快路径：encode_plaintext 产物形态（timestamp 纯数字 ≤18 位、rank
+/// 纯数字或「数字.恰 2 位」定点）直接字节解析，免整行 UTF-8 解码与
+/// parse_f64（query 每次全量载入的热段）。返回 None = 形态不适用（符号/
+/// 指数/inf/nan/其他空白/坏结构），调用方回落 decode_plaintext_line，
+/// 错误文案与优先级（整行 UTF-8 先于字段解析）由慢路径原样保证。空行判定
+/// 只对空格/tab 直接判空（trim 必剥的交集），其余空白形态交慢路径。
+/// 数值位级等价依据：k ≤ 2^53 时 Int64→Double 精确，N/100.0 为单次 IEEE
+/// 除法（正确舍入），与 parse_f64 对同一定点小数的最近偶舍入一致
+fn decode_plaintext_line_fast(
+  bytes : Bytes,
+  start : Int,
+  end : Int,
+) -> Result[Dir?, String]? {
+  // 行尾 CR 剥离（慢路径同款，先于空行判定）
+  let e = if end > start && bytes[end - 1] == 0x0D { end - 1 } else { end }
+  // 跳前导空白；耗尽整行时空行判定只认空格/tab（其余空白形态回落）
+  let mut i = start
+  let mut only_std_ws = true
+  while i < e {
+    let b = bytes[i]
+    if b == 32 || b == 9 {
+      i += 1
+    } else if plaintext_is_ws_byte(b) {
+      only_std_ws = false
+      i += 1
+    } else {
+      break
+    }
+  }
+  if i >= e {
+    if only_std_ws {
+      return Some(Ok(None))
+    }
+    return None
+  }
+  // timestamp：纯数字段（≤18 位 Int64 无溢出，前导 0 合法同 from_str）
+  let ts_start = i
+  let mut ts : Int64 = 0L
+  while i < e {
+    let c = bytes[i].to_int()
+    if c >= 48 && c <= 57 {
+      ts = ts * 10L + (c - 48).to_int64()
+      i += 1
+    } else {
+      break
+    }
+  }
+  let ts_len = i - ts_start
+  if ts_len == 0 || ts_len > 18 || i >= e || !plaintext_is_ws_byte(bytes[i]) {
+    return None
+  }
+  while i < e && plaintext_is_ws_byte(bytes[i]) {
+    i += 1
+  }
+  // rank：整数或「整数.恰 2 位小数」定点；整数段 >16 位（×100 溢出防护）
+  // 或值超 2^53 回落
+  let r_start = i
+  let mut k : Int64 = 0L
+  while i < e && i - r_start < 16 {
+    let c = bytes[i].to_int()
+    if c >= 48 && c <= 57 {
+      k = k * 10L + (c - 48).to_int64()
+      i += 1
+    } else {
+      break
+    }
+  }
+  if i == r_start ||
+    (i < e && bytes[i].to_int() >= 48 && bytes[i].to_int() <= 57) {
+    return None // 段空或整数段超 16 位被截断
+  }
+  // N = 整数段×100 + 两位小数（k ≤ 16 位 → k×100 ≤ ~1e18，Int64 安全）
+  let mut n : Int64 = k * 100L
+  if i < e && bytes[i] == 46 {
+    // '.'：恰 2 位小数才走快路径
+    i += 1
+    let mut f : Int64 = 0L
+    let mut fd = 0
+    while fd < 2 && i < e {
+      let c = bytes[i].to_int()
+      if c >= 48 && c <= 57 {
+        f = f * 10L + (c - 48).to_int64()
+        i += 1
+        fd += 1
+      } else {
+        break
+      }
+    }
+    if fd != 2 {
+      return None
+    }
+    n = n + f
+  }
+  if i < e && !plaintext_is_ws_byte(bytes[i]) {
+    return None
+  }
+  if n > 9007199254740992L {
+    return None
+  }
+  while i < e && plaintext_is_ws_byte(bytes[i]) {
+    i += 1
+  }
+  if i >= e {
+    return Some(Err(PLAINTEXT_EXPECTED)) // 空 path（慢路径同文案）
+  }
+  // UTF-8 校验只对 path 段：ts/rank 已限定 ASCII 数字，整行校验的其余
+  // 部分与慢路径无分歧（非 ASCII 必落 path 段或触发回落）
+  let path : String = @utf8.decode(bytes[i:e]) catch {
+    _ => return Some(Err("invalid UTF-8"))
+  }
+  let rank = (n.to_double() / 100.0).clamp(min=RANK_MIN, max=RANK_MAX)
+  Some(Ok(Some({ path, rank, last_accessed: ts, note: None, })))
+}
+
+///|
 /// 明文反序列化：按 0x0A 切行逐行解码，行号从 1 起；行级错误全部收集后
 /// 若非空则整库拒绝，最多列 PLAINTEXT_MAX_ERRORS 条、超出折叠为
 /// "... and N more"（对齐上游 deserialize）
@@ -296,7 +418,12 @@ pub fn decode_plaintext(bytes : Bytes) -> Result[Array[Dir], PlaintextError] {
       end += 1
     }
     line_no += 1
-    match decode_plaintext_line(bytes, start, end) {
+    // 快路径优先（encode 产物形态），形态不适用回落慢路径
+    let line = match decode_plaintext_line_fast(bytes, start, end) {
+      Some(res) => res
+      None => decode_plaintext_line(bytes, start, end)
+    }
+    match line {
       Ok(Some(dir)) => dirs.push(dir)
       Ok(None) => ()
       Err(msg) => errors.push("line \{line_no}: \{msg}")
