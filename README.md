@@ -1,100 +1,98 @@
 # jumbit
 
-<a href="README_EN.md">English</a> | 简体中文
-
-a MoonBit rewrite of [zoxide](https://github.com/ajeetdsouza/zoxide): jump to directories in a few keystrokes，用少量关键词跳回去过的目录，jump + Moon**bit**
+A MoonBit rewrite of [zoxide](https://github.com/ajeetdsouza/zoxide): jump to directories in a few keystrokes, jump + Moon**bit**
 
 [![CI](https://github.com/superbigcup325/jumbit/actions/workflows/ci.yml/badge.svg)](https://github.com/superbigcup325/jumbit/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/superbigcup325/jumbit/blob/main/LICENSE)
 [![written in MoonBit](https://img.shields.io/badge/written%20in-MoonBit-9B7EDE)](https://www.moonbitlang.com/)
-[![platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)](USAGE.md#与-zoxide-的差异)
+[![platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)](USAGE.md)
 [![rewrite of zoxide](https://img.shields.io/badge/rewrite%20of-zoxide-orange)](https://github.com/ajeetdsouza/zoxide)
 
 ```bash
-cd ~/projects/backend     # 照常干活：cd 换目录时自动记录
-cd ~/somewhere/else       # …
-j backend                 # 一个词，跳回 ~/projects/backend
-ji                        # 或者 fzf 交互式挑
+cd ~/projects/backend     # work as usual; cd is recorded automatically
+cd ~/somewhere/else
+j backend                 # one keyword gets you back to ~/projects/backend
+ji                        # or pick interactively with fzf
 ```
 
-## 为什么做
+## Why
 
-zoxide 用 frecency（频次 × 时间衰减）把「cd 过的地方」变成「一个词就能回去」，是现代 shell 的标配。jumbit 把这套久经验证的语义用 MoonBit 从零重写：不携带上游任何代码，行为逐条对齐 zoxide 0.10.0，包括衰减系数、关键词匹配、老化口径、退出码、fzf 通道并有百万行级数据与上游真二进制的位级对拍背书（[BENCHMARKS.md](BENCHMARKS.md)）
+zoxide turns "the places you have cd-ed through" into "one keyword and you are back" via frecency (frequency × time decay), a staple of the modern shell. jumbit rewrites these long-proven semantics from scratch in MoonBit: no upstream code is carried over, and behavior is aligned item by item with zoxide 0.10.0, including decay factors, keyword matching, aging, exit codes, and the fzf channel, backed by million-row, byte-level parity runs against the real upstream binary ([BENCHMARKS.md](BENCHMARKS.md))
 
-在这个底座上，jumbit 把目录记忆延伸到 shell 之外：coding agent 是新的「重度 cd 用户」，为此 jumbit 准备了机器可读查询、人工标注、项目地图与 MCP 服务器，让 agent 打开工作区，即知目录分布与用途
+On that foundation, jumbit extends directory memory beyond the shell: coding agents are the new "heavy cd users", and jumbit gives them machine-readable queries, human annotations, a project map, and an MCP server, so that an agent opening the workspace immediately knows the directory layout and purpose
 
-## 功能
+## Features
 
-- **关键词跳转**：`j backend`、`j backend api`，使用 frecency 排序，最后一个关键词锚定路径末组件，多关键词从右往左消耗（语义对齐上游）
-- **9 shell 集成**：bash / zsh / fish 等九个模板，cd 自动记录，`j`/`ji`（fzf 交互）与补全开箱即用
-- **agent 通道**：`--json`/`--tsv` 字节级稳定输出（含 `matched_by` 证据字段）、`describe` 人工标注随库持久化、`export --agents` 生成项目地图 Markdown、`jumbit mcp` 起 stdio MCP 服务器（`jumbit_query`/`jumbit_export_agents` 双工具 + server instructions，官方 SDK 真 client 实测）
-- **历史迁移**：从 z / zsh-z / z.lua / autojump / fasd / atuin 一键导入，空库直灌、`--merge` 合并、坏行不中止
-- **工具生态**：sesh（tmux 会话管理）可整体切换 frecency 后端；yazi 经包装函数成为目录记忆采集器
-- **数据自检与编辑**：`status` 一眼看库（条目/标注/格式/老化阈值），`edit` 用编辑器或 `--rename`/`--prune` 直接改库，`--json` 供脚本消费
+- **Keyword jumping**: `j backend`, `j backend api`, ranked by frecency; the last keyword anchors the final path component, the rest are consumed right-to-left (semantics aligned with upstream)
+- **9-shell integration**: nine templates including bash / zsh / fish; directories are recorded on cd, `j`/`ji` (fzf interactive) and completion work out of the box
+- **Agent channels**: byte-stable `--json`/`--tsv` output (with the `matched_by` evidence field), `describe` human annotations persisted in the database, `export --agents` project-map Markdown, and `jumbit mcp`, a stdio MCP server exposing the `jumbit_query`/`jumbit_export_agents` tools plus server instructions (verified against the official SDK client)
+- **History migration**: one-command import from z / zsh-z / z.lua / autojump / fasd / atuin: direct pour into an empty database, `--merge` otherwise, bad rows never abort the run
+- **Tool ecosystem**: sesh (tmux session manager) can swap its frecency backend wholesale; yazi becomes a directory-memory collector through a wrapper function
+- **Data self-check and editing**: `status` shows the database at a glance (entries/notes/format/aging threshold), `edit` rewrites the database with an editor or `--rename`/`--prune` directly, `--json` for scripts
 
-## 安装
+## Install
 
-**方式一：一键安装脚本（推荐，无工具链依赖）**：预编译覆盖 Linux x86_64 / macOS Apple Silicon / Windows x64
+**Option 1: one-line install script (recommended, no toolchain needed)**: prebuilt coverage: Linux x86_64 / macOS Apple Silicon / Windows x64
 
 ```bash
 curl -fsSL https://github.com/superbigcup325/jumbit/releases/latest/download/install.sh | sh
 ```
 
-装到 `~/.local/bin`（不在 PATH 时脚本会提示；`JUMBIT_INSTALL_DIR` 换目录，`JUMBIT_VERSION` 或位置参数定版本，缺省取 latest）；Windows 不走脚本，从 [Releases](https://github.com/superbigcup325/jumbit/releases) 下载 windows-x86_64 的 zip 解压到 PATH 目录即可（可执行文件名即 `jumbit`）
+Installs to `~/.local/bin` (the script hints if it is not on your PATH; `JUMBIT_INSTALL_DIR` picks another directory, `JUMBIT_VERSION` or a positional argument pins a version, defaults to latest); Windows does not use the script — grab the windows-x86_64 zip from [Releases](https://github.com/superbigcup325/jumbit/releases), unzip, and put it on your PATH (the executable is named `jumbit`)
 
-**方式二：mooncakes（需 [MoonBit 工具链](https://www.moonbitlang.com/)）**
+**Option 2: mooncakes (requires the [MoonBit toolchain](https://www.moonbitlang.com/))**
 
 ```bash
-moon install superbigcup325/jumbit/cmd/jumbit   # 全局安装二进制
+moon install superbigcup325/jumbit/cmd/jumbit   # install the binary globally
 ```
 
-注：二进制落在 `~/.moon/bin/jumbit`，与可执行名一致，装完即用（`~/.moon/bin` 已在 PATH，否则 `moon` 命令本身无法运行）
+Note: the binary lands at `~/.moon/bin/jumbit`, matching the executable name, ready to use right away (`~/.moon/bin` is already on your PATH, otherwise the `moon` command itself would not run)
 
-**方式三：从源码构建**（锚定 `moon 0.1.20261012`，CI 以此钉死可复现构建）：
+**Option 3: build from source** (anchored at `moon 0.1.20261012`; CI pins this version for reproducible builds):
 
 ```bash
 git clone https://github.com/superbigcup325/jumbit && cd jumbit
-export PATH="$HOME/.moon/bin:$PATH"   # MoonBit 工具链
-moon check && moon test               # 构建前自检（可选）
+export PATH="$HOME/.moon/bin:$PATH"   # MoonBit toolchain
+moon check && moon test               # optional pre-build self-check
 moon build --release
-cp _build/native/release/build/cmd/jumbit/jumbit.exe ~/.local/bin/   # 或任意 PATH 目录
+cp _build/native/release/build/cmd/jumbit/jumbit.exe ~/.local/bin/   # or any directory on your PATH
 ```
 
-工具链锚定：CI 以 `.github/workflows/ci.yml` 的 `MOONBIT_VERSION` 常量钉死可复现构建；升级工具链时同步 bump 该常量并重跑全套验证（regression/golden/dataset/chaos/realdata），版本口径以该常量为唯一权威
+Toolchain anchor: CI pins reproducible builds via the `MOONBIT_VERSION` constant in `.github/workflows/ci.yml`; when upgrading the toolchain, bump that constant in the same change and rerun the full verification suite (regression/golden/dataset/chaos/realdata) — the constant is the single source of truth for the version
 
-## 快速上手
+## Quick start
 
 ```bash
-# 1. shell 集成（bash 为例；zsh/fish 等见 USAGE.md）
+# 1. Shell integration (bash shown; zsh/fish etc. see USAGE.md)
 echo 'eval "$(jumbit init bash)"' >> ~/.bashrc && exec bash
-# 2. 像平常一样干活：cd 换目录时自动记录
+# 2. Work as usual; directories are recorded automatically on cd
 cd ~/projects/backend
-# 3. 此后在任意位置按关键词跳回
-j backend        # 记录过的目录里匹配 backend 的最高分
-ji               # fzf 交互式跳转（需安装 fzf）
+# 3. Jump back by keyword from anywhere
+j backend        # highest-ranked recorded directory matching backend
+ji               # interactive jump with fzf (requires fzf)
 ```
 
-记录是全自动的：换目录时 shell hook 调用 `jumbit add`；想看见它在记什么，`export _JB_ECHO=1`
+Recording is fully automatic: the shell hook calls `jumbit add` whenever you change directories; to watch it record, `export _JB_ECHO=1`
 
-## 最小命令集
+## Minimal command set
 
 ```bash
-jumbit add ~/projects/backend        # 记录目录（hook 自动调用；也可手动）
-jumbit query backend                 # 输出匹配的最高分目录
-jumbit query --list --score          # 全部匹配，按得分降序带分数前缀
-jumbit describe ~/projects/backend --note "后端服务"   # 人工标注（jumbit 扩展）
-jumbit status                        # 数据库自检（jumbit 扩展）
-jumbit remove ~/projects/backend     # 从数据库移除
-jumbit help                          # 全部命令与 flag
+jumbit add ~/projects/backend        # record a directory (hook-invoked; manual use is fine)
+jumbit query backend                 # print the best-matching directory
+jumbit query --list --score          # all matches, ranked, with score prefix
+jumbit describe ~/projects/backend --note "backend service"   # human annotation (jumbit extension)
+jumbit status                        # database self-check (jumbit extension)
+jumbit remove ~/projects/backend     # remove from the database
+jumbit help                          # every command and flag
 ```
 
-## 文档
+## Documentation
 
-- [USAGE.md](USAGE.md)：完整用法，含命令与 flag 全表、shell 集成参数与 `j`/`ji` 行为、agent 通道（`--json`/`--tsv`/tool 注册 schema）、sesh/yazi 配置、六插件导入、frecency/老化/匹配语义、环境变量、与 zoxide 的差异
-- [TROUBLESHOOTING.md](TROUBLESHOOTING.md)：报错与故障，含退出码表、常见症状速查、stderr 文案对照、数据损坏处置
-- [BENCHMARKS.md](BENCHMARKS.md)：百万行规模对拍基准（裁判 = 上游真二进制）
-- skill 加载型 agent：[skills/jumbit/SKILL.md](skills/jumbit/SKILL.md)
+- [USAGE.md](USAGE.md): full reference, including complete command/flag tables, shell-integration options and `j`/`ji` behavior, agent channels (`--json`/`--tsv`/tool registration schema), sesh/yazi setup, six-plugin import, frecency/aging/matching semantics, environment variables, and differences from zoxide
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md): errors and failures, including the exit-code table, symptom lookup, stderr message reference, and corrupt-database recovery
+- [BENCHMARKS.md](BENCHMARKS.md): million-row benchmark against upstream (judge = the real upstream binary)
+- Skill-loading agents: [.agents/skills/jumbit/SKILL.md](.agents/skills/jumbit/SKILL.md)
 
-## 许可证
+## License
 
-MIT License。基于 [zoxide](https://github.com/ajeetdsouza/zoxide)（MIT）的语义重写，许可证附原始版权声明
+MIT License. A semantic rewrite based on [zoxide](https://github.com/ajeetdsouza/zoxide) (MIT); the license file carries the original copyright notice
