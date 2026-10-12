@@ -1,0 +1,21 @@
+# What `moon package` / `moon publish` put in the archive.
+#
+# A `.moonignore` here replaces this tree's `.gitignore` for packaging (the two
+# are not merged), and Git's `.git/info/exclude` / global gitignore are never
+# consulted — anything that must stay out of a release belongs in this file.
+# Dot-prefixed paths are excluded by default at every depth, so local-only
+# material under dot-directories needs no entry here.
+
+# Local build output — bare `target` matches at every depth, like .gitignore
+# does; `/target` would only cover the root and let a nested one ship.
+target/
+target
+
+# Bytecode left by the scripts
+__pycache__/
+*.pyc
+
+# Golden fixtures for the shell integration and the MCP server. They belong in
+# the repository (the harness reads them) but not in the published module.
+/scripts/golden/
+/scripts/golden-mcp/
