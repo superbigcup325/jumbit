@@ -1,90 +1,101 @@
-# jumbit 报错与故障排查
+# jumbit errors and troubleshooting
 
-退出码、stderr 文案对照与常见症状处置。命令与 flag 的完整说明见 [USAGE.md](USAGE.md)
+Exit codes, a stderr message reference, and what to do about common symptoms. The
+full command and flag reference is in [USAGE.md](USAGE.md).
 
-## 退出码（全部命令通用）
+## Exit codes (common to every command)
 
-| 退出码 | 含义 |
+| Code | Meaning |
 |---|---|
-| 0 | 有结果或成功；注意 `query --list` 空结果也是 0（静默，对齐上游） |
-| 1 | 无结果或运行失败（**是「没查到」不是故障**，读 stderr 区分） |
-| 2 | 用法错误（未知命令 / flag 互斥 / 缺必选参数），stderr 提示 `jumbit help`；文案为英文 clap 风格（`error: ...` + `For more information, try ...`） |
-| 130 | fzf 用户中断（仅 `--interactive`），静默透传 |
+| 0 | A result was produced, or the command succeeded. Note that `query --list` exits 0 on empty output too (silent, matching upstream) |
+| 1 | No result, or a runtime failure (**"not found" is not a malfunction** — read stderr to tell the two apart) |
+| 2 | Usage error (unknown command / mutually exclusive flags / missing required argument); stderr points at `jumbit help`. The wording is clap-style English (`error: ...` plus `For more information, try ...`) |
+| 130 | The user interrupted fzf (`--interactive` only), passed through silently |
 
-## 常见症状速查
+## Symptom lookup
 
-| 症状 | 原因 | 处置 |
+| Symptom | Cause | What to do |
 |---|---|---|
-| 新目录查不到 | hook 未装，或该目录从未 cd 过 | `jumbit add <目录>`；检查 `eval "$(jumbit init bash)"` 是否在 rc 文件 |
-| 结果路径已不存在 | 默认查询做存在性过滤并懒删陈旧条目 | 确要绕过用 `--all` |
-| fuzzy 命中能不能信 | 看 `--json`/`--tsv` 的 `matched_by` | `exact` 可直接行动，`fuzzy` 先核对再动 |
-| import 拒绝执行 | 库非空 | 加 `--merge` |
-| `could not find fzf` | fzf 未安装 | 安装 fzf 或改用非交互查询 |
-| 数据文件在哪 | 默认 `$HOME/.local/share/jumbit/db.txt`（旧版 db.zo 首次写库时自动转明文，原文件保留可删） | `_JB_DATA_DIR` 重定向（须绝对路径） |
-| shell 报「possible configuration issue」 | init 没放在 rc 文件末尾，或被后续配置覆盖 | 把 `eval "$(jumbit init bash)"` 移到 rc 文件末尾；确认无误可 `export _JB_DOCTOR=0` 关闭提示 |
+| A new directory cannot be found | The hook is not installed, or the directory was never cd-ed into | `jumbit add <dir>`; check that `eval "$(jumbit init bash)"` is in the rc file |
+| The result path no longer exists | Default queries filter on existence and lazily delete stale entries | Use `--all` to bypass |
+| Can a fuzzy hit be trusted? | Check `matched_by` in `--json`/`--tsv` | `exact` can be acted on; verify a `fuzzy` hit before acting |
+| import refuses to run | The database is not empty | Add `--merge` |
+| `could not find fzf` | fzf is not installed | Install fzf, or use a non-interactive query |
+| Where is the data file? | Default `$HOME/.local/share/jumbit/db.txt` (an old db.zo is converted to plaintext on the first write; the original file is kept and can be deleted) | Redirect with `_JB_DATA_DIR` (an absolute path is required) |
+| The shell prints "possible configuration issue" | The init line is not last in the rc file, or a later setting overrides it | Move `eval "$(jumbit init bash)"` to the end of the rc file; if you are sure it is fine, `export _JB_DOCTOR=0` silences the hint |
 
-## stderr 文案对照
+## stderr message reference
 
-**用法错误（exit 2）**，改命令行即可：
+**Usage errors (exit 2)** — fix the command line:
 
-| 文案 | 含义 |
+| Message | Meaning |
 |---|---|
-| `error: unrecognized subcommand '<X>'` | 子命令拼写错误（后续行 `For more information, try 'jumbit help'.`） |
-| `error: add: missing required argument '<PATHS>'` | `add` 后没给目录 |
-| `error: invalid value '<X>' for '--score <N>'` / `error: a value is required for '--score <N>' ...` | 权重值非法或缺失 |
-| `error: invalid value '<X>' for '--limit <n>'` / `error: a value is required for '--limit <n>' ...` | 截断值非法 |
-| `error: the argument '--tsv' cannot be used with '--json'` 等 | 输出通道互斥，去掉其一 |
-| `error: '--limit' requires '--list', '--json' or '--tsv'` | `--limit` 需与列表型输出组合 |
-| `error: missing required argument '<SHELL>'` / `error: invalid value '<X>' for '<SHELL>'`（附 `[possible values: ...]` 行） | `init` 后缺失或拼错 shell 名 |
-| `error: invalid value '<X>' for '--hook <HOOK>'` | hook 取值非法 |
+| `error: unrecognized subcommand '<X>'` | The subcommand is misspelled (the following line says `For more information, try 'jumbit help'.`) |
+| `error: add: missing required argument '<PATHS>'` | `add` was given no directory |
+| `error: invalid value '<X>' for '--score <N>'` / `error: a value is required for '--score <N>' ...` | The weight is invalid or missing |
+| `error: invalid value '<X>' for '--limit <n>'` / `error: a value is required for '--limit <n>' ...` | The truncation value is invalid |
+| `error: the argument '--tsv' cannot be used with '--json'` and similar | The output channels are mutually exclusive; drop one |
+| `error: '--limit' requires '--list', '--json' or '--tsv'` | `--limit` needs a list-shaped output |
+| `error: missing required argument '<SHELL>'` / `error: invalid value '<X>' for '<SHELL>'` (with a `[possible values: ...]` line) | `init` was given no shell, or a misspelled one |
+| `error: invalid value '<X>' for '--hook <HOOK>'` | The hook value is invalid |
 
-**无结果 / 运行失败（exit 1）**：
+**No result / runtime failure (exit 1)**:
 
-| 文案 | 含义与处置 |
+| Message | Meaning and what to do |
 |---|---|
-| `jumbit: no match found` | 没查到，不是故障；确认关键词能锚定末组件（如 `projects` 匹配的是末组件含 projects 的目录），或先 `query --list --score` 看库里有什么 |
-| `jumbit: not a directory: <path>` | `add` 的目标不存在或不是目录 |
-| `jumbit: path not found in database: <path>` | `remove`/`describe` 的路径不在库里（可能已被 `_JB_EXCLUDE_DIRS` 查询懒删、或超 3 个月未访问的 TTL 懒删清出；`--exclude` 只过滤输出、不删库） |
-| `jumbit: you are already in the only match` | 唯一命中被 `--exclude` 排除（对齐上游同文案） |
-| `jumbit: no note found for <path>` | 该条目没有人工标注（查看模式正常返回） |
-| `error: note cannot contain newline or tab` + 退出码 2 | `describe --note` 的标注含换行或 tab（解析层拒绝） |
-| `jumbit: could not find fzf, is it installed?` | fzf 未安装或不可执行；装 fzf 或改用非交互查询 |
-| `fzf returned an error` / `fzf was terminated` / `fzf returned an unknown error` | fzf 自身异常退出；其 stderr 原文会一并打印，按 fzf 侧排查（常见：无可用终端） |
-| `jumbit: could not read <path>: <errno 短语> (os error N)` | import 读不到插件数据文件（如 `No such file or directory`）；核对 `$_Z_DATA` 等探测路径 |
-| `jumbit: failed to run `atuin`; is it installed and on PATH?` | `import atuin` 找不到 atuin 可执行文件；安装 atuin 或改导入其他插件 |
-| `jumbit: could not resolve path <path>: <errno 短语> (os error N)` | `_JB_RESOLVE_SYMLINKS=1` 时目标无法 realpath（如符号链接自环）；修链接或去掉该环境变量 |
-| `jumbit: could not save database: io failure: <errno 短语> (os error N)` | 库文件写不进去（磁盘满/目录只读/权限）；解除后重试 |
-| `jumbit: current database is not empty, specify --merge to continue anyway` | 导入目标库非空，确认后加 `--merge` |
-| `<file>:<行号>: invalid entry: <行>` | import 坏行逐条上报（不中止导入）；该行不符合插件标准格式 |
-| `jumbit: corrupted data file: <原因>` / `jumbit: could not open database: <原因>` | 库文件无法解析，见下节处置 |
-| `jumbit: _JB_DATA_DIR must be an absolute path: <path>` | `_JB_DATA_DIR` 给了相对路径；改用绝对路径 |
-| `jumbit: cannot determine the data directory: set _JB_DATA_DIR` | HOME 未设置且未给 `_JB_DATA_DIR`；设置其一 |
-| `jumbit: invalid glob in _JB_EXCLUDE_DIRS: <pattern>` | `_JB_EXCLUDE_DIRS` 含非法 glob（未闭合 `[`、倒序区间等）；修正 pattern |
-| `jumbit: _JB_MAXAGE must be a non-negative integer: <value>` | `_JB_MAXAGE` 不是非负整数；修正取值（写命令运行时校验，query 不消费该变量） |
-| `jumbit: no editor: set $EDITOR or $VISUAL` | `jumbit edit` 找不到编辑器；设置 `VISUAL` 或 `EDITOR` |
-| `jumbit: editor exited with code N` | 编辑器退出非零（未改库）；修编辑器侧后重试 |
-| `jumbit: path already in database: <path>` | `edit --rename` 的目标路径已在库中（拒绝，不合并） |
+| `jumbit: no match found` | Nothing matched — not a malfunction. Check that the keyword can anchor the final component (`projects` matches a directory whose last component contains `projects`), or run `query --list --score` first to see what the database holds |
+| `jumbit: not a directory: <path>` | The `add` target does not exist or is not a directory |
+| `jumbit: path not found in database: <path>` | The path given to `remove`/`describe` is not in the database (it may have been lazily deleted by a `_JB_EXCLUDE_DIRS` query, or by the TTL sweep after 3 months without a visit; `--exclude` only filters the output, it never deletes) |
+| `jumbit: you are already in the only match` | The single match was excluded by `--exclude` (same wording as upstream) |
+| `jumbit: no note found for <path>` | That entry has no human annotation (viewing mode still returns normally) |
+| `error: note cannot contain newline or tab` plus exit code 2 | The `describe --note` text contains a newline or a tab (rejected at the parsing layer) |
+| `jumbit: could not find fzf, is it installed?` | fzf is not installed or not executable; install fzf, or use a non-interactive query |
+| `fzf returned an error` / `fzf was terminated` / `fzf returned an unknown error` | fzf itself exited abnormally; its stderr is printed verbatim, so debug on the fzf side (the usual cause: no usable terminal) |
+| `jumbit: could not read <path>: <errno phrase> (os error N)` | import could not read the plugin's data file (e.g. `No such file or directory`); check the probed path such as `$_Z_DATA` |
+| `jumbit: failed to run `atuin`; is it installed and on PATH?` | `import atuin` cannot find the atuin executable; install atuin, or import from another plugin instead |
+| `jumbit: could not resolve path <path>: <errno phrase> (os error N)` | With `_JB_RESOLVE_SYMLINKS=1` the target cannot be realpath-ed (a symlink loop, for instance); fix the link or drop that variable |
+| `jumbit: could not save database: io failure: <errno phrase> (os error N)` | The database file cannot be written (disk full / read-only directory / permissions); clear that up and retry |
+| `jumbit: current database is not empty, specify --merge to continue anyway` | The import target database is not empty; add `--merge` once you are sure |
+| `<file>:<line>: invalid entry: <line>` | import reports a bad row row by row (it does not abort the import); the row does not match the plugin's standard format |
+| `jumbit: corrupted data file: <reason>` / `jumbit: could not open database: <reason>` | The database file cannot be parsed — see the next section |
+| `jumbit: _JB_DATA_DIR must be an absolute path: <path>` | `_JB_DATA_DIR` was given a relative path; use an absolute one |
+| `jumbit: cannot determine the data directory: set _JB_DATA_DIR` | HOME is unset and no `_JB_DATA_DIR` was given; set one of them |
+| `jumbit: invalid glob in _JB_EXCLUDE_DIRS: <pattern>` | `_JB_EXCLUDE_DIRS` holds an invalid glob (an unterminated `[`, a reversed range, …); fix the pattern |
+| `jumbit: _JB_MAXAGE must be a non-negative integer: <value>` | `_JB_MAXAGE` is not a non-negative integer; fix the value (validated when a write command runs; query does not consume it) |
+| `jumbit: no editor: set $EDITOR or $VISUAL` | `jumbit edit` found no editor; set `VISUAL` or `EDITOR` |
+| `jumbit: editor exited with code N` | The editor exited non-zero (the database was not changed); fix things on the editor side and retry |
+| `jumbit: path already in database: <path>` | The `edit --rename` target is already in the database (rejected, not merged) |
 
-## 数据损坏处置
+## Recovering a corrupted database
 
-库文件（`<数据目录>/db.txt`）为明文，每行 `timestamp<TAB>rank<TAB>path`。轻微损坏（个别坏行）**可直接手编修复**，`jumbit status` 会给出坏行行号与原因；修好再跑 `jumbit status` 确认不再报错
+The database file (`<data dir>/db.txt`) is plaintext, one
+`timestamp<TAB>rank<TAB>path` per line. Light damage (a few bad lines) **can be
+fixed by hand** — `jumbit status` reports the line number and the reason — and
+then re-running `jumbit status` confirms it is clean:
 
 ```bash
-jumbit status                                    # 查看坏行位置与原因
-$EDITOR ~/.local/share/jumbit/db.txt             # 手编修复（或 jumbit edit）
-jumbit status                                    # 复核
+jumbit status                                    # see where the bad lines are and why
+$EDITOR ~/.local/share/jumbit/db.txt             # fix by hand (or use jumbit edit)
+jumbit status                                    # confirm
 ```
 
-大面积损坏（不想修）：
+Heavy damage (not worth fixing):
 
 ```bash
-mv ~/.local/share/jumbit/db.txt ~/.local/share/jumbit/db.txt.bak   # 留档
-jumbit status                                                      # 自此按空库重建
+mv ~/.local/share/jumbit/db.txt ~/.local/share/jumbit/db.txt.bak   # keep a copy
+jumbit status                                                      # from here it rebuilds as an empty database
 ```
 
-历史目录随后自然重新积累；已有插件数据可 `jumbit import --merge z` 等回灌。换库位置用 `_JB_DATA_DIR`（须绝对路径）
+The directory history then re-accumulates naturally, and existing plugin data can
+be poured back with `jumbit import --merge z` and friends. Move the database
+elsewhere with `_JB_DATA_DIR` (an absolute path is required).
 
-附注：
+Notes:
 
-- 旧版二进制 `db.zo` 在首次写库时自动转换为 `db.txt`，转换后**原文件保留**；确认新库正常后可手动删除 `db.zo`
-- `notes.tsv`（标注侧文件）可随 `db.txt` 一起手编，行格式 `path<TAB>note`；path 被改名时标注不会自动跟随（note 按 path 关联），改名请同步编辑两处，或用 `edit --rename`（标注自动跟随）
+- An old binary `db.zo` is converted to `db.txt` on the first database write, and
+  the **original file is kept**; once the new database looks right you can delete
+  `db.zo` by hand
+- `notes.tsv` (the annotation side file) can be edited alongside `db.txt`, one
+  `path<TAB>note` per line. Annotations are keyed on the path, so renaming a path
+  by hand does not move its note — edit both places, or use `edit --rename`, which
+  carries the note along
