@@ -6,20 +6,25 @@ on:
   pull_request:
 
 env:
-  # 工具链版本钉死（本仓库版本口径的唯一权威，README「安装」节与其呼应）。
-  # 升级流程：
-  #   1. 本地装 latest：curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
-  #      （版本化直链亦可：binaries/<版本>/moonbit-linux-x86_64.tar.gz，
-  #       cores/<版本>.tar.gz；target 格式为 linux-x86_64）
-  #   2. moon version 取新版本号 bump 此常量
-  #   3. 全套闸门本地全绿：regression/golden/dataset/chaos/realdata
-  #   4. 同步提交推送，盯 CI（本仓库曾因 latest 漂移挂掉：v0.10.12 改名了 strconv.from_str）
+  # Toolchain version pin: the single source of truth for the version this repo
+  # targets (the README's Install section mirrors it).
+  # Upgrade procedure:
+  #   1. Install latest locally:
+  #      curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+  #      (versioned direct links work too:
+  #       binaries/<version>/moonbit-linux-x86_64.tar.gz and
+  #       cores/<version>.tar.gz; the target format is linux-x86_64)
+  #   2. Read the new version from `moon version` and bump this constant
+  #   3. Run the full gate locally, all green: regression/golden/dataset/chaos/realdata
+  #   4. Commit and push in the same change, then watch CI (a latest drift broke
+  #      this repo once: v0.10.12 renamed strconv.from_str)
   MOONBIT_VERSION: 0.1.20261012
 
 jobs:
   test:
-    # macOS 档自 probe（2026-09-25）毕业并入：darwin-aarch64 全套闸门与 Linux
-    # 零分歧后转正；fail-fast 关闭，一腿失败不掩盖另一腿
+    # The macOS leg graduated from its probe on 2026-09-25: darwin-aarch64 went
+    # green on every gate with no divergence from Linux. fail-fast is off so one
+    # failing leg cannot hide the other.
     strategy:
       fail-fast: false
       matrix:
@@ -34,7 +39,8 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.moon
-          # key 带平台段：linux/macos 工具链二进制互不兼容，缓存不可跨腿命中
+          # The key carries the platform: linux and macos toolchain binaries are
+          # incompatible, so one leg's cache must never satisfy the other
           key: moonbit-${{ matrix.os }}-${{ env.MOONBIT_VERSION }}
 
       - name: Install MoonBit (cache miss only)
@@ -44,7 +50,8 @@ jobs:
       - name: Add MoonBit to PATH
         run: echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
 
-      # latest 会漂移：安装/缓存结果与钉住版本不符时立即失败，逼出显式升级
+      # latest drifts: fail immediately when the installed/cached toolchain does
+      # not match the pin, so the upgrade has to be explicit
       - name: Verify pinned toolchain version
         run: |
           moon version --all
@@ -61,7 +68,8 @@ jobs:
       - name: Format check
         run: moon fmt --check
 
-      # pkg.generated.mbti 进版本控制，接口漂移（改了代码没跑 moon info）直接挂
+      # pkg.generated.mbti is version-controlled, so an interface drift (code
+      # changed without running moon info) fails here
       - name: Interface freshness (info)
         run: |
           moon info
@@ -75,16 +83,19 @@ jobs:
           moon build --release
           _build/native/release/build/cmd/jumbit/jumbit.exe help > /dev/null
 
-      # 真实二进制全链路：add/query/remove/import/init（shell 矩阵未装的自动跳过）
+      # The real binary end to end: add/query/remove/import/init (shells missing
+      # from the matrix are skipped automatically)
       - name: End-to-end smoke (scripts/smoke.sh)
         run: bash scripts/smoke.sh
 
-      # 扩展面 golden 冻结（out/err/code 三元组逐字节）：上游无裁判可用，
-      # 人工核验后的 golden 即裁判；runner 自带 python3，release 二进制已构建
+      # The extension surface is frozen as goldens (out/err/code triples, byte for
+      # byte). Upstream offers no judge here, so the hand-verified golden is the
+      # judge; the runner ships python3 and the release binary is already built
       - name: Golden check (scripts/golden_check.sh)
         run: bash scripts/golden_check.sh
 
-      # MCP 协议面冻结：stdio 会话固定消息序列逐字节比对（信封/工具目录/
-      # 错误码），protocol 层的字节确定性不靠肉眼
+      # The MCP protocol surface is frozen: a fixed stdio message sequence compared
+      # byte for byte (envelope / tool directory / error codes) — byte-level
+      # determinism at the protocol layer is not eyeballed
       - name: MCP protocol check (scripts/mcp_check.sh)
         run: bash scripts/mcp_check.sh

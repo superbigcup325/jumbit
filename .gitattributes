@@ -1,3 +1,4 @@
-# golden 冻结文件逐字节比对，禁止 git 的行尾翻译（autocrlf checkout 时
-# LF→CRLF 会让 Windows 腿裁判失真，probe 字节诊断实证 31 0d 0a）
+# Golden files are compared byte for byte, so git's newline translation must not
+# touch them (an autocrlf checkout turns LF into CRLF and corrupts the Windows leg's
+# judge; a byte probe showed 31 0d 0a).
 scripts/golden/** -text

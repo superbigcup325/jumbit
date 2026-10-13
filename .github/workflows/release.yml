@@ -1,8 +1,9 @@
 name: Release
 
-# tag（v*）触发：三平台 release 构建 → 压缩包 → 汇总为 draft GitHub Release。
-# draft 形态：发布确认（改 changelog 文案/置 latest）是维护者显式动作，
-# workflow 只负责产物与草稿，不直接 publish。
+# Triggered by a tag (v*): build the release on three platforms, zip the result,
+# and gather it into a draft GitHub Release. It stays a draft because confirming a
+# release (editing the changelog wording, marking it latest) is the maintainer's
+# explicit act — the workflow produces the artefacts and the draft, never publishes.
 on:
   push:
     tags: ["v*"]
@@ -32,9 +33,10 @@ jobs:
         with:
           path: ~/.moon
           key: moonbit-${{ matrix.os }}-${{ env.MOONBIT_VERSION }}
-      # 安装姿势与 ci.yml（unix）/windows-probe.yml（powershell）逐字同款：
-      # unix.sh 的版本位置参数拼出的钉版 URL 实测 CDN 403，两份既有 workflow
-      # 均装 latest + verify 钉版（不符即红，逼出显式升级），release 同口径
+      # The install dance matches ci.yml (unix) and windows-probe.yml (powershell)
+      # word for word: a pinned URL built from unix.sh's version argument returns
+      # 403 from the CDN in practice, so both existing workflows install latest and
+      # then verify the pin (mismatch = red, forcing an explicit upgrade). Same here
       - name: Install MoonBit (unix)
         if: matrix.os != 'windows-latest'
         run: curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
@@ -69,7 +71,8 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           name="jumbit-${version}-${{ matrix.target }}"
           mkdir -p dist
-          # 只留压缩包（裸文件曾随 dist 一起上传造成 asset 双份，已实证清理）
+          # Keep only the archives: bare files once rode along with dist and
+          # produced duplicate assets — verified and cleaned up
           if [ "${{ matrix.os }}" = windows-latest ]; then
             cp _build/native/release/build/cmd/jumbit/jumbit.exe "${name}.exe"
             7z a -tzip "dist/${name}.zip" "${name}.exe"
@@ -93,12 +96,13 @@ jobs:
         with:
           merge-multiple: true
           path: dist
-      # install.sh 随资产分发（README 一键安装的落点）；只在 release job 加一次，
-      # build 矩阵三 artifact 合并后各带一份会撞同名
+      # install.sh ships as an asset (it is what the README's one-liner fetches).
+      # Add it once, in the release job: each of the three build-matrix artefacts
+      # carrying its own copy would collide on the same name
       - name: Attach install script
         run: cp scripts/install.sh dist/install.sh
-      # Release notes = CHANGELOG 对应版本节（与仓库文档单一事实源对齐，
-      # 不用 --generate-notes 的 PR 列表）
+      # Release notes = the matching CHANGELOG section (single source of truth with
+      # the repo docs, instead of --generate-notes' PR list)
       - name: Extract release notes from CHANGELOG
         run: |
           version="${GITHUB_REF_NAME#v}"
@@ -107,7 +111,7 @@ jobs:
             found && index($0, "## [") == 1 { exit }
             found { print }
           ' CHANGELOG.md > release-notes.md
-          [ -s release-notes.md ] || { echo "CHANGELOG 缺 $version 节" >&2; exit 1; }
+          [ -s release-notes.md ] || { echo "CHANGELOG has no section for $version" >&2; exit 1; }
       - name: Create draft release
         env:
           GH_TOKEN: ${{ github.token }}
