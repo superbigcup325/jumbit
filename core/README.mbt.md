@@ -1,59 +1,68 @@
 # `core`
 
-jumbit 的纯函数内核：路径规范化、glob 匹配、关键词过滤、浮点解析与数据库编解码。
-本文件同时是 docstring 测试载体：` ```mbt check ` 代码块会编译进测试（`moon test`），
-示例即用例
+jumbit's pure-function core: path resolution, glob matching, keyword filtering,
+float parsing, and database encoding. This file is also the docstring-test
+carrier: the ` ```mbt check ` blocks are compiled into the test suite
+(`moon test`), so the examples are the cases.
 
-## 路径规范化
+## Path resolution
 
-`resolve_path` 将相对路径基于 base（当前目录）绝对化，解析 `.` 与 `..`，
-不解析符号链接（对齐上游 zoxide 的 `util::resolve_path`）；分隔符语义按目标平台
-编译期分发（POSIX 走 `/`，Windows 走 win32 盘符与双分隔符组件模型）
+`resolve_path` makes a relative path absolute against a base (the current
+directory) and resolves `.` and `..`; it does not resolve symlinks (matching
+upstream zoxide's `util::resolve_path`). Separator semantics are dispatched at
+compile time per target platform (POSIX uses `/`; Windows uses the win32
+drive-letter and double-separator component model).
 
 ```mbt check
 ///|
-// POSIX 形态断言（win32 实现输出反斜杠且 base 语义不同，平台各测）
+// POSIX-shape assertions (the win32 implementation emits backslashes and differs
+// on base semantics, so each platform is tested separately)
 #cfg(not(platform="windows"))
-test "resolve_path 绝对化与点段规范化" {
-  // 相对路径基于 base 拼接
+test "resolve_path absolutises and normalises dot segments" {
+  // a relative path is joined onto the base
   inspect(@core.resolve_path("a/b", "/x/y"), content="/x/y/a/b")
-  // `..` 与 `.` 在规范化的同时消除
+  // `..` and `.` are eliminated while normalising
   inspect(@core.resolve_path("../a", "/x/y"), content="/x/a")
   inspect(@core.resolve_path("/a/./b", "/"), content="/a/b")
-  // 越界 `..` 停在根
+  // `..` past the root stops at the root
   inspect(@core.resolve_path("/../../a", "/"), content="/a")
 }
 ```
 
-`starts_with` 是组件级前缀判断（对齐 `std::path::Path::starts_with`）：
-字符串前缀不算数，按路径组件逐段比较
+`starts_with` is a component-level prefix test (matching
+`std::path::Path::starts_with`): a string prefix does not count, components are
+compared one by one.
 
 ```mbt check
 ///|
-test "starts_with 组件级前缀" {
+test "starts_with is component-level" {
   inspect(@core.starts_with("/foo/bar/baz", "/foo/bar"), content="true")
-  // 字符串前缀不构成组件前缀
+  // a string prefix is not a component prefix
   inspect(@core.starts_with("/foo/ba", "/foo/bar"), content="false")
 }
 ```
 
-## glob 匹配
+## Glob matching
 
-`*` / `**` 跨路径分隔符，`?` / `[...]` / `[!...]` 匹配任意单字符（含分隔符），
-对齐上游 glob crate 默认 MatchOptions（require_literal_separator=false）；
-`\` 转义；`{a,b}` 括号展开不支持（与上游 glob crate 的已定差异）。非法 pattern
-用 `validate_glob` 前置校验，`glob_matches` 返回 `Result`，`glob_match` 供
-已校验 pattern 的快路径
+`*` / `**` cross path separators; `?` / `[...]` / `[!...]` match any single
+character (separators included), matching the upstream glob crate's default
+MatchOptions (require_literal_separator=false). `\` escapes. Brace expansion
+`{a,b}` is not supported (a settled difference from the upstream glob crate).
+Validate an untrusted pattern up front with `validate_glob`; `glob_matches`
+returns a `Result`, while `glob_match` is the fast path for already-validated
+patterns.
 
 ```mbt check
 ///|
-test "glob 跨分隔符与非法 pattern" {
-  // `*` 跨组件展开（glob crate 默认语义，`*` 匹配含分隔符的任意序列）
+test "glob crosses separators; invalid pattern" {
+  // `*` crosses components (the glob crate's default: `*` matches any sequence,
+  // separators included)
   inspect(@core.glob_match("/usr/*", "/usr/local"), content="true")
   inspect(@core.glob_match("/usr/*", "/usr/local/bin"), content="true")
-  // 未闭合字符类报错（`{a,b}` 为合法 pattern，按字面量处理不展开）
+  // an unterminated character class is an error (`{a,b}` is a valid pattern,
+  // treated literally and not expanded)
   inspect(@core.validate_glob("/usr/[ab") is Some(_), content="true")
-  // 校验与匹配一步完成
+  // validate and match in one step
   inspect(
     @core.glob_matches("/usr/lo*al", "/usr/local") is Ok(true),
     content="true",
@@ -61,26 +70,30 @@ test "glob 跨分隔符与非法 pattern" {
 }
 ```
 
-## 关键词过滤
+## Keyword filtering
 
-`filter_by_keywords` 实现上游 zoxide 的关键词语义：末关键词必须落在路径末组件，
-其余关键词从右往左消耗且不许重叠；大小写归一仅限 ASCII（与上游的已定差异）。
-`filter_by_keywords_fuzzy` 为精确零命中时的兜底：各关键词为某路径组件的子串即命中
+`filter_by_keywords` implements upstream zoxide's keyword semantics: the last
+keyword must land in the path's final component, and the earlier ones are
+consumed right-to-left without overlapping. Case folding is ASCII-only (a settled
+difference from upstream). `filter_by_keywords_fuzzy` is the fallback when an
+exact pass finds nothing: a row matches when each keyword is a substring of some
+path component.
 
 ```mbt check
 ///|
-test "关键词末组件锚定与 fuzzy 兜底" {
-  // 末关键词锚定末组件，其余从右往左消耗
+test "keyword anchoring on the final component, and the fuzzy fallback" {
+  // the last keyword anchors the final component; the rest are consumed right-to-left
   inspect(
     @core.filter_by_keywords(["user", "work"], "/home/user/work"),
     content="true",
   )
-  // 顺序反了则 miss（work 不在末组件）
+  // reversed order misses (work is not in the final component)
   inspect(
     @core.filter_by_keywords(["work", "user"], "/home/user/work"),
     content="false",
   )
-  // fuzzy：`ork` 是 `work` 的连续子串即命中，不限末组件（子串匹配非缩写）
+  // fuzzy: `ork` is a substring of `work` so it matches, with no anchoring on the
+  // final component (substring matching, not abbreviation)
   inspect(
     @core.filter_by_keywords_fuzzy(["ork"], "/home/user/work"),
     content="true",
@@ -88,36 +101,40 @@ test "关键词末组件锚定与 fuzzy 兜底" {
 }
 ```
 
-## 浮点解析
+## Float parsing
 
-`parse_f64` 对齐 Rust `f64::from_str` 语义（jumbit 与上游逐字节对齐的根基）：
-科学计数法、`inf`/`nan` 字面量接受，溢出饱和为无穷，非法串拒绝
+`parse_f64` matches Rust's `f64::from_str` semantics (the foundation of jumbit's
+byte-for-byte alignment with upstream): scientific notation and the `inf`/`nan`
+literals are accepted, overflow saturates to infinity, and invalid strings are
+rejected.
 
 ```mbt check
 ///|
-test "parse_f64 对齐 Rust from_str" {
+test "parse_f64 matches Rust from_str" {
   match @core.parse_f64("3.5") {
     Ok(v) => inspect(v, content="3.5")
-    Err(_) => fail("3.5 应解析成功")
+    Err(_) => fail("3.5 should parse")
   }
-  // 溢出饱和为无穷（Rust 语义）
+  // overflow saturates to infinity (Rust semantics)
   match @core.parse_f64("1e309") {
     Ok(v) => inspect(v.is_inf(), content="true")
-    Err(_) => fail("1e309 应饱和为 inf")
+    Err(_) => fail("1e309 should saturate to inf")
   }
-  // 非法串拒绝
+  // invalid strings are rejected
   inspect(@core.parse_f64("abc") is Err(_), content="true")
 }
 ```
 
-## 数据库编解码
+## Database encoding
 
-明文格式 `db.txt` 的行编解码：每行 `timestamp\trank\tpath`，人工标注走侧文件
-`notes.tsv` 不进主格式；坏行整库拒绝并按行号报错（见 `PlaintextError`）
+Line encoding and decoding for the plaintext `db.txt` format: each line is
+`timestamp\trank\tpath`; human annotations live in the side file `notes.tsv` and
+never enter the main format. A bad line makes the whole database decode fail with
+a line number (see `PlaintextError`).
 
 ```mbt check
 ///|
-test "明文编解码 roundtrip" {
+test "plaintext encode/decode round-trip" {
   let dirs = [
     @core.Dir::{
       path: "/home/user/work",
@@ -132,7 +149,7 @@ test "明文编解码 roundtrip" {
       inspect(decoded[0].path, content="/home/user/work")
       inspect(decoded[0].rank == 3.0, content="true")
     }
-    Err(_) => fail("decode_plaintext 不应失败")
+    Err(_) => fail("decode_plaintext should not fail")
   }
 }
 ```
