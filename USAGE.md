@@ -1,82 +1,95 @@
-# jumbit 使用手册
+# jumbit user manual
 
-完整用法参考：命令与 flag 全表、shell 集成参数、agent 通道、工具集成、导入、工作原理、环境变量与差异清单。报错排查见 [TROUBLESHOOTING.md](TROUBLESHOOTING.md)，性能基准见 [BENCHMARKS.md](BENCHMARKS.md)
+The complete reference: every command and flag, the shell-integration options,
+the agent channels, tool integrations, import, how it works, environment
+variables, and the differences from zoxide. For failures see
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md); for performance numbers see
+[BENCHMARKS.md](BENCHMARKS.md).
 
-## 命令总览
+## Command overview
 
 ```bash
-jumbit add [--score N] <path>...        记录目录（hook 自动调用；也可手动；--score 指定本次增量权重）
-jumbit remove <path>...                 从数据库移除目录
-jumbit query [kw]...                    输出最高得分匹配目录
-  --list                                输出全部匹配（按得分降序）
-  --score                               前缀显示得分
-  --all                                 跳过存在性检查
-  --exclude <path>                      排除指定目录（精确路径，glob 排除走 _JB_EXCLUDE_DIRS）
-  --interactive                         fzf 交互式选择
-  --json                                单行 JSON 数组输出全部匹配（agent 通道，与 --interactive 互斥）
-  --fuzzy                               精确零命中时按组件子串兜底（jumbit 扩展）
-  --tsv                                 Tab 分隔输出 path/score/last_accessed/matched_by（jumbit 扩展，与 --json/--interactive 互斥）
-  --limit <n>                           只输出前 n 条（与 --list/--json/--tsv 组合，jumbit 扩展）
-jumbit init <shell>                     生成 shell 集成脚本（默认定义 j/ji，hook=pwd）
+jumbit add [--score N] <path>...        record directories (the hook calls this automatically; manual use is fine; --score sets this visit's weight)
+jumbit remove <path>...                 remove directories from the database
+jumbit query [kw]...                    print the highest-scoring matching directory
+  --list                                print every match (descending by score)
+  --score                               prefix each line with the score
+  --all                                 skip the existence check
+  --exclude <path>                      exclude a directory (exact path; glob exclusion goes through _JB_EXCLUDE_DIRS)
+  --interactive                         pick interactively with fzf
+  --json                                one-line JSON array of every match (agent channel, mutually exclusive with --interactive)
+  --fuzzy                               fall back to component substrings when an exact pass finds nothing (jumbit extension)
+  --tsv                                 tab-separated path/score/last_accessed/matched_by (jumbit extension, mutually exclusive with --json/--interactive)
+  --limit <n>                           print only the first n rows (combines with --list/--json/--tsv, jumbit extension)
+jumbit init <shell>                     emit the shell integration (defines j/ji by default, hook=pwd)
   [--cmd C] [--hook pwd|prompt|none] [--no-cmd]
-jumbit import <plugin> [--merge]        从其他工具导入历史数据（plugin ∈ atuin/autojump/fasd/z/z.lua/zsh-z）
-jumbit describe <path> [--note text]    查看/设置人工标注（--note "" 清除，jumbit 扩展）
-jumbit export --agents                  输出项目地图 Markdown（jumbit 扩展）
-jumbit status [--json] [--check]        数据库自检：条目/标注/格式/阈值（--check 扫存在性，jumbit 扩展）
-jumbit edit                             用 $VISUAL/$EDITOR 编辑数据库（jumbit 扩展）
-  [--rename <old> <new>] | [--prune]    改路径（标注跟随）/ 清除不存在条目；三形态互斥
-jumbit mcp                              启动 stdio MCP 服务器（agent 通道，jumbit 扩展，见「面向 agent」）
-jumbit help                             显示帮助
-jumbit --version                        显示版本（-V 同义）
+jumbit import <plugin> [--merge]        import history from another tool (plugin ∈ atuin/autojump/fasd/z/z.lua/zsh-z)
+jumbit describe <path> [--note text]    view/set a human annotation (--note "" clears it, jumbit extension)
+jumbit export --agents                  print the project map as Markdown (jumbit extension)
+jumbit status [--json] [--check]        database self-check: entries/notes/format/threshold (--check scans for existence, jumbit extension)
+jumbit edit                             edit the database with $VISUAL/$EDITOR (jumbit extension)
+  [--rename <old> <new>] | [--prune]    rename a path (the note follows) / drop entries that no longer exist; the three forms are mutually exclusive
+jumbit mcp                              start the stdio MCP server (agent channel, jumbit extension, see "For agents")
+jumbit help                             show help
+jumbit --version                        show the version (-V is a synonym)
 ```
 
-语法与行为速记：
+Syntax and behaviour at a glance:
 
-- flag 两形态等价：`--cmd zj` 与 `--cmd=zj`（对齐上游 clap 双形态）；子命令的 flag 与 positional 参数位置任意穿插（`jumbit init --cmd zj bash` 合法，对齐 clap intermix）
-- 无参数调用输出用法帮助（stderr）并退出 2（对齐上游）；`jumbit help` 显式请求则走 stdout 退出 0
-- 带值 flag（`--score` / `--exclude` / `--limit` / `--note`）重复出现时后者覆盖；`--` 之后不再解析 flag
-- `query` 无关键词 = 输出最高分条目；`query --list` 空结果静默、退出码 0（对齐上游）
-- `describe <path>` 不带 `--note` 为查看模式：打印现有标注，无标注 exit 1
-- 单结果路 stdout 是纯路径，可直接 `cd "$(jumbit query kw)"`
-- `query` 默认做存在性过滤并懒删陈旧条目；确要绕过用 `--all`
+- The two flag forms are equivalent: `--cmd zj` and `--cmd=zj` (matching upstream's clap). A subcommand's flags and positionals may be interleaved freely (`jumbit init --cmd zj bash` is valid, matching clap's intermix)
+- Called with no arguments it prints the usage help to stderr and exits 2 (matching upstream); an explicit `jumbit help` writes to stdout and exits 0
+- Repeating a value-taking flag (`--score` / `--exclude` / `--limit` / `--note`) lets the last one win; nothing after `--` is parsed as a flag
+- `query` with no keywords prints the highest-scoring entry; `query --list` is silent on empty output with exit code 0 (matching upstream)
+- `describe <path>` without `--note` is view mode: it prints the existing annotation and exits 1 when there is none
+- The single-result path writes a bare path to stdout, so `cd "$(jumbit query kw)"` works directly
+- `query` filters on existence by default and lazily deletes stale entries; use `--all` to bypass that
 
-## shell 集成
+## Shell integration
 
 ```bash
-# bash：加入 ~/.bashrc
+# bash: add to ~/.bashrc
 eval "$(jumbit init bash)"
-# zsh：~/.zshrc；fish：~/.config/fish/config.fish 用 `jumbit init fish | source`
-# 另支持 elvish / nushell / posix / powershell / tcsh / xonsh，用法同上
+# zsh: ~/.zshrc; fish: use `jumbit init fish | source` in ~/.config/fish/config.fish
+# elvish / nushell / posix / powershell / tcsh / xonsh are supported too, the same way
 
-j backend        # 跳转（自动补全）
-ji               # fzf 交互式跳转（需安装 fzf）
+j backend        # jump (with completion)
+ji               # interactive jump with fzf (requires fzf)
 ```
 
-`init` 参数：
+`init` options:
 
-| 参数 | 作用 | 默认 |
+| Option | Effect | Default |
 |---|---|---|
-| `--cmd C` | 自定义命令名（两形态 `--cmd cd` / `--cmd=cd`） | `j`（交互命令 `ji` 同步派生） |
-| `--hook pwd\|prompt\|none` | 记录触发方式：换目录时 / 提示符时机 / 不自动记录 | `pwd` |
-| `--no-cmd` | 只生成内部函数，不定义公开命令（自行 alias） | 关 |
+| `--cmd C` | Custom command name (both forms: `--cmd cd` / `--cmd=cd`) | `j` (the interactive command `ji` is derived alongside) |
+| `--hook pwd\|prompt\|none` | How recording is triggered: on directory change / at prompt time / never automatically | `pwd` |
+| `--no-cmd` | Emit only the internal functions, define no public command (alias it yourself) | off |
 
-`j` 的完整行为：
+The full behaviour of `j`:
 
-| 调用 | 行为 |
+| Invocation | Behaviour |
 |---|---|
-| `j`（无参数） | 回 home |
-| `j -` | 回上一个目录（OLDPWD） |
-| `j <存在的路径>` | 直达该目录（先于关键词匹配） |
-| `j <关键词>...` | frecency 最高分匹配并 cd；跳转目的地随后自动入库（`--hook none` 下不自动记录） |
-| `ji [关键词]...` | fzf 交互式选择后 cd |
+| `j` (no arguments) | go home |
+| `j -` | go to the previous directory (OLDPWD) |
+| `j <existing path>` | go straight to that directory (before keyword matching) |
+| `j <keyword>...` | cd to the best frecency match; the destination is recorded afterwards (with `--hook none` nothing is recorded) |
+| `ji [keyword]...` | pick interactively with fzf, then cd |
 
-> 测试覆盖口径：bash / zsh / fish 的 hook 全链路在 CI 中真跑（source init 输出、驱动钩子、断言落点与入库）；tcsh / xonsh 在 smoke 中做脚本态真加载门禁（source/execx 后断言命令别名已定义）；elvish / nushell / posix / powershell 保持语法门禁（nu-check / sh -n / pwsh 解析 / elvish 编译），九模板的 headless 全链路已于 2026-09-27 真机逐壳验证通过（bash/zsh/posix/tcsh 脚本态、fish/nu/pwsh/xonsh 脚本态、elvish pty 交互态），发现问题请提 issue
+> Test coverage: the full hook chain for bash / zsh / fish runs for real in CI
+> (source the init output, drive the hooks, assert the landing point and the
+> recording); tcsh / xonsh get a script-mode load gate in smoke (assert the alias
+> exists after source/execx); elvish / nushell / posix / powershell keep syntax
+> gates (nu-check / sh -n / pwsh parse / elvish compile). All nine templates were
+> verified headless on real machines, shell by shell, on 2026-09-27 (script mode
+> for bash/zsh/posix/tcsh, script mode for fish/nu/pwsh/xonsh, and elvish in an
+> interactive pty). Please open an issue if you find a problem.
 
-## 面向 agent
+## For agents
 
-jumbit 的目录记忆不只喂给 shell，也喂给 coding agent。四条通道：
+jumbit's directory memory does not only feed the shell — it feeds coding agents
+too. Four channels:
 
-**机器可读查询**：`query --json` / `--tsv` 供 agent 脚本解析，`--limit N` 截断返回条数、控制上下文开销：
+**Machine-readable queries**: `query --json` / `--tsv` are for agent scripts, and
+`--limit N` caps the row count to control context cost:
 
 ```bash
 jumbit query --json backend
@@ -86,19 +99,22 @@ jumbit query --json backend
 [{"path":"/home/you/projects/backend-api","score":8,"last_accessed":1789054423,"matched_by":"exact"}]
 ```
 
-- 键序固定 `path, score, last_accessed, matched_by`，单行数组，字节级稳定
-- `last_accessed` 为 epoch 秒；`score` 为最短浮点表示（NaN/±Infinity 出 `null`，JSON 数值域）
-- `matched_by` 是证据字段：`exact`（关键词精确匹配）或 `fuzzy`（`--fuzzy` 子串兜底命中），agent 可据此决定是否信任结果
-- `--tsv` 出无表头 Tab 分隔行，列序与 JSON 键序一致，适合喂表格类工具：
+- The key order is fixed — `path, score, last_accessed, matched_by` — one line, byte-stable
+- `last_accessed` is epoch seconds; `score` uses the shortest float form (NaN/±Infinity become `null`, the JSON numeric domain)
+- `matched_by` is the evidence field: `exact` (a keyword match) or `fuzzy` (a `--fuzzy` substring fallback), so an agent can decide how much to trust the row
+- `--tsv` emits headerless tab-separated rows with the same column order as the JSON keys, which suits table-shaped tools:
 
 ```
 /home/you/projects/backend-api	8	1789054423	exact
 ```
 
-**项目地图**：`describe` 给常用目录加人工标注（随库持久化），`export --agents` 导出为 Markdown 表格，追加进 AGENTS.md 后，agent 打开工作区即获知项目分布与用途：
+**Project map**: `describe` attaches a human annotation to a frequent directory
+(persisted in the database), and `export --agents` renders them as a Markdown
+table to append to AGENTS.md, so an agent opening the workspace immediately knows
+what lives where:
 
 ```bash
-jumbit describe ~/projects/backend-api --note "后端服务"
+jumbit describe ~/projects/backend-api --note "backend service"
 jumbit export --agents >> AGENTS.md
 ```
 
@@ -106,12 +122,17 @@ jumbit export --agents >> AGENTS.md
 <!-- jumbit export --agents: project map, ordered by frecency -->
 | Path | Description |
 |---|---|
-| /home/you/projects/backend-api | 后端服务 |
+| /home/you/projects/backend-api | backend service |
 ```
 
-**退出码与报错**：agent 决策面，0 有结果或成功；1 无结果或运行失败（「没查到」不是故障，读 stderr 区分）；2 用法错误；130 fzf 用户中断。全表与 stderr 文案对照见 [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+**Exit codes and errors**: the agent decision surface — 0 means a result or
+success; 1 means no result or a runtime failure ("not found" is not a malfunction,
+read stderr to tell them apart); 2 is a usage error; 130 is a user interrupt of
+fzf. The full table and the stderr reference are in
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
-**注册为 tool**（工具注册型 agent 的 JSON schema 草案；skill 加载型用仓库 `skills/jumbit/SKILL.md`）：
+**Register as a tool** (a draft JSON schema for tool-registering agents;
+skill-loading agents use [.agents/skills/jumbit/SKILL.md](.agents/skills/jumbit/SKILL.md)):
 
 ```json
 {
@@ -139,15 +160,20 @@ jumbit export --agents >> AGENTS.md
 }
 ```
 
-命令面映射：`jumbit query --json [--fuzzy] [--limit N] <keywords...>`，解析 stdout 单行 JSON，按 `matched_by` 决定信任级别
+Command mapping: run `jumbit query --json [--fuzzy] [--limit N] <keywords...>`,
+parse the single-line JSON from stdout, and use `matched_by` to decide the trust
+level.
 
-**MCP 服务器**：`jumbit mcp` 起 stdio MCP 服务器（Model Context Protocol，stdio transport），上一节的 tool 注册对 MCP 客户端是自动的：客户端从 `tools/list` 拿 schema，无需手工注册。Claude Code 一行接入：
+**MCP server**: `jumbit mcp` starts a stdio MCP server (Model Context Protocol,
+stdio transport). The tool registration above is automatic for MCP clients: they
+read the schema from `tools/list`, with no manual registration. One line for
+Claude Code:
 
 ```bash
 claude mcp add jumbit -- jumbit mcp
 ```
 
-其他 MCP 客户端用等价 JSON 配置：
+Other MCP clients use the equivalent JSON:
 
 ```json
 {
@@ -160,19 +186,31 @@ claude mcp add jumbit -- jumbit mcp
 }
 ```
 
-- 两个 tool：`jumbit_query`（`keywords`/`fuzzy`/`limit`，返回与 `query --json` 同源同形的单行 JSON 数组）、`jumbit_export_agents`（无参，返回项目地图 Markdown）
-- `initialize` 应答带 server instructions（何时用 jumbit 的短叙事，客户端注入模型 system prompt）；协议版本支持 2024-11-05 / 2025-03-26 / 2025-06-18，协商规则=支持则回显、否则回 2025-06-18
-- newline-delimited JSON-RPC 2.0，stdout 只承载协议消息（日志无）；客户端关闭 stdin 即正常退出（exit 0）
-- 错误划分对齐同类实现（atuin mcp）：未知工具/参数非法走协议层 -32602；miss 等执行失败走结果内 `isError: true`，文案与 CLI stderr 同源（「没查到」不是故障）
-- 协议字节面由 `scripts/mcp_check.sh` 冻结（CI 步骤），真 client 兼容性经官方 TypeScript SDK 实测
+- Two tools: `jumbit_query` (`keywords`/`fuzzy`/`limit`, returning the same
+  single-line JSON array as `query --json`) and `jumbit_export_agents` (no
+  arguments, returning the project-map Markdown)
+- The `initialize` response carries server instructions (the short narrative of
+  when to reach for jumbit, which clients inject into the model's system prompt).
+  Protocol versions 2024-11-05 / 2025-03-26 / 2025-06-18 are supported; the
+  negotiation rule is to echo a supported version, otherwise answer 2025-06-18
+- newline-delimited JSON-RPC 2.0; stdout carries protocol messages only (no logs);
+  closing stdin makes it exit cleanly (exit 0)
+- The error split matches comparable implementations (atuin mcp): an unknown tool
+  or an invalid argument goes through the protocol layer as -32602, while an
+  execution failure such as a miss becomes `isError: true` in the result, with the
+  same wording as the CLI's stderr ("not found" is not a malfunction)
+- The protocol's byte surface is frozen by `scripts/mcp_check.sh` (a CI step), and
+  real-client compatibility was tested against the official TypeScript SDK
 
-## 与其他工具集成
+## Integrations with other tools
 
-jumbit 的目录记忆经 CLI 面供给其他工具消费，以下配置均经真机验证（sesh 2.29 / yazi 26.9）
+jumbit's directory memory is exposed through the CLI for other tools to consume.
+The configurations below were verified on real machines (sesh 2.29 / yazi 26.9).
 
-### sesh（tmux 会话管理器）
+### sesh (tmux session manager)
 
-sesh v2.29.0 起提供 `[frecency]` 配置节，可把 frecency 后端从 zoxide 整体换成 jumbit。写入 `~/.config/sesh/sesh.toml`：
+sesh v2.29.0 offers a `[frecency]` config section that swaps the frecency backend
+from zoxide to jumbit wholesale. Write this into `~/.config/sesh/sesh.toml`:
 
 ```toml
 [frecency]
@@ -182,11 +220,14 @@ add_command = "jumbit add {}"
 remove_command = "jumbit remove {}"
 ```
 
-`sesh list -z` 列出 jumbit 记录（按得分降序）；`sesh connect <名字或路径>` 创建并连接会话，连接后经 `add_command` 回写使用记录，跳转决策与记忆积累双向打通
+`sesh list -z` lists what jumbit has recorded (descending by score); `sesh connect
+<name-or-path>` creates and attaches a session and writes back through
+`add_command`, so both the jump decision and the memory accumulation work.
 
-### yazi（终端文件管理器）
+### yazi (terminal file manager)
 
-yazi 26.x 经 `--cwd-file` 支持退出时回传所在目录，社区惯例是 shell 包装函数。加入 `~/.bashrc` 或 `~/.zshrc`：
+yazi 26.x supports `--cwd-file` to hand back the directory it exits in, and the
+community idiom is a shell wrapper. Add this to `~/.bashrc` or `~/.zshrc`:
 
 ```sh
 yj() {
@@ -204,76 +245,180 @@ yj() {
 }
 ```
 
-`yj <关键词>` 经 jumbit 解析出目录作为 yazi 起点进入文件管理；退出后自动 `jumbit add` 喂入本次到达的目录并 cd 过去，文件管理器成为目录记忆的采集器
+`yj <keyword>` resolves a directory through jumbit as yazi's starting point, and
+on exit it feeds the directory you reached back with `jumbit add` and cds there —
+the file manager becomes a collector for your directory memory.
 
-## 导入
+## Import
 
-如果你在用以下插件，可以把历史目录数据导入 jumbit。数据文件按各插件的标准约定自动探测：
+If you use any of the plugins below, you can import their history into jumbit.
+The data files are probed by each plugin's standard convention:
 
 ```sh
 jumbit import <plugin>
 ```
 
-| 插件 | 命令 | 数据文件探测 | 数据格式 |
+| Plugin | Command | Data file probing | Data format |
 |---|---|---|---|
-| atuin | `jumbit import atuin` | 经 `atuin history list` 子进程读取 | `YYYY-MM-DD HH:MM:SS<TAB>path`（子进程输出） |
-| autojump | `jumbit import autojump` | `$XDG_DATA_HOME/autojump/autojump.txt`，默认 `~/.local/share/autojump/autojump.txt` | `rank<TAB>path`（rank 过 sigmoid 归一，对齐上游） |
-| fasd | `jumbit import fasd` | `$_FASD_DATA`，否则 `~/.fasd` | `path\|rank\|timestamp` |
-| z | `jumbit import z` | `$_Z_DATA`，否则 `~/.z` | `path\|rank\|timestamp` |
-| z.lua | `jumbit import z.lua` | `$_ZL_DATA`，否则 `~/.zlua`；主路径缺失回落 `zlua/zlua.txt` | `path\|rank\|timestamp`（与 z 同解析器，对齐上游） |
-| zsh-z | `jumbit import zsh-z` | `$ZSHZ_DATA`，否则同 z | `path\|rank\|timestamp` |
+| atuin | `jumbit import atuin` | read through the `atuin history list` subprocess | `YYYY-MM-DD HH:MM:SS<TAB>path` (subprocess output) |
+| autojump | `jumbit import autojump` | `$XDG_DATA_HOME/autojump/autojump.txt`, else `~/.local/share/autojump/autojump.txt` | `rank<TAB>path` (the rank is sigmoid-normalized, matching upstream) |
+| fasd | `jumbit import fasd` | `$_FASD_DATA`, else `~/.fasd` | `path\|rank\|timestamp` |
+| z | `jumbit import z` | `$_Z_DATA`, else `~/.z` | `path\|rank\|timestamp` |
+| z.lua | `jumbit import z.lua` | `$_ZL_DATA`, else `~/.zlua`; falls back to `zlua/zlua.txt` when the main path is missing | `path\|rank\|timestamp` (same parser as z, matching upstream) |
+| zsh-z | `jumbit import zsh-z` | `$ZSHZ_DATA`, else as z | `path\|rank\|timestamp` |
 
-注：数据库非空时须加 `--merge` 合并导入（如 `jumbit import --merge z`）；坏行逐条上报、不中止导入
+Note: when the database is not empty, add `--merge` to import into it (for
+example `jumbit import --merge z`); bad rows are reported one by one and never
+abort the import.
 
-注：atuin 经子进程 `atuin history list` 读取，其退出码不检查（对齐上游）：atuin 自身报错时得到空结果且 exit 0，成败以 stderr 为准
+Note: atuin is read through the `atuin history list` subprocess and its exit code
+is not checked (matching upstream), so an atuin-side error yields an empty result
+with exit 0 — judge success by stderr.
 
-注：`import atuin` 读取的是 atuin 记录里随命令实时捕获的目录字段（子进程 `atuin history list --format={time}\t{directory} --print0`，对齐上游）。该字段仅当记录由 atuin shell hook 实时产生时才有值；经 `atuin import bash` 等从 shell 历史文件灌入的记录不含目录信息，atuin 以字面量 `unknown` 填充，导入结果即为无意义的 `unknown` 条目（与上游逐字节一致，实测 2026-09-27；atuin 18 的 `{directory}` 模板变量本身有效，历史输出格式变化与本导入无关）。若你的 atuin 数据源自历史文件导入，`import atuin` 无目录信息可导
+Note: `import atuin` reads the directory field that atuin captures live alongside
+each command (the subprocess runs `atuin history list
+--format={time}\t{directory} --print0`, matching upstream). That field only has a
+value when the record was produced live by atuin's shell hook; records poured in
+from a shell history file with `atuin import bash` and friends carry no directory
+information, and atuin fills in the literal `unknown`, so the import produces
+meaningless `unknown` entries (byte-identical to upstream, measured 2026-09-27;
+atuin 18's `{directory}` template variable itself works, and the output-format
+change is unrelated to this import). If your atuin data came from a history-file
+import, `import atuin` has no directory information to import.
 
-## 工作原理
+## How it works
 
-**frecency 排序**。每条记录是 `path / rank / last_accessed` 三字段，得分 = rank（累计访问权重）× 时间衰减系数，系数按 `last_accessed` 距今分档：
+**Frecency ranking.** Each record is three fields — `path / rank /
+last_accessed` — and the score is rank (the accumulated visit weight) times a time
+decay factor chosen by how long ago `last_accessed` was:
 
-| 距上次访问 | 系数 |
+| Time since the last visit | Factor |
 |---|---|
-| 1 小时内 | ×4.0 |
-| 1 天内 | ×2.0 |
-| 1 周内 | ×0.5 |
-| 其余 | ×0.25 |
+| within an hour | ×4.0 |
+| within a day | ×2.0 |
+| within a week | ×0.5 |
+| otherwise | ×0.25 |
 
-**老化**。库内总分**严格超过** `_JB_MAXAGE`（默认 10000）时触发一次全局衰减：全体 rank 乘 `0.9 × max_age / total`，乘后 rank < 1 的条目删除，常去的地方留下，冷门自然淡出
+**Aging.** When the database's total score **strictly exceeds** `_JB_MAXAGE`
+(10000 by default), one global decay runs: every rank is multiplied by
+`0.9 × max_age / total`, and any entry whose rank drops below 1 is deleted. Places
+you visit often stay; cold ones fade out on their own.
 
-**持久化**。数据存于明文文本 `<数据目录>/db.txt`，每行一条：`timestamp\trank\tpath`（timestamp 为 10 位访问时间，rank 定点两位小数、上限 9999999.99），任意文本工具可直接查看与手改（改坏会整库拒绝加载并按行报错，见 TROUBLESHOOTING）。人工标注存于同目录 `notes.tsv`（`path\tnote`），不进 db.txt；换行/tab 的标注被拒绝。旧版二进制 `db.zo` 首次写库时自动转换为明文，转换后原文件保留，确认无误可手动删除
+**Persistence.** Data lives in the plaintext file `<data dir>/db.txt`, one entry
+per line: `timestamp\trank\tpath` (timestamp is a 10-digit visit time, rank is
+fixed-point with two decimals and caps at 9999999.99), which any text tool can
+read and hand-edit (breaking it makes the whole database refuse to load and report
+the line, see TROUBLESHOOTING). Human annotations live beside it in `notes.tsv`
+(`path\tnote`) and never enter db.txt; annotations containing a newline or tab are
+rejected. An old binary `db.zo` is converted to plaintext on the first database
+write, the original file is kept, and you may delete it once the new database
+looks right.
 
-**关键词匹配**（语义对齐上游）：最后一个关键词锚定路径末组件（命中点右侧到路径末尾不得再出现分隔符），其余关键词从右往左逐个消耗、命中区间不重叠；大小写归一仅限 ASCII
+**Keyword matching** (semantics aligned with upstream): the last keyword anchors
+the path's final component (no separator may appear between the match and the end
+of the path), and the preceding keywords are consumed right-to-left without
+overlapping match ranges. Case folding is ASCII-only.
 
 ```bash
-j backend api   # api 落在路径末组件，backend 在其左侧消耗
+j backend api   # api lands in the final component, backend is consumed to its left
 ```
 
-**查询流**：按得分降序 → 关键词过滤 → glob 排除（`_JB_EXCLUDE_DIRS`，命中即懒删）→ 存在性检查；不存在的目录超过 3 个月未访问，则在查询时懒删除
+**Query flow**: sort by score descending → keyword filter → glob exclusion
+(`_JB_EXCLUDE_DIRS`; a hit is lazily deleted) → existence check. A directory that
+no longer exists and has not been visited for over 3 months is lazily deleted at
+query time.
 
-## 环境变量
+## Environment variables
 
-| 变量 | 作用 | 默认 |
+| Variable | Effect | Default |
 |---|---|---|
-| `_JB_DATA_DIR` | 数据目录（须绝对路径） | `$HOME/.local/share/jumbit` |
-| `_JB_ECHO=1` | add 时回显记录的目录 | 关 |
-| `_JB_EXCLUDE_DIRS` | 冒号分隔的 glob：add 时拦截写入，查询时命中懒删出库 | home 目录本身 |
-| `_JB_FZF_OPTS` | 透传给 fzf 的自定义参数 | 内置参数组 |
-| `_JB_MAXAGE` | 数据库总分老化阈值 | 10000 |
-| `_JB_RESOLVE_SYMLINKS=1` | add 时解析符号链接 | 关 |
-| `_JB_DOCTOR=0` | 关闭 shell 配置诊断提示（仅 bash/zsh/posix 模板有此检查） | 开 |
+| `_JB_DATA_DIR` | the data directory (an absolute path is required) | `$HOME/.local/share/jumbit` |
+| `_JB_ECHO=1` | echo the recorded directory on add | off |
+| `_JB_EXCLUDE_DIRS` | colon-separated globs: such paths are blocked on add and lazily removed when a query hits them | the home directory itself |
+| `_JB_FZF_OPTS` | extra arguments passed through to fzf | a built-in set |
+| `_JB_MAXAGE` | the aging threshold for the database's total score | 10000 |
+| `_JB_RESOLVE_SYMLINKS=1` | resolve symlinks on add | off |
+| `_JB_DOCTOR=0` | silence the shell-configuration diagnostic (only the bash/zsh/posix templates check) | on |
 
-## 与 zoxide 的差异
+## Differences from zoxide
 
-- 持久化为明文 `db.txt`（`timestamp\trank\tpath`，对齐上游 [zoxide#1288](https://github.com/ajeetdsouza/zoxide/pull/1288) 的明文方向，该 PR 合并前 jumbit 已先行）；rank 定点两位小数（全精度入、两位出），标注存侧文件 `notes.tsv` 不进主格式（jumbit 扩展）；与上游 0.10.0 的二进制 `db.zo` 不互通，与未来上游明文格式可互换（减 note 列）
-- 环境变量前缀 `_ZO_*` → `_JB_*`，两者可共存
-- 关键词大小写归一仅限 ASCII（上游为 Unicode 全量）
-- `_JB_EXCLUDE_DIRS` 的 glob 排除不支持 `{a,b}` 括号展开（视为字面量；上游 glob crate 支持）；`*`/`**`/`?`/`[...]` 语义对齐上游 glob crate 默认选项（`*` 与 `**` 跨分隔符匹配、`?` 与字符类匹配任意单字符含分隔符、大小写敏感、匹配锚定全路径）；`query --exclude` 为精确路径过滤、不做 glob（对齐上游）；重复 `--exclude` 为后者覆盖（上游直接报错 exit 2：`cannot be used multiple times`）
-- 支持 Linux、macOS（Apple Silicon）与 Windows x64（CI 多平台矩阵实测：测试/冒烟/字节冻结面全绿）；Intel mac 未支持（工具链官方安装脚本无 darwin-x86_64 分支）；fzf 预览窗口的平台定制未实现（import 的 autojump/z.lua 路径探测同按 Linux 语义）；Windows 限定：`_JB_EXCLUDE_DIRS` 的冒号分隔与盘符冒号冲突（含 `C:` 的 pattern 会被误拆，规避：排除项不以盘符开头），glob pattern 以正斜杠书写（`/` 经分隔符等价匹配反斜杠路径；反斜杠在 pattern 中恒为转义字符）
-- fzf 交互通道（`query --interactive`）：选中/`--score` 输出与退出码对齐上游（伪 fzf 探针矩阵逐字节对拍）；文案差异两处：fzf 取消（其退出码 1）jumbit 静默退出 1，上游报 `no match found`；fzf 自身异常的提示为英文原文且无 `zoxide: ` 前缀。另 spawn 失败不区分「未安装」与「无法启动」（上游区分，进程绑定不暴露错误类别），统一报 `jumbit: could not find fzf, is it installed?`；fzf argv 无上游的 `--bind=ctrl-z:ignore,btab:up,tab:down`；关键词 miss 时不启动 fzf、直接报 `jumbit: no match found`（上游先拉起 fzf，fzf 未安装时报其 `could not find fzf`）
-- `edit` 上游为 fzf 交互调 rank（0.10.0），jumbit 为编辑器/结构化形态（见 `edit` 扩展条）；上游已宣布该形态待砍（#1288 评论区），不跟随
-- 纯读 `query` 不重写数据库文件：仅在查询真实懒删（`_JB_EXCLUDE_DIRS` 命中 / 超 3 个月 TTL）时落盘；上游 query 每次保存都会重写 db 文件。legacy `db.zo` 的明文迁移相应推迟到首个真实数据变更（写命令或懒删），迁移内容保持
-- `jumbit help <子命令>` 与 `jumbit help <未知>` 均输出通用帮助退出 0（clap 语义为按子命令给帮助、未知报 unrecognized subcommand exit 2）
-- 非 finite rank：明文格式下入库时 `inf` 钳到上限、`nan` 归最低权重（0.01），读取遇 `nan` 行整库拒绝并按行报错；上游 0.10.0 的「非 finite 毒库」问题（[zoxide#1280](https://github.com/ajeetdsouza/zoxide/pull/1280)）在 jumbit 明文格式下不再成立
-- 扩展（上游无）：`query --json`（单行 JSON 数组，含 `matched_by` 证据字段）、`query --tsv`（无表头 Tab 分隔行 `path\tscore\tlast_accessed\tmatched_by`，列序与 `--json` 键序一致；path 原样不转义；路径含 tab 时该行列数歧义，属已知限制；score 为最短表示，NaN/±Infinity 出 `NaN`/`Infinity`/`-Infinity` 原文而非 JSON 的 `null`）、`query --limit <n>`（`--list`/`--json`/`--tsv` 输出的前 n 条截断，`--limit 0` 为空输出、退出码 0；重复出现后者覆盖）、`query --fuzzy`（仅精确匹配零命中时启用，各关键词为某路径组件的子串即命中：不限末组件、无序且允许同组件，大小写归一同主路仅 ASCII；覆盖上游热榜 FR [zoxide#1137](https://github.com/ajeetdsouza/zoxide/issues/1137)「零命中时兜底模糊」的形态（该 FR open 未实现），FR [#388](https://github.com/ajeetdsouza/zoxide/issues/388) 的非连续字符（子序列）查询未覆盖：fuzzy 为组件连续子串，`wrk` 不匹配 `work`）、`describe`（条目人工标注，随库持久化）、`export --agents`（项目地图）、`status`（数据库自检：数据文件/大小/格式/条目数/标注数/老化阈值，`--json` 单行对象，`format` 出 `plaintext`/`binary`/`null`；`--check` 显式触发 O(N) 存在性扫描并报 `existing K/N`；库损坏退出码 1）与 `edit`（`$VISUAL`/`$EDITOR` 编辑明文库，`--rename` 改路径、`--prune` 清除不存在条目）
+- Persistence is the plaintext `db.txt` (`timestamp\trank\tpath`), following the
+  plaintext direction of upstream [zoxide#1288](https://github.com/ajeetdsouza/zoxide/pull/1288)
+  (jumbit got there before that PR merged); rank is fixed-point with two decimals
+  (stored at full precision, read back with two) and annotations live in the side
+  file `notes.tsv` rather than the main format (a jumbit extension). It is not
+  interoperable with upstream 0.10.0's binary `db.zo`, but is interchangeable with
+  a future upstream plaintext format (minus the note column)
+- The environment-variable prefix is `_ZO_*` → `_JB_*`; the two can coexist
+- Keyword case folding is ASCII-only (upstream folds the full Unicode range)
+- `_JB_EXCLUDE_DIRS` glob exclusion does not support `{a,b}` brace expansion
+  (treated literally; upstream's glob crate supports it). `*` / `**` / `?` /
+  `[...]` match the upstream glob crate's default options (`*` and `**` cross
+  separators, `?` and character classes match any single character including
+  separators, matching is case-sensitive, and it anchors the whole path).
+  `query --exclude` is an exact-path filter with no globbing (matching upstream);
+  a repeated `--exclude` lets the last one win (upstream errors out with exit 2:
+  `cannot be used multiple times`)
+- Linux, macOS (Apple Silicon) and Windows x64 are supported (a CI multi-platform
+  matrix: tests, smoke and the byte-frozen surfaces all green). Intel macs are not
+  supported (the toolchain's official install script has no darwin-x86_64 branch).
+  Platform-specific fzf preview window tweaks are not implemented (the autojump and
+  z.lua path probing in import likewise assumes Linux). Windows caveats: the
+  colon separator of `_JB_EXCLUDE_DIRS` collides with drive-letter colons (a
+  pattern containing `C:` is split wrongly — the workaround is not to start an
+  entry with a drive letter), and glob patterns are written with forward slashes
+  (a `/` matches a backslash path through separator equivalence; a backslash inside
+  a pattern is always an escape)
+- The fzf interactive channel (`query --interactive`): selection and `--score`
+  output and the exit codes match upstream (a fake-fzf probe matrix compared byte
+  for byte). Two wording differences: when fzf is cancelled (its exit code 1)
+  jumbit exits 1 silently where upstream prints `no match found`, and the hint for
+  an fzf-side failure is the English original with no `zoxide: ` prefix. Also, a
+  spawn failure does not distinguish "not installed" from "could not start"
+  (upstream does; the process binding does not expose the error class), and both
+  report `jumbit: could not find fzf, is it installed?`. The fzf argv lacks
+  upstream's `--bind=ctrl-z:ignore,btab:up,tab:down`. On a keyword miss jumbit
+  does not start fzf and reports `jumbit: no match found` directly (upstream starts
+  fzf first and reports its `could not find fzf` when fzf is missing)
+- `edit` is upstream's fzf-driven rank adjustment (0.10.0); jumbit's is
+  editor/structured (see the `edit` extension entry). Upstream has announced that
+  form is going away (in the #1288 discussion) and jumbit does not follow it
+- A read-only `query` does not rewrite the database file: it writes only when the
+  query really deletes something (an `_JB_EXCLUDE_DIRS` hit, or the 3-month TTL).
+  Upstream's query rewrites the db file on every save. The legacy `db.zo`
+  plaintext migration is correspondingly deferred to the first real data change (a
+  write command or a lazy delete), and the migrated content is preserved
+- `jumbit help <subcommand>` and `jumbit help <unknown>` both print the general
+  help and exit 0 (clap's semantics are per-subcommand help, and an unknown one
+  reports unrecognized subcommand with exit 2)
+- Non-finite ranks: in the plaintext format `inf` is clamped to the upper bound
+  and `nan` to the lowest weight (0.01) on import, and a `nan` row encountered on
+  read makes the whole database refuse to load and report the line. Upstream
+  0.10.0's "non-finite rank poisons the database" problem
+  ([zoxide#1280](https://github.com/ajeetdsouza/zoxide/pull/1280)) no longer
+  applies under jumbit's plaintext format
+- Extensions (no upstream counterpart): `query --json` (a single-line JSON array
+  with the `matched_by` evidence field); `query --tsv` (headerless tab-separated
+  rows `path\tscore\tlast_accessed\tmatched_by`, same column order as the `--json`
+  keys; the path is written verbatim and not escaped, so a path containing a tab
+  makes that row's column count ambiguous — a known limitation; the score is the
+  shortest form, so NaN/±Infinity come out as the literals
+  `NaN`/`Infinity`/`-Infinity` rather than JSON's `null`); `query --limit <n>`
+  (truncates `--list`/`--json`/`--tsv` output to the first n rows; `--limit 0`
+  gives empty output with exit code 0; a repeat lets the last one win);
+  `query --fuzzy` (enabled only when an exact pass finds nothing, and a row
+  matches when each keyword is a substring of some path component: no anchoring on
+  the final component, order-free, the same component may be reused, and case
+  folding is ASCII-only like the main path; it covers the shape of the popular
+  upstream feature request [zoxide#1137](https://github.com/ajeetdsouza/zoxide/issues/1137)
+  "fall back to fuzzy when nothing matches" (that FR is still open, unimplemented),
+  while FR [#388](https://github.com/ajeetdsouza/zoxide/issues/388)'s
+  non-contiguous (subsequence) query is not covered: fuzzy is a contiguous
+  component substring, so `wrk` does not match `work`); `describe` (human
+  annotations on entries, persisted in the database); `export --agents` (the
+  project map); `status` (database self-check: data file/size/format/entry
+  count/note count/aging threshold; `--json` is a single-line object and `format`
+  is `plaintext`/`binary`/`null`; `--check` explicitly runs the O(N) existence
+  scan and reports `existing K/N`; a corrupt database exits 1); and `edit`
+  (`$VISUAL`/`$EDITOR` on the plaintext database, `--rename` to change a path and
+  `--prune` to drop entries that no longer exist)
