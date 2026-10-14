@@ -1,29 +1,29 @@
 #!/usr/bin/env bash
-# 数据集 D7：混沌语料。坏输入下不崩溃、坏行行号正确、与上游行为逐字节一致。
+# Dataset D7: the chaos corpus. No crash on bad input, correct bad-row line numbers, byte-identical behaviour vs upstream.
 #
-# 双判定面：
-# - 自检面（各工具独立）：import/query 退出码 ∈ {0,1}（不被信号杀死/无 panic
-#   痕迹）；stderr 上报的行号全部落在 1..记录数（行数公式两侧同验，公式错即暴露）
-# - 对拍面（裁判=上游 zoxide）：import 退出码 + stderr + stdout 逐字节；
-#   query 三段（-a 全量 → 非 --all 走 exists 过滤与懒删除 → -a 复查）排序后
-#   逐字节 + 退出码 + jumbit 侧 score 非递增
+# Two judging surfaces:
+# - a self-check surface (independent per tool): import/query exit codes in {0,1} (not killed by a signal, no panic
+#   trace); every line number reported on stderr falls in 1..record count (the count formula is checked on both sides, so an error shows up)
+# - a comparison surface (judge = upstream zoxide): import exit code + stderr + stdout byte for byte;
+#   the three query stages (-a full -> non---all with exists filtering and lazy deletion -> -a re-check) sorted, byte for byte,
+#   plus the exit code and jumbit-side non-increasing scores
 #
-# 场景：手工边界文件（z 字段/UTF-8 逐类/形状、autojump、atuin 流、二进制垃圾）
-#       + 固定种子 PRNG 变异/截断（对 2000 行有效 z 数据做字节级破坏）。
-# 混沌期望值不预先枚举，一致性由对拍面裁定；单测锁定的文案类为已知来源。
+# Scenarios: hand-written boundary files (z fields / UTF-8 case by case / shapes, autojump, atuin streams, binary garbage)
+#       plus fixed-seed PRNG mutation/truncation (byte-level damage to 2000 valid z lines).
+# Chaos expectations are not enumerated up front; consistency is decided by the comparison surface, and wording locked by unit tests counts as a known source.
 #
-# 依赖：zoxide（PATH）、python3、jumbit release 二进制（moon build --release）。
-# 数据本体落 /tmp 不入库；变异种子固定可复现。
+# Depends on: zoxide (on PATH), python3 and the jumbit release binary (moon build --release).
+# The data lands in /tmp, never in the repo; the mutation seed is fixed and reproducible.
 #
-# 【明文迁移窗口期判定域】（2026-09-22，规格 docs/spec-plaintext-edit.md）：
-# jumbit 明文 rank 两位小数 + 毒条目救库（NaN→0.01、空 path 跳过），与裁判
-# zoxide 0.10.0 bincode（NaN/空 path 存活、rank 全精度）存在既定分歧：
-#   - score 数值差 ≤ 0.1001（量化半界翻转，同 dataset_check）
-#   - zo 侧 NaN 条目：jb 侧任意有限值通过（救库语义 §1.3）
-#   - zo 侧空 path 条目：jb 侧缺失通过（明文行格式无法表达）
-# stderr/退出码/行号仍字节级。上游合并 #1288 后重议。
+# [The plaintext-migration window\'s judgement domain] (2026-09-22, spec docs/spec-plaintext-edit.md):
+# jumbit\'s plaintext ranks carry two decimals and poisoned entries are rescued (NaN->0.01, empty path skipped), which is a settled
+# divergence from the judge zoxide 0.10.0\'s bincode (NaN and empty paths survive, ranks are full precision):
+#   - scores differ by <= 0.1001 (a half-boundary flip from quantization, as in dataset_check)
+#   - a NaN entry on the zo side: any finite value on the jb side passes (rescue semantics §1.3)
+#   - an empty-path entry on the zo side: missing on the jb side passes (the plaintext line format cannot express it)
+# stderr, exit codes and line numbers stay byte-level. Revisit once upstream merges #1288.
 #
-# 用法：bash scripts/chaos_check.sh
+# Usage: bash scripts/chaos_check.sh
 
 set -u
 cd "$(dirname "$0")/.."
@@ -31,110 +31,110 @@ cd "$(dirname "$0")/.."
 bin=_build/native/release/build/cmd/jumbit/jumbit.exe
 seed=20260909
 
-need() { command -v "$1" >/dev/null || { echo "✗ 缺依赖: $1" >&2; exit 2; }
+need() { command -v "$1" >/dev/null || { echo "✗ missing dependency: $1" >&2; exit 2; }
 }
 need zoxide
 need python3
-[ -x "$bin" ] || { echo "✗ 缺 $bin（先 moon build --release）" >&2; exit 2; }
+[ -x "$bin" ] || { echo "✗ $bin is missing (run moon build --release first)" >&2; exit 2; }
 
 tmp=$(mktemp -d /tmp/jumbit-chaos-XXXX)
 pass=0
 fail=0
 failed=()
 
-# ---------- 混沌文件生成（全部 python 字节级构造，绕开 shell 转义陷阱） ----------
+# ---------- chaos file generation (all byte-level python, sidestepping shell escaping traps) ----------
 
 python3 - "$tmp" "$seed" <<'PY'
 import random, sys
 tmp, seed = sys.argv[1], int(sys.argv[2])
 w = lambda name, data: open(f"{tmp}/{name}", "wb").write(data)
 
-# z-utf8：坏 UTF-8 逐类 + 合法对照 + EOF 截断 + CR 交互 + BOM（期望文案已由
-# 单测锁定，此处重在行号与整批一致性）
+# z-utf8: bad UTF-8 case by case + a valid control + an EOF truncation + CR interaction + a BOM (the expected wording is
+# locked by unit tests; what matters here is the line numbers and whole-batch consistency)
 z_utf8 = (
-    b"/a|1.5|100\xff\n"            # 起始坏：1 byte from 10
-    b"/b|\xc3cd|100\n"             # 双字节次字节坏：1 byte from 3
-    b"/c|\xe0\x80\x80|100\n"       # E0 域坏：1 byte
-    b"/d|\xed\xa0\x80|100\n"       # ED 代理区：1 byte
-    b"/e|\xf4\x90\x80\x80|100\n"   # F4 域坏：1 byte
-    b"/f|\xe0\xa0\x41|100\n"       # 三字节第三字节坏：2 bytes
-    b"/g|\xf0\x9f\x92\x41|100\n"   # 四字节第四字节坏：3 bytes
-    b"/h|\xe4\xb8\xad|1.5|100\n"   # 合法中文对照
-    b"/i|1.5|100\xc3\r\n"          # 剥 \r 后 C3 成切片尾 → incomplete
-    b"\xef\xbb\xbf/j|1.5|100\n"    # BOM 属路径（两侧同解析）
-    b"/k|1.5|100\xc3"              # EOF 截断 → incomplete
+    b"/a|1.5|100\xff\n"            # bad first byte: 1 byte from 10
+    b"/b|\xc3cd|100\n"             # bad second byte of a two-byte sequence: 1 byte from 3
+    b"/c|\xe0\x80\x80|100\n"       # bad E0 range: 1 byte
+    b"/d|\xed\xa0\x80|100\n"       # ED surrogate range: 1 byte
+    b"/e|\xf4\x90\x80\x80|100\n"   # bad F4 range: 1 byte
+    b"/f|\xe0\xa0\x41|100\n"       # bad third byte of a three-byte sequence: 2 bytes
+    b"/g|\xf0\x9f\x92\x41|100\n"   # bad fourth byte of a four-byte sequence: 3 bytes
+    b"/h|\xe4\xb8\xad|1.5|100\n"   # a valid non-ASCII control
+    b"/i|1.5|100\xc3\r\n"          # after \r is stripped C3 ends the slice -> incomplete
+    b"\xef\xbb\xbf/j|1.5|100\n"    # the BOM belongs to the path (both sides parse it the same way)
+    b"/k|1.5|100\xc3"              # EOF truncation -> incomplete
 )
 w("z-utf8.dat", z_utf8)
 
-# z-field：字段解析边界（u64 域 la、浮点字面量、分隔符形状）
+# z-field: field-parsing boundaries (u64-domain la, float literals, separator shapes)
 z_field = (
-    b"/a|1.5|18446744073709551615\n"   # la = u64::MAX（接受，×4 档）
-    b"/b|1.5|18446744073709551616\n"   # la 溢出 u64 → 坏行
-    b"/c|1.5|+5\n"                     # 前导 +
-    b"/d|1.5|007\n"                    # 前导零
-    b"/e|1.5| 5\n"                     # la 前导空格 → 坏行
-    b"/f| 1.5|100\n"                   # rank 前导空格 → 坏行
-    b"/g|1.5 |100\n"                   # rank 尾随空格 → 坏行
-    b"/h|1e400|100\n"                  # rank 溢出 → inf（age 下变 NaN）
-    b"/i|Infinity|100\n"               # 大小写变体
+    b"/a|1.5|18446744073709551615\n"   # la = u64::MAX (accepted, the x4 bucket)
+    b"/b|1.5|18446744073709551616\n"   # la overflows u64 -> a bad row
+    b"/c|1.5|+5\n"                     # a leading +
+    b"/d|1.5|007\n"                    # a leading zero
+    b"/e|1.5| 5\n"                     # leading space in la -> a bad row
+    b"/f| 1.5|100\n"                   # leading space in rank -> a bad row
+    b"/g|1.5 |100\n"                   # trailing space in rank -> a bad row
+    b"/h|1e400|100\n"                  # rank overflows -> inf (which aging turns into NaN)
+    b"/i|Infinity|100\n"               # a case variant
     b"/j|-inf|100\n"
     b"/k|nan|100\n"
     b"/l|+1.5|100\n"
     b"/m|.5|100\n"
     b"/n|5.|100\n"
-    b"/o|1_000|100\n"                  # 下划线 → 坏行
-    b"/p|\xef\xbc\x91.5|100\n"         # 全角数字 → 坏行
-    b"/q|1e|100\n"                     # 悬空指数 → 坏行
-    b"/r|0x10|100\n"                   # 十六进制 → 坏行
+    b"/o|1_000|100\n"                  # an underscore -> a bad row
+    b"/p|\xef\xbc\x91.5|100\n"         # a full-width digit -> a bad row
+    b"/q|1e|100\n"                     # a dangling exponent -> a bad row
+    b"/r|0x10|100\n"                   # hexadecimal -> a bad row
     b"no-pipe\n"
-    b"|1.5|100\n"                      # 空路径（合法）
-    b"/s|1.5|\n"                       # 空 la → 坏行
-    b"a|b|c|d|2.0|300\n"               # 多余管道归路径
-    b"/t|2.0|300|\n"                   # 尾管道 → la 为空 → 坏行
-    b"/u|1.5|100"                      # 无尾换行
+    b"|1.5|100\n"                      # an empty path (legal)
+    b"/s|1.5|\n"                       # empty la -> a bad row
+    b"a|b|c|d|2.0|300\n"               # the extra pipe belongs to the path
+    b"/t|2.0|300|\n"                   # a trailing pipe -> empty la -> a bad row
+    b"/u|1.5|100"                      # no trailing newline
 )
 w("z-field.dat", z_field)
 
-# z-shape：形状边界（巨行/多空行后大行号/仅空行/空文件）
+# z-shape: shape boundaries (a huge line / a large line number after many blanks / blanks only / an empty file)
 w("z-shape.dat",
-  b"/big|" + b"9" * 500000 + b"|100\n"           # 50 万字节数字段
-  + b"x" * 100000 + b"|1.0|100\n"                # 10 万字节路径
-  + b"|" * 2000 + b"|1.0|100\n"                  # 2000 连管道
-  + b"\n" * 50000 + b"/after-empty|1.0|100\n")   # 5 万空行后大行号
+  b"/big|" + b"9" * 500000 + b"|100\n"           # a 500k-byte numeric field
+  + b"x" * 100000 + b"|1.0|100\n"                # a 100k-byte path
+  + b"|" * 2000 + b"|1.0|100\n"                  # 2000 consecutive pipes
+  + b"\n" * 50000 + b"/after-empty|1.0|100\n")   # a large line number after 50k blank lines
 w("z-newlines.dat", b"\n\n\n\n")
 w("z-empty.dat", b"")
 
-# aj-chaos：autojump 字段边界
+# aj-chaos: autojump field boundaries
 aj = (
     b"3.7\t/home/aj-ok\n"
     b"no-tab-path\n"
-    b"\t/no-rank\n"                # 空 rank → empty string 文案
+    b"\t/no-rank\n"                # an empty rank -> the "empty string" wording
     b"abc\t/bad-rank\n"
-    b"\t\t/double-tab\n"           # 空 rank + 空首段
-    b"1.0\t\n"                     # 空路径
+    b"\t\t/double-tab\n"           # an empty rank plus an empty first field
+    b"1.0\t\n"                     # an empty path
     b"1e400\t/aj-inf\n"
     b"nan\t/aj-nan\n"
     b"-5\t/aj-negative\n"
-    b" 1.5\t/aj-space\n"           # 前导空格 rank → 坏行
-    b"1.5\t\xffaj-badutf\n"        # 路径坏 UTF-8
-    b"1.5\t/aj\x00nul\n"           # 路径含 NUL
-    b"1.5\t/aj-crlf\r\n"           # CRLF（文件源剥 \r → 路径干净）
-    b"1.5\t/aj-noeol"              # 无尾换行
+    b" 1.5\t/aj-space\n"           # a leading space in rank -> a bad row
+    b"1.5\t\xffaj-badutf\n"        # a path with bad UTF-8
+    b"1.5\t/aj\x00nul\n"           # a path containing NUL
+    b"1.5\t/aj-crlf\r\n"           # CRLF (the file source strips \r -> a clean path)
+    b"1.5\t/aj-noeol"              # no trailing newline
 )
 import os
 os.makedirs(f"{tmp}/xdg-chaos/autojump", exist_ok=True)
 w("xdg-chaos/autojump/autojump.txt", aj)
 
-# at-chaos：atuin 流（NUL 分隔）——时间戳逐类 + 折叠交互 + 坏 UTF-8
+# at-chaos: the atuin stream (NUL separated) -- timestamps case by case + folding interaction + bad UTF-8
 at = b"\x00".join([
     b"2024-01-01 00:00:00\t/at/one",
-    b"2024-01-01 00:00:00\t/at/one",          # 连续重复 → 折叠
-    b"2024-01-01 00:00:01\t/at/one",          # 同路径非连续重复 → 折叠
-    b"garbage-no-tab",                        # 无 \t
-    b"\t/at/empty-ts",                        # 空 ts
-    b"2023-02-29 00:00:00\t/at/bad-day",      # 非闰年闰日
-    b"2024-02-29 00:00:00\t/at/leap",         # 闰日合法
-    b"1969-12-31 23:59:59\t/at/pre-epoch",    # 纪元前（负 epoch）
+    b"2024-01-01 00:00:00\t/at/one",          # consecutive repeats -> folded
+    b"2024-01-01 00:00:01\t/at/one",          # the same path repeated non-consecutively -> folded
+    b"garbage-no-tab",                        # no \t
+    b"\t/at/empty-ts",                        # an empty ts
+    b"2023-02-29 00:00:00\t/at/bad-day",      # a leap day in a non-leap year
+    b"2024-02-29 00:00:00\t/at/leap",         # a legal leap day
+    b"1969-12-31 23:59:59\t/at/pre-epoch",    # pre-epoch (a negative epoch)
     b"0000-01-01 00:00:00\t/at/year-zero",
     b"99999-01-01 00:00:00\t/at/year-overflow",
     b"2024-13-01 00:00:00\t/at/month-range",
@@ -144,22 +144,22 @@ at = b"\x00".join([
     b"2024-01-01T00:00:00\t/at/tee-sep",
     b"2024-01-01 00:00:00x\t/at/trailing",
     b"2024-01-01 00:00:00\t/at/bad\xffutf",
-    b"2024-01-01 00:00:00\t/at/nu\x00l",      # 记录内 NUL → 被切分
-    b"",                                      # 空记录占位
-    b"2024-01-02 00:00:00\t/at/one",          # 与首条同路径（隔坏行折叠交互）
+    b"2024-01-01 00:00:00\t/at/nu\x00l",      # a NUL inside a record -> it gets split
+    b"",                                      # an empty-record placeholder
+    b"2024-01-02 00:00:00\t/at/one",          # the same path as the first record (folding interaction across a bad row)
     b"x" * 100000 + b"\t/at/giant",
 ]) + b"\x00"
 w("at-chaos.bin", at)
 
-# z-bin：种子化二进制垃圾 + ELF 头前缀
+# z-bin: seeded binary garbage with an ELF header prefix
 rng = random.Random(seed)
 w("z-bin.dat", b"\x7fELF" + bytes(rng.randrange(256) for _ in range(4092)))
 PY
 
-# 变异基座：2000 行有效 z 数据（真实路径池，机器内自洽即可）
+# mutation base: 2000 valid z lines (a real path pool; machine-local consistency is all that is needed)
 python3 scripts/gen_dataset.py --format z --lines 2000 --out "$tmp/base.dat" --seed "$seed" >/dev/null
 
-mutate() { # src dst seed rounds：置换/删/插/截段 四操作
+mutate() { # src dst seed rounds: the four operations substitute / delete / insert / cut a span
 python3 - "$1" "$2" "$3" "$4" <<'PY'
 import random, sys
 src, dst, seed, rounds = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
@@ -198,14 +198,14 @@ d = open(sys.argv[1], "rb").read()
 open(sys.argv[2], "wb").write(d[: len(d) - 3])
 PY
 
-# 伪 atuin：两侧同喂一份混沌流
+# fake atuin: both sides get the same chaos stream
 mkdir -p "$tmp/fakebin"
 printf '#!/bin/sh\ncat %s/at-chaos.bin\n' "$tmp" > "$tmp/fakebin/atuin"
 chmod +x "$tmp/fakebin/atuin"
 
-# ---------- 判定 ----------
+# ---------- judging ----------
 
-# 记录数：分隔符数 + 无尾分隔符时的残余（与 platform split_records 同式）
+# record count: the separator count, plus the leftover when there is no trailing separator (same formula as platform split_records)
 n_records() { # file nl|nul
 python3 - "$1" "$2" <<'PY'
 import sys
@@ -215,7 +215,7 @@ print(d.count(sep) + (1 if d and not d.endswith(sep) else 0))
 PY
 }
 
-# stderr 行号合法面：全部落在 1..N（jb/zo 同验，公式错即暴露）
+# the stderr line-number legality surface: all in 1..N (checked on both jb and zo, so a wrong formula shows up)
 check_lineno() { # stderr-file N
   local ok=1 n
   while IFS= read -r line; do
@@ -235,12 +235,12 @@ has_panic_mark() { # stderr-file
   grep -qE 'panic|panicked|Aborted|Segmentation|Uncaught|Fatal' "$1"
 }
 
-# run_scenario <名> <插件> <env串> <数据文件> <nl|nul>
+# run_scenario <name> <plugin> <env string> <data file> <nl|nul>
 run_scenario() {
-  # $6 可选 "no-score-parity"：跳过 query 内容容差、保留退出码/降序/自检面。
-  # 用于含 non-finite rank 行的场景（[#3] 入库归一后，nan 不再毒化 total、
-  # inf 钳上限，两侧老化行为必然分歧——上游 0.10.0 靠 NaN 毒库跳过老化，
-  # jumbit 已按 USAGE 差异清单文档化 diverge；import 三流对拍与自检面保留）
+  # $6 may be "no-score-parity": skip the query content tolerance, keep the exit code / descending order / self-check surface.
+  # Used for scenarios holding non-finite rank rows (after [#3]\'s import normalization nan no longer poisons the total and
+  # inf clamps to the bound, so the two sides\' aging necessarily diverges: upstream 0.10.0 relies on NaN poisoning to skip aging,
+  # and jumbit documents that divergence in USAGE\'s differences list; the import three-stream comparison and the self-check surface stay)
   local name="$1" plugin="$2" envs="$3" file="$4" sep="$5" score_parity="${6:-score-parity}"
   local jd="$tmp/jb-$name" zd="$tmp/zo-$name"
   mkdir -p "$jd" "$zd"
@@ -252,25 +252,25 @@ run_scenario() {
   $zo_env zoxide import "$plugin" >"$tmp/zo-$name.imp" 2>"$tmp/zo-$name.imp.err"
   local zo_code=$?
 
-  # 自检面：退出码、panic 痕迹、行号合法（两侧同验）
+  # self-check surface: exit code, panic trace, legal line numbers (checked on both sides)
   local ok=1 why=""
   local c
   for c in "$jb_code" "$zo_code"; do
-    case $c in 0 | 1) ;; *) ok=0 why="$why 退出码$c" ;; esac
+    case $c in 0 | 1) ;; *) ok=0 why="$why exit code $c" ;; esac
   done
   if has_panic_mark "$tmp/jb-$name.imp.err"; then ok=0 why="$why jb.panic"; fi
   if has_panic_mark "$tmp/zo-$name.imp.err"; then ok=0 why="$why zo.panic"; fi
   local nrec
   nrec=$(n_records "$file" "$sep")
-  if ! check_lineno "$tmp/jb-$name.imp.err" "$nrec"; then ok=0 why="$why jb.行号越界"; fi
-  if ! check_lineno "$tmp/zo-$name.imp.err" "$nrec"; then ok=0 why="$why zo.行号越界"; fi
+  if ! check_lineno "$tmp/jb-$name.imp.err" "$nrec"; then ok=0 why="$why jb.line number out of range"; fi
+  if ! check_lineno "$tmp/zo-$name.imp.err" "$nrec"; then ok=0 why="$why zo.line number out of range"; fi
 
-  # 对拍面：import 三流逐字节
-  if [ "$jb_code" != "$zo_code" ]; then ok=0 why="$why import退出码($jb_code!=$zo_code)"; fi
-  cmp -s "$tmp/jb-$name.imp" "$tmp/zo-$name.imp" || { ok=0 why="$why import.stdout分歧"; }
-  cmp -s "$tmp/jb-$name.imp.err" "$tmp/zo-$name.imp.err" || { ok=0 why="$why import.stderr分歧"; }
+  # comparison surface: the import three streams, byte for byte
+  if [ "$jb_code" != "$zo_code" ]; then ok=0 why="$why import exit code ($jb_code!=$zo_code)"; fi
+  cmp -s "$tmp/jb-$name.imp" "$tmp/zo-$name.imp" || { ok=0 why="$why import.stdout differs"; }
+  cmp -s "$tmp/jb-$name.imp.err" "$tmp/zo-$name.imp.err" || { ok=0 why="$why import.stderr differs"; }
 
-  # query 三段：-a 全量 → exists 过滤懒删 → -a 复查
+  # the three query stages: -a full -> exists filtering and lazy deletion -> -a re-check
   local q jcode zcode
   for q in q1 q2 q3; do
     case $q in
@@ -295,17 +295,17 @@ run_scenario() {
     esac
     sort -o "$tmp/jb-$name.$q.s" "$tmp/jb-$name.$q"
     sort -o "$tmp/zo-$name.$q.s" "$tmp/zo-$name.$q"
-    # 窗口期判定:路径集合(空 path 豁免) + score 容差(NaN 单侧豁免)
+    # window judgement: path sets (empty-path exempt) + score tolerance (one-sided NaN exempt)
     if [ "$score_parity" != "no-score-parity" ]; then
       if ! python3 scripts/score_tolerance_check.py "$tmp/jb-$name.$q" "$tmp/zo-$name.$q" 0.1001 --allow-missing-empty --allow-zo-nan >"$tmp/$name.$q.tol" 2>&1; then
-        ok=0 why="$why $q.内容分歧($(tail -1 "$tmp/$name.$q.tol"))"
+        ok=0 why="$why $q.content differs ($(tail -1 "$tmp/$name.$q.tol"))"
       fi
     fi
-    # jumbit 侧 score 非递增（NaN 行豁免）
+    # jumbit-side non-increasing scores (NaN rows exempt)
     if ! awk 'NR>1 && $1 !~ /NaN/ && p1 !~ /NaN/ && $1+0 > p1+0 { exit 1 } { p1=$1 }' "$tmp/jb-$name.$q"; then
-      ok=0 why="$why $q.jb非降序"
+      ok=0 why="$why $q.jb not descending"
     fi
-    [ "$jcode" != "$zcode" ] && { ok=0 why="$why $q.退出码($jcode!=$zcode)"; }
+    [ "$jcode" != "$zcode" ] && { ok=0 why="$why $q.exit code ($jcode!=$zcode)"; }
   done
 
   if [ "$ok" = 1 ]; then
@@ -315,14 +315,14 @@ run_scenario() {
     echo "✗ $name →$why"
     fail=$((fail + 1))
     failed+=("$name")
-    echo "  --- import stderr 首处分歧 ---"
+    echo "  --- first import stderr divergence ---"
     diff "$tmp/jb-$name.imp.err" "$tmp/zo-$name.imp.err" | head -6 | sed 's/^/  /'
-    echo "  --- q1 首处分歧（排序后）---"
+    echo "  --- first q1 divergence (after sorting) ---"
     diff "$tmp/jb-$name.q1.s" "$tmp/zo-$name.q1.s" | head -6 | sed 's/^/  /'
   fi
 }
 
-echo "== D7 混沌语料（seed=$seed）=="
+echo "== D7 chaos corpus (seed=$seed) =="
 run_scenario z-utf8    z   "_Z_DATA=$tmp/z-utf8.dat"    "$tmp/z-utf8.dat"    nl
 run_scenario z-field   z   "_Z_DATA=$tmp/z-field.dat"   "$tmp/z-field.dat"   nl no-score-parity
 run_scenario z-shape   z   "_Z_DATA=$tmp/z-shape.dat"   "$tmp/z-shape.dat"   nl
@@ -339,10 +339,10 @@ run_scenario z-trunc-1-2 z "_Z_DATA=$tmp/z-trunc-1-2.dat" "$tmp/z-trunc-1-2.dat"
 run_scenario z-trunc-3-4 z "_Z_DATA=$tmp/z-trunc-3-4.dat" "$tmp/z-trunc-3-4.dat" nl
 run_scenario z-trunc-eof z "_Z_DATA=$tmp/z-trunc-eof.dat" "$tmp/z-trunc-eof.dat" nl
 
-echo "== 结果：$pass 通过 / $fail 失败 =="
+echo "== result: $pass passed / $fail failed =="
 if [ "$fail" -gt 0 ]; then
-  printf '失败场景: %s\n' "${failed[*]}"
-  echo "现场保留: $tmp"
+  printf 'failed scenarios: %s\n' "${failed[*]}"
+  echo "kept the scratch dir: $tmp"
   exit 1
 fi
 rm -rf "$tmp"
