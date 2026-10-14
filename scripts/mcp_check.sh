@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# jumbit MCP 通道协议冻结：release 二进制起 stdio MCP 服务器，喂固定消息序列，
-# stdout 逐字节比对（协议信封/工具目录/结果 content/错误码全部在冻结面内）。
+# jumbit MCP channel protocol freeze: start the release binary's stdio MCP server, feed it a fixed sequence,
+# and compare stdout byte for byte (protocol envelope, tool directory, result content and error codes are all inside the frozen surface).
 #
-# 确定性设计（与 golden_check 同思路）：
-# - 命中用例的条目来自真实临时目录（工具路不外露 --all，默认链路有 exists
-#   检查 + TTL 懒删除，合成的永不存在路径会被过滤/懒删掉），la 取当下
-#   （<1h → ×4 档恒定，score 稳定）
-# - 随机临时目录路径归一化为 @MCP_TMP@；last_accessed 的 10 位 epoch 归一化
-#   为 @EPOCH@；其余字节（信封键序、instructions、工具 schema、错误文案）
-#   全部静态
-# - 通知不响应、EOF 退出 0 也随序列冻结
+# Determinism design (the same approach as golden_check):
+# - a matching case's entry comes from a real temporary directory (the tool path does not expose --all, so the default chain has the exists
+#   check plus TTL lazy deletion, and a synthetic never-existing path would be filtered or lazily deleted), and la is set to now
+#   (the <1h bucket is a constant ×4, so the score is stable)
+# - the random temporary directory path is normalized to @MCP_TMP@ and last_accessed's 10-digit epoch to
+#   @EPOCH@; every other byte (envelope key order, instructions, tool schema, error wording)
+#   is static
+# - notifications getting no reply, and exit 0 on EOF, are frozen with the sequence too
 #
-# 用法：bash scripts/mcp_check.sh [--update]
-#   --update  重新生成 scripts/golden-mcp/session.out（变更须人工 diff 审查）
-# 依赖：jumbit release 二进制（moon build --release）
+# Usage: bash scripts/mcp_check.sh [--update]
+#   --update  regenerate scripts/golden-mcp/session.out (any change needs a hand-reviewed diff)
+# Depends on: the jumbit release binary (moon build --release)
 
 set -u
 cd "$(dirname "$0")/.."
@@ -24,23 +24,23 @@ mode=check
 if [ "${1:-}" = "--update" ]; then
   mode=update
 fi
-[ -x "$bin" ] || { echo "✗ 缺 $bin（先 moon build --release）" >&2; exit 2; }
+[ -x "$bin" ] || { echo "✗ $bin is missing (run moon build --release first)" >&2; exit 2; }
 
 tmp=$(mktemp -d /tmp/jumbit-mcp-XXXX)
 trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/alpha" "$tmp/web-app"
 
-# 数据：真实目录 + 新鲜 la（query 的 exists/TTL 链路照常生效且确定性）
+# Data: a real directory plus a fresh la (query's exists/TTL chain still applies, deterministically)
 printf '%s|1.0|%s\n%s|2.0|%s\n' \
   "$tmp/alpha" "$(date +%s)" "$tmp/web-app" "$(date +%s)" > "$tmp/dataset.z"
 
-# 建库（独立进程 import；空库直灌）
+# Build the database (import in a separate process; a direct pour into an empty one)
 _JB_DATA_DIR="$tmp/db" _Z_DATA="$tmp/dataset.z" "$bin" import z \
   >"$tmp/import.out" 2>"$tmp/import.err"
 
-# 固定 MCP 会话：initialize → initialized(通知，无响应) → tools/list →
-# query 命中 → query miss → query 参数非法 → export（无标注 → 空表头）→
-# ping（字符串 id）→ 坏 JSON → 未知方法；EOF 关闭
+# The fixed MCP session: initialize → initialized (a notification, no reply) → tools/list →
+# query hit → query miss → query with an invalid argument → export (no annotations → empty header) →
+# ping (a string id) → malformed JSON → unknown method; then EOF closes it
 {
   printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"mcp-check","version":"0"}}}'
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
@@ -56,7 +56,7 @@ _JB_DATA_DIR="$tmp/db" _Z_DATA="$tmp/dataset.z" "$bin" import z \
 } | _JB_DATA_DIR="$tmp/db" "$bin" mcp > "$tmp/session.raw"
 code=$?
 
-# 归一化：随机目录路径 + epoch 字面量；update 模式直接落 golden 目录
+# Normalization: the random directory path and epoch literals; update mode writes straight into the golden directory
 outdir="$tmp"
 if [ "$mode" = update ]; then
   mkdir -p "$golden"
@@ -68,20 +68,20 @@ sed -E -e "s|$tmp|@MCP_TMP@|g" -e 's/[0-9]{10}/@EPOCH@/g' \
 echo "$code" > "$tmp/session.code"
 
 if [ "$mode" = update ]; then
-  echo "✓ golden-mcp 已更新（$golden/session.out），请 git diff 人工审查" >&2
+  echo "✓ golden-mcp updated ($golden/session.out); review with git diff" >&2
   exit 0
 fi
 
 if ! diff -u "$golden/session.out" "$tmp/session.out" > "$tmp/session.diff"; then
-  echo "✗ MCP 会话字节漂移（详见 $tmp/session.diff）" >&2
+  echo "✗ MCP session bytes drifted (see $tmp/session.diff)" >&2
   fail=1
 else
-  echo "✓ MCP 会话字节一致"
+  echo "✓ MCP session bytes match"
   fail=0
 fi
 want=$(cat "$golden/session.code")
 if [ "$code" != "$want" ]; then
-  echo "✗ MCP 退出码漂移：want=$want got=$code" >&2
+  echo "✗ MCP exit code drifted: want=$want got=$code" >&2
   fail=1
 fi
 exit $fail
