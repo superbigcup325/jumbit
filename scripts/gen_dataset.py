@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""合成 jumbit/zoxide 对拍数据集。
+"""Synthetic jumbit/zoxide comparison dataset.
 
-固定随机种子可复现；stdlib-only。三种格式：
-- z 系（z/fasd/zsh-z/z.lua 共用）：`path|rank|last_accessed`
+Fixed seed, reproducible, stdlib-only. Three formats:
+- the z family (shared by z/fasd/zsh-z/z.lua): `path|rank|last_accessed`
 - autojump：`rank\\tpath`
-- atuin：`YYYY-MM-DD HH:MM:SS\\tpath` 记录流（NUL 分隔由对拍脚本包装）
+- atuin: a record stream of `YYYY-MM-DD HH:MM:SS\\tpath` ` (the NUL separation is added by the comparison script)
 
-分布设计：
-- 路径池 = 本机真实目录采样（find ~，限制深度与数量）+ 人工边界路径
-- 访问频率按 Zipf 分布（少数目录占绝大多数访问，模拟真实足迹）
-- 时间戳 7 成近期（指数分布）、2 成两年内、1 成陈旧（触发 ×0.25 档/懒删除），
-  另含衰减档位精确边界（now-1h/-1d/-1w/-30d）
-- rank 含常规浮点与边界字面量（nan/inf/+5/007/1e3 等——双方解析语义的对拍面）
-- 少量确定性坏行（校验 stderr 坏行上报的逐字节一致）
+Distribution design:
+- the path pool = real local directories sampled (find ~, depth and count limited) plus hand-written boundary paths
+- visit frequency follows a Zipf distribution (a few directories take most visits, imitating a real footprint)
+- timestamps: 70% recent (exponential), 20% within two years, 10% stale (exercising the x0.25 bucket and lazy deletion),
+  plus the exact decay-bucket boundaries (now-1h/-1d/-1w/-30d)
+- rank values include regular floats and boundary literals (nan/inf/+5/007/1e3 and so on: the comparison surface for both sides' parsing semantics)
+- a few deterministic bad rows (to check that bad-row reporting on stderr matches byte for byte)
 
-用法：gen_dataset.py --format z --lines 20000 --out /tmp/ds/z.txt [--seed N]
+Usage: gen_dataset.py --format z --lines 20000 --out /tmp/ds/z.txt [--seed N]
 """
 
 from __future__ import annotations
@@ -28,11 +28,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 SEED = 20260908
-# 固定基准时间（数据集创建日附近）：时间戳全部相对它生成，保证同种子逐字节可复现。
-# 注意：随真实时间流逝，"近期"条目会逐渐陈旧——对对拍无影响（双方看到同一份数据）
+# A fixed reference time (around the dataset's creation date): every timestamp is generated relative to it, keeping the same seed byte-reproducible.
+# Note: as real time passes the "recent" entries grow stale, which is harmless here (both sides see the same data)
 NOW = 1788824275
 
-# 人工边界路径：Unicode/空格/竖线/加点/超长/连字符混合（z 系格式允许 path 含 |）
+# Hand-written boundary paths: Unicode / spaces / pipes / dot segments / overlong / hyphens (the z family allows | in a path)
 EDGE_PATHS = [
     "/home/用户/博客",
     "/opt/with space/dir name",
@@ -48,7 +48,7 @@ EDGE_PATHS = [
 
 
 def real_dir_pool(max_depth: int, limit: int) -> list[str]:
-    """本机真实目录采样；find 失败或为空则退化为纯边界池。"""
+    """Sample real local directories; if find fails or returns nothing, fall back to the boundary pool alone."""
     home = os.path.expanduser("~")
     try:
         out = subprocess.run(
@@ -60,15 +60,15 @@ def real_dir_pool(max_depth: int, limit: int) -> list[str]:
         ).stdout.splitlines()
     except Exception:
         return []
-    # 过滤明显噪声：超长路径、含换行不可能出现，find 也不会给出
+    # filter obvious noise: overlong paths, or ones containing a newline, cannot occur and find will not yield them
     pool = [p for p in out if len(p) < 250 and p != home][:limit]
     return pool
 
 
 def synthetic_pool(n: int) -> list[str]:
-    """合成唯一路径池（性能规模集用）：组件词池 + 六位序号保证 n 条互不相同。
+    """Synthesize a unique-path pool (for the performance scale set): a component word pool plus a six-digit index keeps all n distinct.
 
-    末组件来自 10 词小池，供关键词查询场景按末组件命中约 1/10 条目。
+    The final component comes from a 10-word pool so the keyword-query scenario hits about 1/10 of the entries.
     """
     words = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot",
              "golf", "hotel", "india", "juliet", "kilo", "lima"]
@@ -80,32 +80,32 @@ def synthetic_pool(n: int) -> list[str]:
 
 
 def zipf_pick(rng: random.Random, pool: list[str]) -> str:
-    """1/rank 幂律采样：少数路径占绝大多数命中。"""
-    rank = rng.paretovariate(1.2)  # 重尾
+    """A 1/rank power-law sample: a few paths take the vast majority of hits."""
+    rank = rng.paretovariate(1.2)  # heavy tail
     idx = min(int(rank * 8), len(pool) - 1)
     return pool[idx]
 
 
 def pick_offset(rng: random.Random) -> int:
-    """距 now 的秒数偏移：时间衰减分布 + 精确档位边界。"""
+    """A second offset from now: the time-decay distribution plus the exact bucket boundaries."""
     roll = rng.random()
     if roll < 0.10:
-        # 精确档位边界（1h/1d/1w/30d 前）：双方衰减系数切换点
+        # the exact bucket boundaries (1h/1d/1w/30d ago): where both sides switch decay factor
         return rng.choice([3600, 86400, 604800, 2592000])
     if roll < 0.75:
-        # 近期：指数分布，均值 7 天
+        # recent: exponential, mean 7 days
         return int(rng.expovariate(1 / (7 * 86400)))
     if roll < 0.95:
-        # 两年内
+        # within two years
         return rng.randint(86400, 2 * 365 * 86400)
-    # 陈旧长尾（>3 个月，触发 ×0.25 与懒删除边界）
+    # the stale long tail (>3 months, exercising the x0.25 bucket and the lazy-deletion boundary)
     return rng.randint(90 * 86400, 5 * 365 * 86400)
 
 
 def unique_offsets(rng: random.Random, n: int) -> list[int]:
-    """n 个唯一的秒级偏移：分布采样后排序去重（相邻 +1 保唯一）。
-    唯一时间戳保证 score 几乎无平分——不同排序算法对相等 score 的平分顺序
-    无法逐字节一致，唯一化是对拍稳定的前提。"""
+    """n distinct second offsets: sample from the distribution, then sort and de-duplicate (adjacent +1 keeps them unique).
+    Unique timestamps keep scores almost free of ties: different sort algorithms order equal scores
+    differently, so they could never match byte for byte; uniqueness is the precondition for a stable comparison."""
     offsets = sorted(pick_offset(rng) for _ in range(n))
     for i in range(1, n):
         if offsets[i] <= offsets[i - 1]:
@@ -117,12 +117,12 @@ def unique_offsets(rng: random.Random, n: int) -> list[int]:
 RANK_POOL = [
     "1", "2.5", "0.5", "10", "100", "3.14159",
     "-2", "-0.75", "0", "007", "+5", "1e3", "-0",
-    "0.1", "0.2", "0.3",  # 浮点精度敏感值
+    "0.1", "0.2", "0.3",  # float-precision-sensitive values
     "123.456", "99999",
 ]
-# nan/inf 族：双方解析后按位型差异（payload/符号）会引入平分顺序分歧，不进
-# 逐字节对拍面——其显示/排序语义由单测按上游 total_cmp 源码锁定。
-# 1e308 同理：inf 聚合 clamp 后全部平分为 9999.0。
+# the nan/inf family: after parsing, bit-pattern differences (payload, sign) introduce tie-order
+# divergence, so they stay out of the byte-level comparison; their display/sort semantics are locked by unit tests against upstream's total_cmp source.
+# 1e308 likewise: once the inf total is clamped, everything ties at 9999.0.
 RANK_EDGE = ["nan", "NaN", "inf", "-inf", "infinity", "INF", "1e308"]
 
 
@@ -164,7 +164,7 @@ def gen_z(
 def gen_autojump(
     rng: random.Random, lines: int, pool: list[str], now: int, allow_edge: bool,
 ) -> list[str]:
-    del now  # autojump 不落时间
+    del now  # autojump does not store a time
     out = []
     for _ in range(lines):
         if rng.random() < 0.01:
@@ -173,7 +173,7 @@ def gen_autojump(
         path = zipf_pick(rng, pool)
         if path == "":
             continue
-        # autojump 权重任意浮点，时间不落盘（导入侧 sigmoid 归一 + last_accessed=0）
+        # autojump weights are arbitrary floats and its time is not stored (the import side sigmoid-normalizes and sets last_accessed=0)
         out.append(f"{pick_rank(rng, allow_edge)}\t{path}")
     return out
 
@@ -185,8 +185,8 @@ def fmt_atuin_time(epoch: int) -> str:
 def gen_atuin_records(
     rng: random.Random, lines: int, pool: list[str], now: int, allow_edge: bool,
 ) -> list[str]:
-    """atuin 命令序记录：含大量连续重复（触发连续折叠语义）。"""
-    del allow_edge  # atuin rank 恒 1.0，无 rank 字面量
+    """An atuin command-sequence record: lots of consecutive repeats (exercising the consecutive-folding semantics)."""
+    del allow_edge  # an atuin rank is always 1.0, so there are no rank literals
     offsets = unique_offsets(rng, lines)
     out = []
     i = 0
@@ -195,10 +195,10 @@ def gen_atuin_records(
         if path == "":
             i += 1
             continue
-        stay = min(rng.randint(1, 20), lines - i)  # 连住一个目录的命令数
+        stay = min(rng.randint(1, 20), lines - i)  # how many commands stay in one directory
         for _ in range(stay):
             if rng.random() < 0.02:
-                # 时间戳边界（闰日/纪元前由解析端校验）
+                # timestamp boundaries (leap days and pre-epoch values are validated by the parsing side)
                 ts = rng.choice([
                     "2024-02-29 00:00:00", "2023-02-29 00:00:00",
                     "1969-12-31 23:59:59",
@@ -219,16 +219,16 @@ def main() -> None:
     ap.add_argument("--out", required=True)
     ap.add_argument("--seed", type=int, default=SEED)
     ap.add_argument("--max-depth", type=int, default=4)
-    ap.add_argument("--now", type=int, default=NOW, help="时间戳基准 epoch 秒")
+    ap.add_argument("--now", type=int, default=NOW, help="the reference timestamp in epoch seconds")
     ap.add_argument("--rank-edge", action="store_true",
-                    help="掺入 nan/inf/1e308 边界 rank（仅供内容级对拍，逐字节对拍勿用）")
+                    help="mix in nan/inf/1e308 boundary ranks (content-level comparison only, never byte-level)")
     ap.add_argument("--unique-paths", type=int, default=0,
-                    help="改用合成唯一路径池（性能规模集，仅 --format z）：路径逐行轮转，"
-                         "每路径约 lines/N 次（触发 dedup），不与本机真实池/Zipf 叠加")
+                    help="use the synthesized unique-path pool instead (performance scale set, --format z only): paths rotate line by line,"
+                         "about lines/N times each (triggering dedup), never stacked on the real local pool or Zipf")
     args = ap.parse_args()
 
     if args.unique_paths and args.format != "z":
-        ap.error("--unique-paths 仅支持 --format z")
+        ap.error("--unique-paths only supports --format z")
 
     rng = random.Random(args.seed)
     now = args.now
@@ -238,7 +238,7 @@ def main() -> None:
         order = synthetic_pool(args.unique_paths)
         rng.shuffle(order)
         path_iter = itertools.cycle(order)
-        pool = order  # 仅供末尾统计显示
+        pool = order  # for the summary at the end only
     else:
         pool = real_dir_pool(args.max_depth, 800) + EDGE_PATHS
         if not pool:
@@ -254,7 +254,7 @@ def main() -> None:
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     if args.format == "atuin":
-        # atuin --print0 语义：记录间 NUL 分隔、尾部 NUL（不是行文本！）
+        # atuin --print0 semantics: records NUL-separated with a trailing NUL (not line text!)
         out.write_bytes("\x00".join(lines_).encode("utf-8") + b"\x00")
     else:
         out.write_text("\n".join(lines_) + "\n", encoding="utf-8")
