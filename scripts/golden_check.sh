@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
-# 数据集 D8：jumbit 扩展面（query --json / --fuzzy / matched_by / --limit / --tsv /
-# describe / export --agents）的 golden 冻结。上游无对应物、无裁判可用，人工核验后的
-# golden 文件即裁判；命令面输出逐字节比对（stdout/stderr/退出码三元组）。
+# Dataset D8: golden freeze for jumbit's extension surface (query --json / --fuzzy / matched_by / --limit / --tsv /
+# describe / export --agents). Upstream has no counterpart and no judge is available, so the hand-verified
+# golden file is the judge; the command surface's output is compared byte for byte (the stdout/stderr/exit-code triple).
 #
-# 确定性设计（golden 不随机器/时间漂移）：
-# - 数据文件为合成路径（/golden/**，任何机器上都不存在，exists 过滤行为恒定）
-# - 时间戳只取两类：la=0（×0.25 档，随时间只增不减）与 la=2^40（未来，u64
-#   饱和 → ×4 档，公元 3.6 万年前恒定）；不含 <1h/<1d/<1w 漂移档
-# - rank 含一个 nan：总分变 NaN → 老化整体跳过，rank 原样入库（确定性复现）
+# Determinism design (the golden does not drift with machine or time):
+# - the data holds synthetic paths (/golden/**, which exist nowhere, so the exists filter behaves constantly)
+# - timestamps come in two kinds only: la=0 (the x0.25 bucket, which only grows with time) and la=2^40 (the future, where a u64
+#   saturates to the x4 bucket, constant until the year 36000); never the drifting <1h/<1d/<1w buckets
+# - one rank is nan: the total becomes NaN, so aging is skipped entirely and ranks land as they are (reproducible)
 #
-# 用法：bash scripts/golden_check.sh [--update]
-#   --update  重新生成 scripts/golden/ 下的 golden 文件（变更须人工 diff 审查）
-# 依赖：python3、jumbit release 二进制（moon build --release）
+# Usage: bash scripts/golden_check.sh [--update]
+#   --update  regenerate the golden files under scripts/golden/ (any change needs a hand-reviewed diff)
+# Depends on: python3 and the jumbit release binary (moon build --release)
 
 set -u
 cd "$(dirname "$0")/.."
 
-# Git Bash/MSYS 会把 POSIX 形态参数（合成路径 /golden/**）自动映射为
-# Git 安装根的真实路径（probe 实证 /golden/alpha → C:/Program Files/Git/
-# golden/alpha），污染查询参数与库内原样路径的精确匹配；禁用之
+# Git Bash/MSYS maps POSIX-shaped arguments (synthetic paths like /golden/**) onto
+# real paths under the Git installation (probed: /golden/alpha -> C:/Program Files/Git/
+# golden/alpha), which would poison the query arguments' exact match against the raw paths in the database; disable it
 export MSYS_NO_PATHCONV=1
 export MSYS2_ARG_CONV_EXCL='*'.
 
@@ -28,12 +28,12 @@ mode=check
 if [ "${1:-}" = "--update" ]; then
   mode=update
 fi
-[ -x "$bin" ] || { echo "✗ 缺 $bin（先 moon build --release）" >&2; exit 2; }
+[ -x "$bin" ] || { echo "✗ $bin is missing (run moon build --release first)" >&2; exit 2; }
 
 tmp=$(mktemp -d /tmp/jumbit-golden-XXXX)
-# Windows（Git Bash）下转混合形态：MSYS 的 /tmp 与 Windows 原生程序的
-# 「当前盘根 \tmp」是两个真实位置，python3 写数据集与 jumbit 经 _Z_DATA
-# 读取必须落在同处；C:/ 形态 bash 工具同样接受。POSIX 无 cygpath 原样
+# Under Windows (Git Bash) convert to the mixed form: MSYS's /tmp and a native Windows program's
+# "	mp at the current drive root" are two different real places, and the python3 writing the dataset and jumbit reading it through _Z_DATA
+# must land in the same one; bash tools accept the C:/ form too. On POSIX, with no cygpath, use it as is
 is_win=0
 if command -v cygpath >/dev/null; then
   is_win=1
@@ -43,13 +43,13 @@ pass=0
 fail=0
 failed=()
 
-# ---------- 数据集 ----------
+# ---------- dataset ----------
 
 python3 - "$tmp" <<'PY'
 import sys
 tmp = sys.argv[1]
-# 合成数据集：路径永不存在；la 只取 0（×0.25 恒定）与 2^40（未来 → ×4 恒定）；
-# nan rank 使总分 NaN → 老化跳过（import 语义的确定性组成部分）
+# synthetic dataset: the paths never exist; la is only 0 (a constant x0.25) or 2^40 (the future, a constant x4);
+# a nan rank makes the total NaN, so aging is skipped (a deterministic part of the import semantics)
 rows = [
     b"/golden/alpha|3.0|0",
     b"/golden/beta|2.0|1099511627776",
@@ -68,12 +68,12 @@ rows = [
 open(f"{tmp}/dataset.z", "wb").write(b"\n".join(rows) + b"\n")
 PY
 
-# ---------- 执行 ----------
+# ---------- execution ----------
 
 mkdir -p "$tmp/db"
 export _JB_DATA_DIR="$tmp/db"
 
-# g <case名> <命令...>：运行一条 jumbit 命令，捕获 out/err/code 三元组
+# g <case name> <command...>: run one jumbit command and capture the out/err/code triple
 g() {
   local case="$1"
   shift
@@ -82,7 +82,7 @@ g() {
   strip_cr "$tmp/$case.out" "$tmp/$case.err" "$tmp/$case.code"
 }
 
-# 生成模式直接落 scripts/golden/，检查模式留 tmp 比对
+# generate mode writes straight into scripts/golden/, check mode keeps them in tmp for comparison
 if [ "$mode" = update ]; then
   mkdir -p "$golden"
   g() {
@@ -94,8 +94,8 @@ if [ "$mode" = update ]; then
   }
 fi
 
-# 就地改写（GNU/BSD sed 通用）：BSD sed 的 -i 必带后缀参数（会吞掉 sed 表达式），
-# 统一走「stdout 落临时文件 mv 回原位」
+# in-place rewrite (works with both GNU and BSD sed): BSD sed's -i requires a suffix argument (which would swallow the sed expression),
+# so everything goes through "stdout to a temp file, then mv back"
 sed_inplace() {
   local expr="$1"
   shift
@@ -105,14 +105,14 @@ sed_inplace() {
   done
 }
 
-# CRLF 归一化：Windows 下进程输出重定向经文本模式翻译带 \r（Git Bash 侧
-# 重定向同样翻译），逐字节比对/冻结前剥离；POSIX 输出无 \r，Linux 侧零影响
+# CRLF normalization: under Windows, redirected process output goes through text-mode translation and carries \r (Git Bash-side
+# redirection translates it too), so it is stripped before the byte comparison/freeze; POSIX output has no \r, so Linux is unaffected
 strip_cr() {
   tr -d '\r' <"$1" >"$1.nt" && mv "$1.nt" "$1"
 }
 
-# genv <case名> <VAR=val>... -- <命令...>：带环境注入的 g（edit 用例：
-# VISUAL 指伪 editor、_JB_DATA_DIR 指独立库）
+# genv <case name> <VAR=val>... -- <command...>: g with environment injection (the edit cases:
+# VISUAL points at the fake editor, _JB_DATA_DIR at a separate database)
 genv() {
   local case="$1"
   shift
@@ -132,8 +132,8 @@ genv() {
   strip_cr "$outdir/$case.out" "$outdir/$case.err" "$outdir/$case.code"
 }
 
-# gs <case名> <命令...>：status 用例专用——status 输出含数据文件绝对路径
-# （位于随机 mktemp 目录），比对前归一化为 @JUMBIT_TMP@，两种模式同规则
+# gs <case name> <command...>: for the status cases -- status output carries the data file's absolute path
+# (inside a random mktemp directory), normalized to @JUMBIT_TMP@ before comparison in both modes
 gs() {
   local case="$1"
   shift
@@ -147,18 +147,18 @@ gs() {
   strip_cr "$outdir/$case.out" "$outdir/$case.err" "$outdir/$case.code"
 }
 
-# --- 空库行为 ---
+# --- empty-database behaviour ---
 g json-empty-db query --json --all
 g list-empty-db query --list --score
 g miss-with-kw query --json --all zzznope
 gs status-empty status
 
-# --- 导入（坏行零、静默退出 0；插件数据文件走 _Z_DATA，import 不收路径参数）---
+# --- import (zero bad rows, silent exit 0; the plugin's data file comes from _Z_DATA, import takes no path argument) ---
 export _Z_DATA="$tmp/dataset.z"
 g import-quiet import z
 
-# --- 全量面（--all 不触发 exists，必须先于任何非 --all 用例：exists 过滤
-#     伴随 TTL 懒删除，会不可逆地改库）---
+# --- the full surface (--all does not trigger exists, so it must run before any non---all case: exists filtering
+#     comes with TTL lazy deletion, which changes the database irreversibly) ---
 g text-all query --list --score --all
 g text-single query --score --all beta
 g text-fuzzy-case-exact query --list --score --all --fuzzy UPPER
@@ -170,8 +170,8 @@ g json-fuzzy-multi query --json --all --fuzzy web serv
 g json-fuzzy-nonlast query --json --all --fuzzy myapp
 g json-mutex query --json --interactive
 
-# --- --tsv 数据通道（jumbit 扩展；无表头，path 原样不转义；全 --all 不改库，
-#     须在懒删除段之前跑才能见到全量行：tab 路径/nan/转义路径）---
+# --- the --tsv data channel (a jumbit extension; headerless, the path verbatim and unescaped; all --all, so it does not change the database
+#     and must run before the lazy-deletion section to see every row: tab path / nan / escaped path) ---
 g tsv-all query --tsv --all
 g tsv-limit-2 query --tsv --all --limit 2
 g tsv-mutex-json query --tsv --json --all
@@ -189,27 +189,27 @@ g describe-note-newline describe /golden/gamma --note "a
 b"
 g describe-missing describe /golden/nope
 
-# --- status（jumbit 扩展；13 条 / 2 标注为确定态；--check 下 /golden/** 永
-#     不存在 → 存在 0/13 恒定）---
+# --- status (a jumbit extension; 13 entries / 2 notes is the settled state; under --check /golden/**
+#     never exists, so existing 0/13 is constant) ---
 gs status-full status
 gs status-json status --json
 gs status-check status --check
 
-# --- exists 过滤 + TTL 懒删除（改库，放最后并冻结前后状态）---
+# --- exists filtering + TTL lazy deletion (changes the database; kept last and frozen before and after) ---
 g json-exists-filtered query --json beta
 g text-exists-empty query --list --score
 g json-after-lazy query --json --all
 
-# --- --limit 截断（jumbit 扩展；全 --all 数据路径，不触碰上面懒删除后的库状态）---
+# --- --limit truncation (a jumbit extension; all --all data paths, so it does not touch the post-lazy-deletion state above) ---
 g json-limit-2 query --json --all --limit 2
 g limit-zero query --json --all --limit 0
 g limit-mutex query --limit 2
 g limit-invalid-value query --json --all --limit abc
 g limit-negative query --json --all --limit -1
 
-# --- status 损坏库（独立库目录，exit 1 + stderr）：
-#     status-corrupt = legacy db.zo 二进制路径；status-corrupt-plaintext =
-#     明文坏行聚合（行号 + 上游逐字文案 + 8 条折叠之外的常规两行）---
+# --- status on a corrupt database (a separate database directory, exit 1 + stderr):
+#     status-corrupt = the legacy binary db.zo path; status-corrupt-plaintext =
+#     the plaintext bad-row aggregate (line number + upstream's verbatim wording + the two normal lines beyond the 8-line fold) ---
 mkdir -p "$tmp/db-corrupt"
 printf 'garbage-not-a-db' > "$tmp/db-corrupt/db.zo"
 _JB_DATA_DIR="$tmp/db-corrupt" gs status-corrupt status
@@ -217,13 +217,13 @@ mkdir -p "$tmp/db-corrupt-txt"
 printf '1789054423\t00000001.00\t/golden/ok\nbadline2\n1789054423\tzzz\t/golden/x\n' > "$tmp/db-corrupt-txt/db.txt"
 _JB_DATA_DIR="$tmp/db-corrupt-txt" gs status-corrupt-plaintext status
 
-# --- edit（jumbit 扩展；伪 editor + 独立库 edit-db，不触碰主库/status 库）：
-#     手编库 2 条（/e-keep 带标注、/e-gone 不存在）→ noop 静默 → rename 改
-#     /e-keep（note 跟随）→ 未命中/互斥错误面 → prune 移除 /e-gone 出清单
-#     伪 editor 依赖 POSIX sh + chmod 可执行位，Windows 的 CreateProcess
-#     无法执行无扩展名脚本（.cmd 桩改造属 Phase-2 剩余），Git Bash 下跳过 ---
+# --- edit (a jumbit extension; a fake editor plus a separate edit-db, touching neither the main nor the status database):
+#     2 hand-written entries (/e-keep with a note, /e-gone nonexistent) -> noop is silent -> rename changes
+#     /e-keep (the note follows) -> the miss/mutex error surface -> prune removes /e-gone from the listing
+#     the fake editor needs POSIX sh plus a chmod executable bit, and Windows' CreateProcess
+#     cannot run an extensionless script (converting it to a .cmd stub is phase-2 work), so it is skipped under Git Bash ---
 if command -v cygpath >/dev/null; then
-  echo "  跳过 edit 组（伪 editor 为 POSIX sh 桩，Windows 待 .cmd 化）"
+  echo "  skipping the edit group (the fake editor is a POSIX sh stub; Windows needs a .cmd version)"
 else
 mkdir -p "$tmp/edit-db"
 printf '1789054423\t00000001.00\t/e-keep\n1789054423\t00000002.00\t/e-gone\n' > "$tmp/edit-db/db.txt"
@@ -240,24 +240,24 @@ genv edit-mutex VISUAL="$tmp/fake-editor/noop" _JB_DATA_DIR="$tmp/edit-db" -- ed
 genv edit-prune VISUAL="$tmp/fake-editor/noop" _JB_DATA_DIR="$tmp/edit-db" -- edit --prune
 fi
 
-# 顶层面（--version/-V/无参数；不触库，置于末段）
+# the top level (--version/-V/no arguments; touches no database, so it goes last)
 g version --version
 g version-short -V
 g version-extra --version x
 g noargs
 
 if [ "$mode" = update ]; then
-  echo "== golden 已重生成至 $golden/（请 git diff 人工审查后冻结）=="
+  echo "== golden regenerated into $golden/ (review the git diff, then freeze) =="
   rm -rf "$tmp"
   exit 0
 fi
 
-# ---------- 比对 ----------
+# ---------- comparison ----------
 
 cmp_case() {
   local case="$1" ext="$2" ok=1
-  # golden 侧同样剥 \r：防御 checkout 行尾翻译（.gitattributes 已禁止，
-  # 此为本地既有工作区的双保险）
+  # strip \r on the golden side too: a defence against checkout newline translation (.gitattributes already forbids it,
+  # this is a second line of defence for an existing local worktree)
   strip_cr "$golden/$case.$ext"
   if ! cmp -s "$tmp/$case.$ext" "$golden/$case.$ext"; then
     ok=0
@@ -276,8 +276,8 @@ for case in json-empty-db list-empty-db miss-with-kw import-quiet \
   status-empty status-full status-json status-check status-corrupt status-corrupt-plaintext \
   edit-noop edit-rename describe-renamed edit-missing edit-mutex edit-prune \
   version version-short version-extra noargs; do
-  # Windows（Git Bash）下 edit 组未跑，golden 侧同名文件缺位，跳过比对
-  # （is_win 见下；注意 && / || 混用的左结合陷阱，用 case 分发）
+  # under Windows (Git Bash) the edit group did not run, so the same-named golden is absent and the comparison is skipped
+  # (is_win below; mind the left-associativity trap of mixing && and ||, hence the case dispatch)
   if [ "$is_win" = 1 ]; then
     case "$case" in
       edit-noop|edit-rename|describe-renamed|edit-missing|edit-mutex|edit-prune) continue ;;
@@ -302,10 +302,10 @@ for case in json-empty-db list-empty-db miss-with-kw import-quiet \
   fi
 done
 
-echo "== 结果：$pass 通过 / $fail 失败 =="
+echo "== result: $pass passed / $fail failed =="
 if [ "$fail" -gt 0 ]; then
-  printf '失败用例: %s\n' "${failed[*]}"
-  echo "现场保留: $tmp"
+  printf 'failed cases: %s\n' "${failed[*]}"
+  echo "kept the scratch dir: $tmp"
   exit 1
 fi
 rm -rf "$tmp"
