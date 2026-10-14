@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""明文迁移窗口期的 score 容差判定（dataset_check.sh 专用）。
+"""Score tolerance check for the plaintext-migration window (used by dataset_check.sh only).
 
-用法：score_tolerance_check.py <jb_query_out> <zo_query_out> <tolerance>
-输入：`query --list --score` 输出（行首 score，空格分隔，其余为 path）。
-判定：
-  1. 两侧 path 集合一致（缺失/多出即失败）
-  2. 同 path 的 score 数值差 ≤ tolerance（NaN==NaN 视为相等；单侧 NaN 失败）
-退出码 0=通过，1=失败（stderr 给出超限明细，最多列 5 条）。
+Usage: score_tolerance_check.py <jb_query_out> <zo_query_out> <tolerance>
+Input: `query --list --score` output (score first on the line, space separated, the rest is the path).
+Checks:
+  1. both sides carry the same set of paths (a missing or extra one fails)
+  2. the same path\'s scores differ by <= tolerance (NaN==NaN counts as equal; a NaN on one side fails)
+Exit code 0 = pass, 1 = fail (stderr lists the over-tolerance rows, at most 5).
 
-上游合并 #1288 后两侧同为两位小数精度，本脚本与 dataset_check.sh 的容差
-逻辑一并删除，恢复全字节级判定。
+Once upstream merges #1288 both sides carry two-decimal precision, at which point this script and
+dataset_check.sh\'s tolerance logic are deleted together, restoring the byte-level check.
 """
 import sys
 
@@ -21,14 +21,14 @@ def load(path):
             line = line.rstrip("\n")
             if not line.strip():
                 continue
-            # 行格式 = 右对齐 score + 单空格 + path（path 可为空串或含空格，
-            # score 本身不含空格）——按首个非空格位切，保留 path 尾随空格
+            # line format = right-aligned score + one space + path (the path may be empty or contain
+            # spaces; the score itself contains none) — split at the first non-space, keeping trailing spaces
             i = 0
             while i < len(line) and line[i] == " ":
                 i += 1
             j = line.find(" ", i)
             if j < 0:
-                print(f"格式异常行: {line!r}", file=sys.stderr)
+                print(f"malformed line: {line!r}", file=sys.stderr)
                 sys.exit(1)
             out[line[j + 1:]] = line[i:j]
     return out
@@ -48,27 +48,27 @@ def main():
     problems = []
     for p in sorted(set(jb) | set(zo)):
         if p not in jb or p not in zo:
-            # 空 path 豁免：明文行格式无法表达，救库语义跳过（规格 §1.3）
+            # empty-path exemption: the plaintext line format cannot express it, so the rescue semantics skip it (spec §1.3)
             if allow_missing_empty and p == "":
                 continue
-            problems.append(f"路径单侧缺失: {p!r} (jb={'有' if p in jb else '无'} zo={'有' if p in zo else '无'})")
+            problems.append(f"path missing on one side: {p!r} (jb={'yes' if p in jb else 'no'} zo={'yes' if p in zo else 'no'})")
             continue
         a, b = num(jb[p]), num(zo[p])
         if a is None or b is None:
-            # zo 侧 NaN 豁免：jumbit 救库把 NaN 归化为有限值（规格 §1.3）
+            # zo-side NaN exemption: jumbit\'s rescue normalizes NaN to a finite value (spec §1.3)
             if allow_zo_nan and b is None and a is not None:
                 continue
             if a is not b and not (a is None and b is None):
-                problems.append(f"NaN 单侧: {p} jb={jb[p]} zo={zo[p]}")
+                problems.append(f"NaN on one side: {p} jb={jb[p]} zo={zo[p]}")
             continue
         if abs(a - b) > tol:
-            problems.append(f"score 差超限: {p} jb={jb[p]} zo={zo[p]} 差={abs(a-b):.4f}")
+            problems.append(f"score difference over tolerance: {p} jb={jb[p]} zo={zo[p]} diff={abs(a-b):.4f}")
     if problems:
         for line in problems[:5]:
             print(line, file=sys.stderr)
         if len(problems) > 5:
             print(f"... and {len(problems) - 5} more", file=sys.stderr)
-        print(f"FAIL: {len(problems)} 处", file=sys.stderr)
+        print(f"FAIL: {len(problems)} problem(s)", file=sys.stderr)
         sys.exit(1)
     sys.exit(0)
 

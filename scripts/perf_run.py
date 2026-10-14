@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""子进程计时包装器：同一命令跑 N 轮，逐轮输出 wall 秒与子进程峰值 RSS。
+"""Child-process timing wrapper: run the same command N rounds, printing wall seconds and the child\'s peak RSS each round.
 
-输出行格式（TAB 分隔）：`<rep>\\t<wall 秒>\\t<maxrss KB>\\t<退出码>`，供编排脚
-本聚合。峰值 RSS 取 resource.getrusage(RUSAGE_CHILDREN).ru_maxrss（Linux 单位
-KB），是该进程全部已收子进程的历史峰值——每次调用只应跑一个场景（同一命令
-N 轮），峰值即该场景峰值。stdout/stderr 按轮截断落盘（保留最后一轮现场，文
-件尺寸即单轮产出规模），避免管道/终端 IO 污染计时。
+Output line format (TAB separated): `<rep>\\t<wall seconds>\\t<maxrss KB>\\t<exit code>`, which the
+orchestrating script aggregates. Peak RSS comes from resource.getrusage(RUSAGE_CHILDREN).ru_maxrss
+(in KB on Linux), the historic peak over every child this process has reaped — so each invocation
+should run exactly one scenario (N rounds of one command), making that peak the scenario\'s peak.
+stdout/stderr are truncated to disk per round (keeping the last round\'s evidence; the file size then
 
-env 值中的 `{rep}` 占位替换为轮号：import 类场景每轮需独立空库（非 --merge
-对非空库拒绝），如 `--env=_JB_DATA_DIR=/tmp/x/jb-{rep}`。
+reflects one round\'s output), which keeps pipe/terminal IO from polluting the timing.
+The `{rep}` placeholder in an env value is replaced by the round number: import-type scenarios need a
 
-计时含 subprocess.run 的 fork/exec 开销（毫秒级），对秒级场景可忽略。
+fresh empty database each round (a non-`--merge` import refuses a non-empty one), e.g. `--env=_JB_DATA_DIR=/tmp/x/jb-{rep}`.
 """
 
 from __future__ import annotations
@@ -26,10 +26,10 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--reps", type=int, default=3)
     ap.add_argument("--env", action="append", default=[], metavar="KEY=V",
-                    help="追加环境变量（值支持 {rep} 占位）；可重复")
-    ap.add_argument("--stdout", required=True, help="子进程 stdout 落盘路径（逐轮截断）")
-    ap.add_argument("--stderr", required=True, help="子进程 stderr 落盘路径（逐轮截断）")
-    ap.add_argument("cmd", nargs="+", help="被计时命令（-- 之后）")
+                    help="extra environment variable (its value supports the {rep} placeholder); repeatable")
+    ap.add_argument("--stdout", required=True, help="where to write the child\'s stdout (truncated per round)")
+    ap.add_argument("--stderr", required=True, help="where to write the child\'s stderr (truncated per round)")
+    ap.add_argument("cmd", nargs="+", help="the command to time (after --)")
     args = ap.parse_args()
 
     env = dict(os.environ)
