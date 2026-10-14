@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
-"""上游 askama shell 模板 → MoonBit 渲染函数转译器（templates/*_gen.mbt 生成器）。
+"""Upstream askama shell templates -> MoonBit render functions (the templates/*_gen.mbt generator).
 
-支持模板语法（jumbit 所需的 askama 子集，与上游 templates/*.txt 对齐）：
-- {%- let name = "value" -%} / {%- decl name -%}：字符串绑定；decl 为预声明
+Template syntax supported (the askama subset jumbit needs, aligned with upstream templates/*.txt):
+- {%- let name = "value" -%} / {%- decl name -%}: string bindings; decl pre-declares
 - {%- if cond -%} / {%- else if cond -%} / {%- else -%} / {%- endif -%}
   cond ∈ {echo, resolve_symlinks, hook ==/!= InitHook::X, cfg!(windows)}
-  cfg!(windows) 分支整支丢弃（jumbit 仅 Linux，README 已注明差异）
+  a whole cfg!(windows) branch is dropped (jumbit is Linux-only; the README notes the difference)
 - {%- match cmd %} / {%- when Some with (cmd) %} / {%- when None %} / {%- endmatch %}
-- {%- match hook %} / {%- when InitHook::X %}（渲染为 jumbit 的 Hook 枚举）
-- {{ name }}：变量插值
-- 空白控制：{%- / -%} 剥相邻全部空白（askama 语义）；引号感知扫描右界
+- {%- match hook %} / {%- when InitHook::X %} (rendered as jumbit's Hook enum)
+- {{ name }}: variable interpolation
+- whitespace control: {%- / -%} strip all adjacent whitespace (askama semantics); the right boundary is found quote-aware
 
-重命名（文本与字符串值统一应用，顺序即下述先后）：__zoxide_→__jumbit_、
-_ZO_→_JB_、zoxide→jumbit、z#→j#；生成后再过 `moon fmt` 规整。
+Renames (applied uniformly to text and string values, in the order given): __zoxide_->__jumbit_,
+_ZO_-> _JB_, zoxide->jumbit, z#->j#; the output is then normalized through `moon fmt`.
 
-用法：
+Usage:
   gen_templates.py --src ~/repos-other/zoxide/templates --shell bash --out templates/bash_gen.mbt
-  gen_templates.py --src ... --shell bash --stdout   # 回归比对模式
-回归验证：bash/zsh 重生成后与入库文件逐字节 diff（moon fmt 之后的形态）。
+  gen_templates.py --src ... --shell bash --stdout   # regression comparison mode
+Regression check: regenerate bash/zsh and diff byte for byte against the committed files (the post-moon-fmt shape).
 """
 
 from __future__ import annotations
@@ -42,24 +42,24 @@ def rename(text: str) -> str:
     return text
 
 
-# ---------------------------------------------------------------- 词法
+# ------------------------------------------------------------ lexer
 
 
 @dataclass
 class Token:
     kind: str  # text / expr / stmt
-    value: str  # text 内容 / 表达式名 / 语句原文
+    value: str  # text content / expression name / raw statement
 
 
 def tokenize(tpl: str) -> list[Token]:
-    """切分为 text/expr/stmt；引号感知找右界；应用 askama 空白控制。"""
+    """Split into text/expr/stmt; find the right boundary quote-aware; apply askama whitespace control."""
     tokens: list[Token] = []
     pos = 0
     n = len(tpl)
 
     def find_expr_close(start: int, close_pat: str) -> int:
-        # 表达式两种形态：字符串字面量 {{ "..." }}（右界紧跟字面量闭合引号）
-        # 或普通标识/unwrap（引号感知扫描）
+        # two expression shapes: a string literal {{ "..." }} (the right boundary is the literal's
+        # closing quote) or a plain identifier/unwrap (found with a quote-aware scan)
         i = start
         while i < n and tpl[i] in " \t":
             i += 1
@@ -80,7 +80,7 @@ def tokenize(tpl: str) -> list[Token]:
         return find_close(start, "{{", close_pat)
 
     def find_close(start: int, open_pat: str, close_pat: str) -> int:
-        # 从 start 起找 close_pat，跳过引号字面量（模板正文含 }} 等）
+        # scan for close_pat from start, skipping quoted literals (template bodies contain }} etc.)
         i = start
         quote = ""
         while i < n - 1:
@@ -100,10 +100,10 @@ def tokenize(tpl: str) -> list[Token]:
             if tpl.startswith(close_pat, i):
                 return i
             i += 1
-        raise ValueError(f"未闭合的 {open_pat}（偏移 {start}）")
+        raise ValueError(f"unterminated {open_pat} (offset {start})")
 
     while pos < n:
-        # askama 注释 {#- ... -#} / {# ... #}：整块跳过
+        # an askama comment {#- ... -#} / {# ... #}: skip the whole block
         cmt = tpl.find("{#", pos)
         cand = []
         for open_pat, close_pat, kind in (("{%", "%}", "stmt"), ("{{", "}}", "expr")):
@@ -112,7 +112,7 @@ def tokenize(tpl: str) -> list[Token]:
                 cand.append((idx, open_pat, close_pat, kind))
         if cmt != -1 and (not cand or cmt < min(cand)[0]):
             cend = tpl.find("#}", cmt)
-            assert cend != -1, "未闭合的 {#"
+            assert cend != -1, "unterminated {#"
             if cmt > pos:
                 tokens.append(Token("text", tpl[pos:cmt]))
             pos = cend + 2
@@ -130,8 +130,8 @@ def tokenize(tpl: str) -> list[Token]:
             end = find_close(body_start, open_pat, close_pat)
         body = tpl[body_start:end]
         pos = end + 2
-        # 空白控制：仅 {%- 剥前置文本的尾空白；-%} 在 askama preserve
-        # 模式下不剥右侧空白（以现有入库生成物字节回归为准）
+        # whitespace control: only {%- strips the preceding text's trailing whitespace; under askama's
+        # preserve mode -%} does not strip on the right (the committed generator output is the reference)
         trim_left = body.startswith("-")
         if trim_left:
             body = body[1:]
@@ -147,7 +147,7 @@ def tokenize(tpl: str) -> list[Token]:
     return tokens
 
 
-# ---------------------------------------------------------------- 语法树
+# ----------------------------------------------------------- syntax tree
 
 
 @dataclass
@@ -173,14 +173,14 @@ class Let(Node):
 
 @dataclass
 class If(Node):
-    # arms: [(cond 原文或 None(else), body)]
+    # arms: [(raw cond or None for else, body)]
     arms: list = field(default_factory=list)
 
 
 @dataclass
 class Match(Node):
     expr: str  # cmd / hook
-    # arms: [(pattern 原文, 绑定名或 None, body)]
+    # arms: [(raw pattern, binding name or None, body)]
     arms: list = field(default_factory=list)
 
 
@@ -217,7 +217,7 @@ def parse(tokens: list[Token]) -> list[Node]:
                     pos += 1
                     m2 = re.match(r"if let Some\((\w+)\)\s*=\s*(\w+)$", stmt)
                     body, term, _ = parse_block({"endif"})
-                    pos += 1  # 消费 endif
+                    pos += 1  # consume endif
                     assert term == "endif"
                     nm = m2.group(1)
                     out.append(
@@ -234,7 +234,7 @@ def parse(tokens: list[Token]) -> list[Node]:
                     pos += 1
                     out.append(parse_match(stmt))
                 else:
-                    raise ValueError(f"未知语句(stop={stop}): {stmt}")
+                    raise ValueError(f"unknown statement (stop={stop}): {stmt}")
         return out, None, []
 
     def parse_if(cond: str) -> Node:
@@ -243,13 +243,13 @@ def parse(tokens: list[Token]) -> list[Node]:
         cur_cond = lower_cond(cond)
         while True:
             body, terminator, parts = parse_block({"endif", "else", "else if"})
-            pos += 1  # 消费终止符（else if / else / endif）
+            pos += 1  # consume the terminator (else if / else / endif)
             arms.append((cur_cond, body))
             if terminator == "endif":
                 return If(arms)
             if terminator == "else":
                 body2, term2, _ = parse_block({"endif"})
-                pos += 1  # 消费 endif
+                pos += 1  # consume endif
                 assert term2 == "endif"
                 arms.append((None, body2))
                 return If(arms)
@@ -282,7 +282,7 @@ def parse(tokens: list[Token]) -> list[Node]:
         while True:
             tok = tokens[pos]
             if tok.kind == "text":
-                assert tok.value.strip() == "", f"match 与 when 间存在非空文本: {tok.value!r}"
+                assert tok.value.strip() == "", f"non-empty text between match and when: {tok.value!r}"
                 pos += 1
                 continue
             assert tok.kind == "stmt", tok
@@ -306,7 +306,7 @@ def parse(tokens: list[Token]) -> list[Node]:
     return result
 
 
-# ---------------------------------------------------------------- 降形
+# ------------------------------------------------------- lowering
 
 
 CMD_DEFAULTS: set = set()
@@ -322,7 +322,7 @@ class Emitter:
 
 
 def emit_if(node: If, em: Emitter, declared: dict[str, str], bound: set) -> None:
-    # 丢弃 windows 分支后，else 体原地内联（旧生成物形状）
+    # once the windows branch is dropped, the else body is inlined in place (the old output shape)
     arms = [(c, b) for c, b in node.arms if c != "DROP_WINDOWS"]
     if not arms:
         return
@@ -334,7 +334,7 @@ def emit_if(node: If, em: Emitter, declared: dict[str, str], bound: set) -> None
         if cond is None:
             em.emit("} else {")
         elif first:
-            # 分支内 let 无 decl 时：mut 声明提升到 if 之前
+            # an in-branch let without decl: the mut declaration is lifted above the if
             for name in scan_assigns([body]):
                 if name not in declared:
                     declared[name] = "assign"
@@ -357,11 +357,11 @@ def walk(nodes: list[Node], em: Emitter, declared: dict[str, str], bound: set) -
             raw = node.name
             name = raw.strip()
             if name.startswith('"'):
-                # 字符串字面量表达式：内容已为转义形态，改写后原样写出
+                # a string-literal expression: its content is already escaped, so it is written out as is
                 em.emit(f'sb.write_string("{rename(name[1:-1])}")')
             elif name.startswith("cmd"):
-                # {{cmd}}（无空格）= Some 臂绑定；带空格的 {{ cmd }} / unwrap_or
-                # = askama Option 插值，降形为 cmd_name（None 渲染默认值）
+                # {{cmd}} (no spaces) = the Some arm binding; {{ cmd }} with spaces / unwrap_or
+                # = askama Option interpolation, lowered to cmd_name (None renders the default)
                 m = re.match(r"cmd\.unwrap_or\(\"([^\"]*)\"\)$", name)
                 if m:
                     em.emit("sb.write_string(cmd_name)")
@@ -382,9 +382,9 @@ def walk(nodes: list[Node], em: Emitter, declared: dict[str, str], bound: set) -
                 em.emit(f"let {node.name} : String = {node.value}")
             else:
                 if node.name not in declared:
-                    # 无 decl 的分支内 let：先把 mut 预留到当前块开头之外由调用方处理，
-                    # 这里退化为就地 mut 声明会破坏作用域——统一在本分支 emit 赋值，
-                    # mut 声明由 pre-scan 补（见 transpile）
+                    # an in-branch let without decl: the mut is reserved outside the current block's opening
+                    # for the caller to handle, since degrading to an in-place mut declaration here would
+                    # break scoping — the assignment is emitted in this branch and the mut comes from the pre-scan (see transpile)
                     declared.setdefault(node.name, "assign")
                 em.emit(f"{node.name} = {node.value}")
         elif isinstance(node, If):
@@ -415,7 +415,7 @@ def scan_assigns(nodes: list[Node]) -> list[str]:
 
 
 def moonlit(text: str) -> str:
-    """文本 → MoonBit 字符串字面量内容（转义）。"""
+    """Text -> MoonBit string-literal content (escaped)."""
     out = text.replace("\\", "\\\\").replace('"', '\\"')
     out = out.replace("\n", "\\n").replace("\t", "\\t").replace("\r", "\\r")
     return out
@@ -437,11 +437,11 @@ def transpile(tpl: str, shell: str) -> str:
             f'    None => "{default}"\n  }}\n'
         )
     body = prologue + body
-    return f'''// 由一次性转译工具生成（源：上游 templates/{shell}.txt），勿手改。
-// 重命名：zoxide→jumbit、__zoxide_→__jumbit_、_ZO_→_JB_、z#→j#；Windows 分支已丢弃。
+    return f'''// Generated by a one-shot transpiler (source: upstream templates/{shell}.txt). Do not edit by hand.
+// Renames: zoxide->jumbit, __zoxide_->__jumbit_, _ZO_-> _JB_, z#->j#; the Windows branch is dropped.
 
 ///|
-/// {shell} 模板渲染（自上游 templates/{shell}.txt 转译：zoxide→jumbit、_ZO_→_JB_；勿手改）
+/// {shell} template rendering (transpiled from upstream templates/{shell}.txt: zoxide->jumbit, _ZO_-> _JB_; do not edit by hand)
 pub fn render_{shell}(
   cmd : String?,
   hook : Hook,
@@ -457,7 +457,7 @@ pub fn render_{shell}(
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--src", required=True, help="上游 templates 目录")
+    ap.add_argument("--src", required=True, help="the upstream templates directory")
     ap.add_argument("--shell", required=True)
     ap.add_argument("--out")
     ap.add_argument("--stdout", action="store_true")
@@ -465,8 +465,8 @@ def main() -> None:
 
     tpl = open(f"{args.src}/{args.shell}.txt", encoding="utf-8").read()
     code = transpile(tpl, args.shell)
-    # 模板未使用的形参（elvish 不用 resolve_symlinks、tcsh 不用 echo 等）：
-    # 下划线前缀消 unused 警告，调用方按位置传参不受影响
+    # parameters a template does not use (elvish ignores resolve_symlinks, tcsh ignores echo, ...):
+    # an underscore prefix silences the unused warning; positional callers are unaffected
     for unused in ("resolve_symlinks", "echo"):
         if re.search(r"\b" + unused + r"\b", tpl) is None:
             code = code.replace(unused + " : Bool,", "_" + unused + " : Bool,")
