@@ -1,7 +1,7 @@
 ///|
-/// editor 解析序（UNIX 惯例；上游无此物——现行 zoxide edit 为 fzf 交互调
-/// rank，无 EDITOR/VISUAL 解析，本形态为 jumbit 自有语义面，规格 §1.4）：
-/// $VISUAL → $EDITOR → "vi"；全空 → None（调用方报 no editor）
+/// The editor resolution order (a UNIX convention; upstream has no such thing -- current zoxide edit is fzf-driven rank
+/// adjustment with no EDITOR/VISUAL resolution, so this shape is jumbit\'s own semantic surface, spec §1.4):
+/// $VISUAL -> $EDITOR -> "vi"; all empty -> None (the caller reports no editor)
 async fn resolve_editor(get : (String) -> String?) -> String? {
   match get("VISUAL") {
     Some(v) if v != "" => return Some(v)
@@ -11,29 +11,29 @@ async fn resolve_editor(get : (String) -> String?) -> String? {
     Some(v) if v != "" => return Some(v)
     _ => ()
   }
-  // vi 兜底仍须存在性解析（spawn 前裁定，与 fzf 同款纪律）
+  // the vi fallback still needs an existence check (decided before spawning, the same discipline as fzf)
   resolve_program("vi", get)
 }
 
 ///|
-/// editor 错误（jumbit 自有语义面，文案风格对齐既有 stderr 短语）
+/// Editor errors (jumbit\'s own semantic surface, worded in the style of the existing stderr phrases)
 pub enum EditorError {
-  /// $VISUAL/$EDITOR 未设且 PATH 无 vi
+  /// $VISUAL/$EDITOR unset and no vi on PATH
   NotFound
-  /// editor 退出码非 0（用户取消编辑/编辑器自身故障）
+  /// the editor exited non-zero (the user cancelled, or the editor itself failed)
   Failed(Int32)
-  /// spawn 失败（解析通过但 exec 失败等；@process 绑定不暴露错误类别）
+  /// a spawn failure (resolution succeeded but exec failed, and so on; the @process binding exposes no error class)
   Spawn
 } derive(Debug)
 
 ///|
-/// 交互式编辑：以继承终端的 stdio 起编辑器编辑指定文件（等退出，不收集
-/// 输出）。解析（resolve_editor）与执行分离——wbtest 注入假 editor 绝对
-/// 路径直测执行面，解析面单测。
+/// Interactive editing: spawn the editor on the given file with inherited terminal stdio (wait for exit, collecting no
+/// output). Resolution (resolve_editor) is separated from execution, so the wbtest injects a fake editor\'s absolute
+/// path to test the execution surface directly, while resolution is unit-tested.
 ///
-/// $VISUAL/$EDITOR 含空格时按 shell 命令行处理（sh -c '<值> "$@"' <值>
-/// <file>，git EDITOR 惯用法同款：值可带参数如 "code -w"）；不含空格按
-/// 单程序名 PATH 解析 + 直 spawn。参数转义由用户自负（TROUBLESHOOTING 注记）
+/// A $VISUAL/$EDITOR containing spaces is treated as a shell command line (sh -c '<value> "$@"' <value>
+/// <file>, the same idiom git uses for EDITOR: the value may carry arguments such as "code -w"); without spaces it is
+/// resolved on PATH as a single program name and spawned directly. Argument escaping is the user\'s responsibility (noted in TROUBLESHOOTING)
 pub async fn run_editor(
   file : String,
   get : (String) -> String?,

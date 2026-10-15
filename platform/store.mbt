@@ -1,5 +1,5 @@
 ///|
-/// 数据库存取错误：IO 失败、二进制编解码失败、明文行级失败
+/// Database access errors: IO failure, binary codec failure, plaintext line-level failure
 pub enum StoreError {
   Io(String)
   Codec(@core.CodecError)
@@ -7,8 +7,8 @@ pub enum StoreError {
 } derive(Debug)
 
 ///|
-/// CodecError → 用户可读原因（status 读头诊断与 StoreError 共用的单一出口，
-/// Debug 枚举名不外泄到 stderr）
+/// CodecError -> a user-readable reason (the single exit shared by status\'s header diagnosis and StoreError, so the
+/// Debug enum name never reaches stderr)
 pub fn codec_error_message(e : @core.CodecError) -> String {
   match e {
     @core.CorruptedData => "unparseable data"
@@ -18,8 +18,8 @@ pub fn codec_error_message(e : @core.CodecError) -> String {
 }
 
 ///|
-/// StoreError → 用户可读原因（不含场景前缀，调用方拼「数据文件损坏: 」「打开
-/// 数据库失败: 」等）；明文行级错误多行（每行一条，decode 已截断到 8+N）
+/// StoreError -> a user-readable reason (without a scenario prefix; the caller prefixes "数据文件损坏: ", "打开
+/// 数据库失败: " and so on); a plaintext line-level error spans lines (one per line, decode already truncated to 8+N)
 pub fn StoreError::message(self : StoreError) -> String {
   match self {
     Io(msg) => "io failure: \{msg}"
@@ -29,10 +29,10 @@ pub fn StoreError::message(self : StoreError) -> String {
 }
 
 ///|
-/// Error → 单行短文案：OSError 展开为 strerror 式短语 + (os error N)，对齐
-/// std io::Error Display；其余错误兜底 Repr（仅诊断文本，不进正常输出路）。
-/// 短语经 OSError 公开谓词判定，覆盖高频 errno；其余保数字后缀
-/// （errno_to_string 标注 alert_internal，deny-warn 下不可用）
+/// Error -> a short single-line message: an OSError expands to a strerror-style phrase plus (os error N), matching
+/// std io::Error\'s Display; other errors fall back to Repr (diagnostic text only, never on the normal output path).
+/// The phrase comes from OSError\'s public predicates, covering the frequent errnos; the rest keep the numeric suffix
+/// (errno_to_string is marked alert_internal and unusable under deny-warn)
 pub fn os_error_message(err : Error) -> String {
   match err {
     @os_error.OSError(errno, ..) as ose => {
@@ -54,7 +54,7 @@ pub fn os_error_message(err : Error) -> String {
 }
 
 ///|
-/// 存取上下文：数据库 + 数据目录位置
+/// The access context: the database plus the data-directory location
 pub(all) struct Store {
   db : @core.Database
   data_dir : String
@@ -66,28 +66,28 @@ pub fn Store::database(self : Store) -> @core.Database {
 }
 
 ///|
-/// note 侧文件路径（明文 db.txt 不含 note 列，人工标注存独立 TSV；
-/// 格式 `path\tnote`，path 含 tab 为病态路径，读写均按首个 tab 切分——
-/// 错位属已知限制，TROUBLESHOOTING 注记）
+/// The note side file\'s path (plaintext db.txt carries no note column; human annotations live in a separate TSV;
+/// format `path\tnote`; a path containing a tab is pathological and both read and write split at the first tab --
+/// the misalignment is a known limitation, noted in TROUBLESHOOTING)
 fn notes_path(data_dir : String) -> String {
   data_dir + "/notes.tsv"
 }
 
 ///|
-/// 读取 notes.tsv 并按 path 就地附着到 dirs（文件缺失 = 无标注，正常态；
-/// 未命中 db 条目的行静默忽略——remove/lazy-delete 后孤儿 note 宽松跟随；
-/// note 空串行 = 清除标记，跳过附着）
+/// Read notes.tsv and attach the notes onto dirs by path in place (a missing file means no annotations, a normal state;
+/// a line with no matching entry is ignored silently -- an orphan note after a remove or lazy delete follows loosely;
+/// an empty note line is a clear marker and is skipped)
 async fn attach_notes(data_dir : String, dirs : Array[@core.Dir]) -> Unit {
   let path = notes_path(data_dir)
   if !@afs.exists(path) {
     return
   }
   let data = @afs.read_file(path) catch {
-    _ => return // notes 读失败不阻塞主库加载（best-effort 标注）
+    _ => return // a failed notes read does not block the main load (best-effort annotations)
   }
   let text = data.text()
-  // note 行先入 Map（同 path 后行覆盖前行，与逐行扫描语义一致），再对条目
-  // 单趟附着：O(条目 + note 行)，替代逐行全库扫描的 O(条目 × note 行)
+  // note lines go into a Map first (a later line with the same path overwrites, matching a line-by-line scan), then a
+  // single pass attaches them: O(entries + note lines), replacing a per-line whole-database scan\'s O(entries x note lines)
   let notes : Map[String, String] = Map([])
   for line in text.split("\n") {
     let line = line.to_owned()
@@ -96,26 +96,26 @@ async fn attach_notes(data_dir : String, dirs : Array[@core.Dir]) -> Unit {
     }
     match line.find("\t") {
       Some(tab) => notes[line[0:tab].to_owned()] = line[tab + 1:].to_owned()
-      None => () // 无 tab 的行不是合法条目，忽略
+      None => () // a line with no tab is not a valid entry, so ignore it
     }
   }
   for d in dirs {
     match notes.get(d.path) {
-      // 空串行 = 清除标记，跳过附着
+      // an empty line is a clear marker, so skip the attachment
       Some(note) => if note != "" { d.note = Some(note) }
-      None => () // 未命中 db 条目的行宽松跟随（remove/懒删后的孤儿标注）
+      None => () // a line with no matching entry follows loosely (an orphan note after a remove or lazy delete)
     }
   }
 }
 
 ///|
-/// 打开数据库（规格 docs/spec-plaintext-edit.md §1.3）：
-/// 1. db.txt 存在 → 明文解码（note 经 notes.tsv 附着），dirty=false
-/// 2. db.txt 不存在、legacy db.zo 存在 → 二进制解码（不置脏：迁移由首个
-///    真实数据变更触发——写命令置脏或 query 懒删置脏，save 时落成明文
-///    db.txt 且内容保持；纯读路径不落盘，[#2]）
-/// 3. 均不存在 → 建数据目录返回空库（上游 open 语义）
-/// 磁盘文件与内存 Database 的唯一交汇点。
+/// Open the database (spec docs/spec-plaintext-edit.md §1.3):
+/// 1. db.txt exists -> plaintext decode (notes attached from notes.tsv), dirty=false
+/// 2. db.txt absent and a legacy db.zo present -> binary decode (not marked dirty: the migration is triggered by the first
+///    real data change -- a write command dirtying it, or a query\'s lazy deletion doing so -- and the save then lands as plaintext
+///    db.txt with the content preserved; a read-only path never writes, [#2])
+/// 3. neither exists -> create the data directory and return an empty database (upstream\'s open semantics)
+/// The single meeting point of the on-disk file and the in-memory Database.
 pub async fn load(data_dir : String) -> Result[Store, StoreError] {
   let txt_path = data_dir + "/db.txt"
   let zo_path = data_dir + "/db.zo"

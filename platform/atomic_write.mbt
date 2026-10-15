@@ -1,7 +1,7 @@
 ///|
-/// 原子写：同目录创建 tmp 文件（tmp_ + 16 随机字符，冲突重试 5 次）
-/// → 写入 → sync 落盘 → rename 原子替换；失败时 errdefer 清理 tmp 并原样抛错。
-/// （对齐上游 src/util.rs util::write；rename 在 UNIX 下原子）
+/// Atomic write: create a tmp file in the same directory (tmp_ + 16 random characters, retried 5 times on collision)
+/// -> write -> sync -> rename for an atomic replacement; on failure errdefer cleans up the tmp and rethrows as is.
+/// (matching upstream src/util.rs util::write; rename is atomic on UNIX)
 pub async fn write_atomic(path : String, contents : Bytes) -> Unit {
   let dir = match path.rev_find("/") {
     Some(i) => path[0:i + 1].to_owned()
@@ -23,7 +23,7 @@ pub async fn write_atomic(path : String, contents : Bytes) -> Unit {
 }
 
 ///|
-/// 删除文件并吞掉错误（errdefer 清理用；tmp 本就不存在时也当成功）
+/// Delete a file and swallow errors (for errdefer cleanup; a tmp that never existed also counts as success)
 async fn remove_quiet(path : String) -> Unit {
   @afs.remove(path) catch {
     err => ignore(err)
@@ -31,14 +31,14 @@ async fn remove_quiet(path : String) -> Unit {
 }
 
 ///|
-/// 进程级随机源（[#11]）：全局单例让每次调用推进 ChaCha8 序列，tmp 名在进程内
-/// 唯一。moonc v0.10.15 起无参 Rand() 从平台熵播种（熵不可用才回退内置固定
-/// 种子），跨进程序列也不同；此前 Rand::new() 无参为固定种子，函数内每次新建
-/// 会产出同一序列，write_atomic 的 5 次重试会反复撞同一 tmp 名
+/// A process-level random source ([#11]): the global singleton advances the ChaCha8 sequence on every call, so tmp names are
+/// unique within the process. Since moonc v0.10.15 a no-argument Rand() seeds from platform entropy (falling back to a fixed
+/// built-in seed only when entropy is unavailable), so sequences differ across processes too; before that a no-argument Rand::new() used a fixed seed and a fresh one per call inside the function
+/// produced the same sequence, so write_atomic\'s 5 retries kept colliding on one tmp name
 let global_rand : @random.Rand = @random.Rand()
 
 ///|
-/// tmp 随机名：进程级生成器推进，16 位小写字母数字
+/// The random tmp name: advanced from the process-level generator, 16 lowercase alphanumerics
 fn rand_name() -> String {
   let alphabet = "abcdefghijklmnopqrstuvwxyz0123456789".to_array()
   let sb = StringBuilder()

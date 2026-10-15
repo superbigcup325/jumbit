@@ -1,26 +1,26 @@
 ///|
 pub(all) enum FzfError {
-  /// fzf 不可用（spawn 失败统一归此；上游另区分 "could not launch fzf"，
-  /// @process 绑定不暴露 spawn 错误类别，无法拆分——README 注明）
+  /// fzf unavailable (every spawn failure lands here; upstream also distinguishes "could not launch fzf",
+  /// but the @process binding exposes no spawn error class, so it cannot be split out -- noted in the README)
   NotFound
-  /// fzf 退出码 1：用户未选择（取消语义）。上游报 "no match found"，
-  /// jumbit 静默 exit 1（shell 钩子下行为一致），README 注明
+  /// fzf exit code 1: the user selected nothing (cancel semantics). Upstream reports "no match found";
+  /// jumbit exits 1 silently (the same behaviour under the shell hook), noted in the README
   NoMatch
-  /// fzf 退出码 2：fzf 自身错误（上游文案 "fzf returned an error"）
+  /// fzf exit code 2: an fzf-side error (upstream\'s wording "fzf returned an error")
   ReturnedAnError
-  /// fzf 退出码 130：用户中断，静默透传退出码（上游 SilentExit）
+  /// fzf exit code 130: a user interrupt, passed through silently (upstream\'s SilentExit)
   Interrupted
-  /// fzf 退出码 128..=254 或被信号杀死（wait 返回负值；上游文案
+  /// fzf exit codes 128..=254, or killed by a signal (wait returns a negative value; upstream\'s wording
   /// "fzf was terminated"）
   Terminated
-  /// 其余退出码：3..=127 与 255（上游文案 "fzf returned an unknown error"）
+  /// every other exit code: 3..=127 and 255 (upstream\'s wording "fzf returned an unknown error")
   UnknownExit(Int32)
 } derive(Debug, Eq)
 
 ///|
-/// fzf 退出码映射（对齐上游 FzfChild::wait，zoxide 0.10.0 伪 fzf 探针矩阵
-/// 2026-09-13 实测：0 成功 / 1 无选择 / 2 自身错误 / 130 中断静默 /
-/// 128..=254 与信号杀死视为被终止 / 3..=127 与 255 未知错误，均 exit 1）
+/// The fzf exit-code mapping (matching upstream FzfChild::wait, measured with a fake-fzf probe matrix against
+/// zoxide 0.10.0 on 2026-09-13: 0 success / 1 no selection / 2 an fzf-side error / 130 a silent interrupt /
+/// 128..=254 and a signal kill treated as terminated / 3..=127 and 255 an unknown error, all with exit 1)
 fn map_fzf_exit(code : Int32) -> FzfError? {
   if code == 0 {
     None
@@ -38,9 +38,9 @@ fn map_fzf_exit(code : Int32) -> FzfError? {
 }
 
 ///|
-/// fzf 交互选择：候选按 "6.1f 得分\t路径\0" 写入 stdin，返回 fzf 打印的选中行。
-/// fzf_opts 非 None 时经 FZF_DEFAULT_OPTS 透传（对齐上游 _ZO_FZF_OPTS）。
-/// get 为环境读取入口（裸名 PATH 预解析用）
+/// Interactive fzf selection: candidates are written to stdin as "6.1f score\tpath\0", and the line fzf prints is returned.
+/// A non-None fzf_opts passes through via FZF_DEFAULT_OPTS (matching upstream _ZO_FZF_OPTS).
+/// `get` is the environment read entry point (used when pre-resolving a bare name on PATH)
 pub async fn fzf_select(
   hits : Array[@core.Dir],
   now : Int64,
@@ -51,10 +51,10 @@ pub async fn fzf_select(
 }
 
 ///|
-/// spawn 前置解析：带 `/` 的路径直接查；裸名沿 PATH 找首个可执行普通文件。
-/// 必须在 spawn 前裁定——@process 绑定只对「解析即失败」（绝对路径不存在/
-/// 不可执行）抛错转 NotFound，PATH 搜索语义下的 exec 失败走 wait 退出码路
-/// （黑盒实测报 "fzf returned an error"，2026-09-15 复现），无法事后分类
+/// Pre-spawn resolution: a path with a `/` is checked directly; a bare name walks PATH for the first executable regular file.
+/// This must be decided before spawning: the @process binding only turns "failed at resolution" (an absolute path that does
+/// not exist / is not executable) into NotFound, while an exec failure under PATH-search semantics goes down the wait exit-code
+/// path (measured in a blackbox as "fzf returned an error", reproduced 2026-09-15) and cannot be classified afterwards
 async fn resolve_program(
   program : String,
   get : (String) -> String?,
@@ -64,12 +64,12 @@ async fn resolve_program(
   }
   let path_env = match get("PATH") {
     Some(p) => p
-    // PATH 缺失按空表处理 → NotFound（found nothing to execute）
+    // a missing PATH is treated as an empty table -> NotFound (found nothing to execute)
     None => return None
   }
   for dir in path_env.split(":") {
     let dir = dir.to_owned()
-    // 空项的「当前目录」历史语义不参与解析
+    // an empty entry\'s historical "current directory" meaning takes no part in resolution
     if dir == "" {
       continue
     }
@@ -82,17 +82,17 @@ async fn resolve_program(
 }
 
 ///|
-/// 可执行普通文件判定：kind 须 Regular——目录自带 x 位是穿越位，
-/// can_execute 对目录同样放行，须文件类型先行排除；kind 查询本身抛错
-/// （不存在/权限）视同不可执行
+/// The executable-regular-file test: kind must be Regular -- a directory\'s own x bit is a traversal bit,
+/// and can_execute lets directories through too, so the file type must be excluded first; an error from the kind
+/// lookup itself (missing / permissions) counts as not executable
 async fn is_executable_file(path : String) -> Bool {
   (@afs.kind(path) catch { _ => Unknown }) is Regular &&
   (@afs.can_execute(path) catch { _ => false })
 }
 
 ///|
-/// 指定可执行文件的交互选择核心（fzf_select 的注入点：单测传绝对路径，
-/// 规避 moon test 并行下全局 PATH 注入的同名串扰）
+/// The interactive-selection core for a given executable (fzf_select\'s injection point: unit tests pass an absolute path
+/// to avoid same-name crosstalk from global PATH injection under parallel moon test)
 async fn fzf_select_with(
   program : String,
   hits : Array[@core.Dir],
@@ -134,8 +134,8 @@ async fn fzf_select_with(
       defer stdin_w.close()
       for d in hits {
         let line = d.format_score(now) + "\t" + d.path + "\u{0000}"
-        // fzf 提前退出（已选定/出错）时管道断裂：对齐上游 write 的
-        // BrokenPipe → wait 路径，静默停止投喂（结果已由 fzf 决定）
+        // a broken pipe when fzf exits early (selected or errored): matching upstream\'s write handling
+        // (BrokenPipe -> wait), the feeding stops silently since fzf has already decided
         stdin_w.write(line) catch {
           _ => break
         }

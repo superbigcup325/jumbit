@@ -1,16 +1,16 @@
 ///|
-/// 导入源的单条记录：行号（1 起，空行/空记录同样计数，对齐上游逐行读取语义）
-/// result 为 UTF-8 解码结果；解码失败的行给原因，由调用方拼 `<来源>:<行号>` 上报
+/// One record from an import source: its line number (1-based; blank lines and empty records count too, matching upstream\'s line-by-line reads)
+/// result holds the UTF-8 decode; a failed line carries the reason, and the caller reports `<source>:<line>`
 pub(all) struct ImportRecord {
   line_num : Int32
   result : Result[String, String]
 } derive(Debug)
 
 ///|
-/// 逐条回调读插件数据文件（\n 分隔、剥记录尾 \r）。
-/// 按字节切分后逐行解码：坏 UTF-8 只影响所在行（对齐上游逐行 str::from_utf8）。
-/// 无记录数组物化——百万行级 import 的热路（行串即抛，峰值只留 db）；
-/// 上游 import.rs::run 本就是惰性迭代器单趟消费，此为结构回归而非优化
+/// Read a plugin\'s data file record by record through a callback (\n separated, trailing \r stripped).
+/// Byte splitting then per-line decoding: bad UTF-8 only affects its own line (matching upstream\'s per-line str::from_utf8).
+/// No record array is materialized -- this is the hot path of a million-line import (the line string is dropped at once, so the peak holds only the db);
+/// upstream import.rs::run is already a lazy single-pass iterator, so this is a structural return, not an optimization
 pub async fn for_each_import_line(
   path : String,
   f : (Int32, Result[String, String]) -> Unit,
@@ -24,8 +24,8 @@ pub async fn for_each_import_line(
 }
 
 ///|
-/// 切分为记录数组（行语义与 for_each_import_line 完全一致）：
-/// atuin 折叠路的物化形态 + 行语义冻结器
+/// Split into a record array (the line semantics are identical to for_each_import_line):
+/// the materialized form of the atuin folding path, and the line-semantics freezer
 pub async fn read_import_lines(
   path : String,
 ) -> Result[Array[ImportRecord], String] {
@@ -40,9 +40,9 @@ pub async fn read_import_lines(
 }
 
 ///|
-/// atuin 历史：起子进程 `atuin history list --format={time}\t{directory} --print0`
-/// 读 NUL 分隔记录。上游为流式读取且不检查退出码，这里收集后同语义。
-/// 返回 (记录, atuin 的 stderr 原文)——上游继承 stderr 直接可见，这里交调用方上报。
+/// atuin history: spawn `atuin history list --format={time}\t{directory} --print0`
+/// and read the NUL-separated records. Upstream streams and does not check the exit code; this collects first with the same semantics.
+/// Returns (records, atuin\'s raw stderr): upstream inherits stderr and it is visible directly, while here the caller reports it.
 pub async fn atuin_history_records() -> Result[
   (Array[ImportRecord], String),
   String,
@@ -53,7 +53,7 @@ pub async fn atuin_history_records() -> Result[
 }
 
 ///|
-/// 子进程记录读取的可测内核：NUL 分隔、不剥 \r（atuin 不做 CR 处理）
+/// The testable core of subprocess record reading: NUL separated, no \r stripping (atuin does no CR handling)
 async fn records_from_process(
   cmd : String,
   args : Array[String],
@@ -71,10 +71,10 @@ async fn records_from_process(
 }
 
 ///|
-/// 按分隔符切字节流：分隔符不保留；strip_cr 时剥记录尾 \r（文件行尾 \r\n）；
-/// 空记录保留占位（行号连续，调用方静默跳过）；末尾不足一条的残余按最后一条计。
-/// 单趟字节扫描 + 按行懒解码（零拷贝视图）：分隔符不保留；空记录保留占位。
-/// 回调式消费使 import 热路免于物化 1M 级记录数组
+/// Split a byte stream by a separator: the separator is not kept; with strip_cr a record\'s trailing \r is stripped (a file\'s \r\n line ending);
+/// an empty record keeps its slot (line numbers stay consecutive and the caller skips it silently); a final partial record counts as the last one.
+/// A single byte scan with per-line lazy decoding (zero-copy views): the separator is not kept, and an empty record keeps its slot.
+/// Callback consumption keeps the import hot path from materializing a 1M-record array
 fn for_each_record(
   bytes : Bytes,
   sep : Byte,
@@ -100,14 +100,14 @@ fn for_each_record(
 }
 
 ///|
-/// 单条记录解码：先剥 \r（strip_cr），再 UTF-8 解码（失败不中止，标记该行）。
-/// 快路直接解码（合法输入单趟）；失败才进慢路做逐类定位，错误文案不变。
-/// 坏字节文案对齐上游 str::from_utf8 + anyhow context 的链式 Display
-/// （2026-09-09 与 zoxide 0.10.0 逐类探针实测）：
-/// - 行内坏字节：`invalid utf-8 sequence of N bytes from index M`，N 为
-///   std Utf8Error::error_len——起始字节坏/双字节次字节坏=1、三字节第三字节
-///   坏=2、四字节第四字节坏=3
-/// - 序列在切片末尾截断：`incomplete utf-8 byte sequence from index M`
+/// Decode one record: strip \r first (strip_cr), then UTF-8 decode (a failure does not abort; the line is marked).
+/// The fast path decodes directly (one pass for valid input); only a failure enters the slow path for case-by-case location, with the wording unchanged.
+/// The bad-byte wording matches upstream\'s chained Display of str::from_utf8 plus anyhow context
+/// (probed case by case against zoxide 0.10.0 on 2026-09-09):
+/// - bad bytes inside the line: `invalid utf-8 sequence of N bytes from index M`, where N is
+///   std\'s Utf8Error::error_len -- a bad first byte or a bad second byte of a two-byte sequence = 1, a bad third byte of a three-byte
+///   sequence = 2, a bad fourth byte of a four-byte sequence = 3
+/// - a sequence truncated at the end of the slice: `incomplete utf-8 byte sequence from index M`
 fn decode_view(
   bytes : Bytes,
   start : Int32,
@@ -131,12 +131,12 @@ fn decode_view(
 }
 
 ///|
-/// UTF-8 校验（RFC 3629，复刻 std 校验器的错误定位语义）；None = 合法。
-/// 仅解码失败后的慢路调用，负责产出与 std 一致的逐类错误文案。
-/// 行切片内的截断与文件尾截断同型：std 对切片末尾的不完整序列报 incomplete
+/// UTF-8 validation (RFC 3629, reproducing std validator\'s error-location semantics); None = valid.
+/// Only called on the slow path after a decode failure, producing the case-by-case wording that matches std.
+/// A truncation inside the line slice is the same shape as one at end of file: std reports an incomplete sequence at the end of a slice
 fn utf8_error(bytes : Bytes, start : Int32, end_ : Int32) -> String? {
   let n = end_
-  // 续字节域 80..BF
+  // the continuation-byte range 80..BF
   fn cont(i : Int32) -> Bool {
     let v = bytes[i].to_int()
     v >= 0x80 && v < 0xC0
@@ -149,11 +149,11 @@ fn utf8_error(bytes : Bytes, start : Int32, end_ : Int32) -> String? {
       continue
     }
     if b < 0xC2 {
-      // 80-BF 起始错位 / C0-C1 过long起始
+      // a misplaced 80-BF start / a C0-C1 overlong start
       return Some("invalid utf-8 sequence of 1 bytes from index \{i - start}")
     }
     if b < 0xE0 {
-      // 双字节 C2-DF
+      // two-byte C2-DF
       if i + 1 >= n {
         return Some("incomplete utf-8 byte sequence from index \{i - start}")
       }
@@ -164,7 +164,7 @@ fn utf8_error(bytes : Bytes, start : Int32, end_ : Int32) -> String? {
       continue
     }
     if b < 0xF0 {
-      // 三字节 E0-EF；E0 二字节域 A0-BF（防过long），ED 域 80-9F（防代理区）
+      // three-byte E0-EF; E0\'s second byte is A0-BF (guarding against overlong) and ED\'s is 80-9F (guarding against surrogates)
       if i + 1 >= n {
         return Some("incomplete utf-8 byte sequence from index \{i - start}")
       }
@@ -189,7 +189,7 @@ fn utf8_error(bytes : Bytes, start : Int32, end_ : Int32) -> String? {
       continue
     }
     if b < 0xF5 {
-      // 四字节 F0-F4；F0 二字节域 90-BF，F4 域 80-8F（防 >U+10FFFF）
+      // four-byte F0-F4; F0\'s second byte is 90-BF and F4\'s is 80-8F (guarding against >U+10FFFF)
       if i + 1 >= n {
         return Some("incomplete utf-8 byte sequence from index \{i - start}")
       }
@@ -219,7 +219,7 @@ fn utf8_error(bytes : Bytes, start : Int32, end_ : Int32) -> String? {
       i += 4
       continue
     }
-    // F5-FF 非法起始
+    // F5-FF is an illegal start
     return Some("invalid utf-8 sequence of 1 bytes from index \{i - start}")
   }
   None
