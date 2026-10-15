@@ -595,3 +595,30 @@ async test "store：legacy 未修改 save 不迁移" {
     err => ignore(err)
   }
 }
+
+///|
+#cfg(not(platform="windows"))
+/// fzf_select_expect_ok 契约锁定：get 首查 PATH 返回空目录（解析失败 →
+/// NotFound），次查返回桩目录；calls==2 锁定恰好重试一次即绿。双败仍红由
+/// guard(attempt == 0) 结构保证，行为经 2026-10-15 探针实测（前两查均败、
+/// 第三查本可成功的场景在第二败处 fail 判红，第三次机会未被消费）
+async test "fzf_select_expect_ok：注入单次解析失败后重试即绿" {
+  let bindir = make_tmp_dir()
+  let _fake = make_fake_fzf(bindir)
+  write_fake_fzf_body(bindir, "printf '  40.0\\t/picked\\n'\n")
+  let empty = make_tmp_dir()
+  let calls = [0]
+  let get : (String) -> String? = fn(_key) {
+    calls[0] = calls[0] + 1
+    if calls[0] == 1 {
+      Some(empty)
+    } else {
+      Some(bindir)
+    }
+  }
+  let out = fzf_select_expect_ok("fzf", fzf_hits(), 1000L, None, get)
+  @debug.assert_eq(out, "  40.0\t/picked\n")
+  @debug.assert_eq(calls[0], 2)
+  @afs.rmdir(bindir, recursive=true)
+  @afs.rmdir(empty, recursive=true)
+}
