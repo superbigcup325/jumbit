@@ -1,6 +1,6 @@
 ///|
-/// query 的选项与关键词（--exclude 为精确路径，对齐上游语义；glob 排除走 _JB_EXCLUDE_DIRS；
-/// --json/--fuzzy/--limit/--tsv 为 jumbit 扩展，上游无此语义）
+/// query\'s options and keywords (--exclude is an exact path, matching upstream; glob exclusion goes through _JB_EXCLUDE_DIRS;
+/// --json/--fuzzy/--limit/--tsv are jumbit extensions upstream has no equivalent for)
 pub(all) struct QueryOptions {
   keywords : Array[String]
   mut all : Bool
@@ -10,14 +10,14 @@ pub(all) struct QueryOptions {
   mut exclude : String?
   mut json : Bool
   mut fuzzy : Bool
-  /// --limit <n>：列表型输出（--list/--json/--tsv）的前 n 条截断，None=未设
+  /// --limit <n>: truncate the list-shaped outputs (--list/--json/--tsv) to the first n; None = unset
   mut limit : Int32?
-  /// --tsv：无表头 Tab 分隔数据通道（jumbit 扩展）
+  /// --tsv: the headerless tab-separated data channel (a jumbit extension)
   mut tsv : Bool
 } derive(Debug, Eq)
 
 ///|
-/// 子命令（add / query / remove / init / import / describe / export / help）
+/// Subcommands (add / query / remove / init / import / describe / export / help)
 pub(all) struct AddOptions {
   paths : Array[String]
   mut score : Double
@@ -32,29 +32,29 @@ pub(all) struct InitOptions {
 } derive(Debug, Eq)
 
 ///|
-/// import 的选项：plugin ∈ {atuin, autojump, fasd, z, z.lua, zsh-z}；
-/// --merge 对齐上游 global flag，可出现在插件名前后任意位置
+/// import\'s options: plugin in {atuin, autojump, fasd, z, z.lua, zsh-z};
+/// --merge matches upstream\'s global flag and may appear anywhere before or after the plugin name
 pub(all) struct ImportOptions {
   plugin : String
   mut merge : Bool
 } derive(Debug, Eq)
 
 ///|
-/// describe 的选项（jumbit 扩展）：note 为 None 表示显示模式，Some("") 表示清除
+/// describe\'s options (a jumbit extension): note None means view mode, Some("") means clear
 pub(all) struct DescribeOptions {
   path : String
   mut note : String?
 } derive(Debug, Eq)
 
 ///|
-/// export 的选项（jumbit 扩展）：--agents 输出项目地图 Markdown
+/// export\'s options (a jumbit extension): --agents prints the project-map Markdown
 pub(all) struct ExportOptions {
   mut agents : Bool
 } derive(Debug, Eq)
 
 ///|
-/// status 的选项（jumbit 扩展）：--json 单行 JSON 对象；--check 显式触发
-/// O(N) 存在性扫描（默认快查不做文件系统遍历）
+/// status\'s options (a jumbit extension): --json is a single-line JSON object; --check explicitly runs
+/// the O(N) existence scan (the default quick check walks no filesystem)
 pub(all) struct StatusOptions {
   mut json : Bool
   mut check : Bool
@@ -63,9 +63,9 @@ pub(all) struct StatusOptions {
 ///|
 
 ///|
-/// edit 参数解析（jumbit 扩展，规格 docs/spec-plaintext-edit.md §1.4）：
-/// 无 flag = $EDITOR 交互编辑；--rename <old> <new> 改路径（note 跟随）；
-/// --prune 清除不存在条目。三形态互斥
+/// edit\'s argument parsing (a jumbit extension, spec docs/spec-plaintext-edit.md §1.4):
+/// no flag = interactive editing with $EDITOR; --rename <old> <new> changes a path (the note follows);
+/// --prune drops entries that no longer exist. The three forms are mutually exclusive
 pub(all) struct EditOptions {
   mut rename_old : String?
   mut rename_new : String?
@@ -73,7 +73,7 @@ pub(all) struct EditOptions {
 } derive(Debug, Eq)
 
 ///|
-/// 子命令（add / query / remove / init / import / describe / export / help）
+/// Subcommands (add / query / remove / init / import / describe / export / help)
 pub(all) enum Command {
   Add(AddOptions)
   Query(QueryOptions)
@@ -83,29 +83,29 @@ pub(all) enum Command {
   Describe(DescribeOptions)
   Export(ExportOptions)
   Status(StatusOptions)
-  /// 数据库编辑（jumbit 扩展，上游无；规格 §1.4）
+  /// Edit the database (a jumbit extension, no upstream equivalent; spec §1.4)
   Edit(EditOptions)
-  /// stdio MCP 服务器（jumbit 扩展，上游无）
+  /// The stdio MCP server (a jumbit extension, no upstream equivalent)
   Mcp
   Help
-  /// 版本输出（--version/-V，对齐上游 clap 顶层面）
+  /// Version output (--version/-V, matching upstream clap\'s top level)
   Version
-  /// 无参数调用：帮助全文走 stderr、退出码 2（对齐上游 clap 无子命令）；
-  /// 与 Help（help/--help/-h 显式请求，stdout + 0）区分
+  /// Called with no arguments: the full help goes to stderr with exit code 2 (matching upstream clap with no subcommand);
+  /// distinct from Help (an explicit help/--help/-h, stdout + 0)
   Usage
   Unknown(String)
-  /// 参数值语义错误（flag 组合冲突/值非法）：文案原样上报，不带「未知命令」前缀
+  /// A semantic argument error (conflicting flags / invalid value): the wording is reported as is, with no unknown-command prefix
   Invalid(String)
 } derive(Debug, Eq)
 
 ///|
-/// 子命令解析（args 不含程序名，@env.args() 已验证）
+/// Subcommand parsing (args excludes the program name; verified for @env.args())
 pub fn parse(args : Array[String]) -> Command {
   if args.is_empty() {
     return Usage
   }
-  // 顶层面 --version/-V（对齐上游 clap）：独立使用输出版本退出 0；
-  // 后随多余参数按用法错误退出 2（clap unexpected argument）
+  // top-level --version/-V (matching upstream clap): used alone it prints the version and exits 0;
+  // followed by extra arguments it is a usage error with exit 2 (clap unexpected argument)
   if args[0] == "--version" || args[0] == "-V" {
     if args.length() == 1 {
       return Version
@@ -128,16 +128,16 @@ pub fn parse(args : Array[String]) -> Command {
     "edit" => parse_edit(rest)
     "mcp" => parse_mcp(rest)
     "help" | "--help" | "-h" => Help
-    // 顶层 flag 形态的未知 token：clap 报 unexpected argument（实测上游
-    // zoxide --bogus 同文案），裸 token 才是 unrecognized subcommand
+    // an unknown token in top-level flag form: clap reports unexpected argument (upstream
+    // zoxide --bogus shows the same wording); only a bare token is an unrecognized subcommand
     other if other.has_prefix("-") => Invalid("unexpected argument '\{other}'")
     other => Unknown(other)
   }
 }
 
 ///|
-/// 浮点解析（raise → Option）：供需要分支而非中止的解析处使用；
-/// 语义对齐 Rust f64::from_str（clap 同款：溢出饱和 ±inf、拒下划线）
+/// Float parsing (raise -> Option): for call sites that need a branch rather than an abort;
+/// semantics match Rust f64::from_str (the same as clap: overflow saturates to ±inf, underscores rejected)
 fn parse_double_opt(s : String) -> Double? {
   match @core.parse_f64(s) {
     Ok(v) => Some(v)
@@ -146,9 +146,9 @@ fn parse_double_opt(s : String) -> Double? {
 }
 
 ///|
-/// `--flag=value` 等号形式剥离（对齐上游 clap 双形态）：`--` 前缀且名部
-/// 非 `--` 的 token 切首个 `=`，返回 (名部, 值部)；其余原样返回 None。
-/// 值部可含 `=`、可为空串；`--=x` 不是 flag，交还坏参路
+/// Splitting the `--flag=value` form (matching upstream clap\'s two forms): a token with a `--` prefix whose
+/// name part is not `--` is split at the first `=`, returning (name part, value part); anything else returns None.
+/// The value part may contain `=` or be empty; `--=x` is not a flag and goes back down the bad-argument path
 fn split_eq_flag(token : String) -> (String, String)? {
   if !token.has_prefix("--") {
     return None
@@ -167,7 +167,7 @@ fn split_eq_flag(token : String) -> (String, String)? {
 }
 
 ///|
-/// flag 匹配：空格形式 token 等名，或等号形式名部等名
+/// Flag matching: a space-form token equal to the name, or an equals-form name part equal to it
 fn eq_flag_match(raw : String, pair : (String, String)?, name : String) -> Bool {
   if raw == name {
     return true
@@ -179,7 +179,7 @@ fn eq_flag_match(raw : String, pair : (String, String)?, name : String) -> Bool 
 }
 
 ///|
-/// --hook 值 → Hook 枚举（空格/等号两形态共用的取值校验）
+/// --hook value -> the Hook enum (the value check shared by the space and equals forms)
 fn parse_hook(v : String) -> @tpl.Hook? {
   match v {
     "pwd" => Some(@tpl.HookPwd)
@@ -190,7 +190,7 @@ fn parse_hook(v : String) -> @tpl.Hook? {
 }
 
 ///|
-/// add 的 `--` 分隔符：仅剥离首个裸 `--`，其后参数原样保留（含再次出现的 `--`）
+/// add\'s `--` separator: only the first bare `--` is stripped; what follows is kept as is (including later `--`)
 fn strip_double_dash(args : Array[String]) -> Array[String] {
   let out : Array[String] = []
   let mut dropped = false
@@ -205,7 +205,7 @@ fn strip_double_dash(args : Array[String]) -> Array[String] {
 }
 
 ///|
-/// 版本行（--version/-V 输出，与 usage 首行同源）
+/// The version line (the --version/-V output, from the same source as usage\'s first line)
 pub fn version() -> String {
   "jumbit \{@jumbit.VERSION}"
 }

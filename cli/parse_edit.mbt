@@ -1,10 +1,10 @@
 ///|
-/// edit 参数解析（jumbit 扩展，规格 §1.4）：
-/// - 无 flag：$VISUAL/$EDITOR 交互编辑
-/// - --rename <old> <new>：改路径（note 跟随）
-/// - --prune：清除不存在条目
-/// 互斥矩阵：--rename 与 --prune 同现、--rename 重复、--rename 缺第二参数、
-/// 未知 flag/多余位置参数 → Unknown（文案风格对齐既有「<flag> 缺少…」）
+/// edit\'s argument parsing (a jumbit extension, spec §1.4):
+/// - no flag: interactive editing with $VISUAL/$EDITOR
+/// - --rename <old> <new>: change a path (the note follows)
+/// - --prune: drop entries that no longer exist
+/// The exclusivity matrix: --rename with --prune, a repeated --rename, --rename missing its second argument,
+/// an unknown flag or a surplus positional -> Unknown (the wording style matches the existing "<flag> missing ...")
 fn parse_edit(args : Array[String]) -> Command {
   let opts : EditOptions = { rename_old: None, rename_new: None, prune: false, }
   let mut bad : String? = None
@@ -18,7 +18,7 @@ fn parse_edit(args : Array[String]) -> Command {
       None => None
     }
     if eq_flag_match(raw, pair, "--rename") {
-      // 双参 flag：--rename old new；等号形态 --rename=old 仍需 new 位置参
+      // a two-argument flag: --rename old new; in the equals form --rename=old still needs new as a positional
       let old = match eq_val {
         Some(v) => v
         None =>
@@ -27,7 +27,7 @@ fn parse_edit(args : Array[String]) -> Command {
             args[i]
           } else {
             bad = Some("--rename requires <old> <new>")
-            raw // 占位，bad 已设
+            raw // placeholder; bad is already set
           }
       }
       if bad is None {
@@ -47,12 +47,12 @@ fn parse_edit(args : Array[String]) -> Command {
       }
       opts.prune = true
     } else if bad is None {
-      // bad 已设时保留首个错误(后续参数不再覆盖)
+      // once bad is set the first error is kept (later arguments do not overwrite it)
       bad = Some("unexpected argument '\{raw}'")
     }
     i += 1
   }
-  // 互斥矩阵
+  // the exclusivity matrix
   if bad is None && opts.rename_old is Some(_) && opts.prune {
     return Invalid("the argument '--prune' cannot be used with '--rename'")
   }

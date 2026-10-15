@@ -4,7 +4,7 @@ fn import_opts(plugin~ : String, merge~ : Bool = false) -> @cli.ImportOptions {
 }
 
 ///|
-test "parse：import 六个插件 + --merge 任意位置" {
+test "parse: import\'s six plugins + --merge anywhere" {
   @debug.assert_eq(
     @cli.parse(["import", "z"]),
     @cli.Import(import_opts(plugin="z")),
@@ -26,7 +26,7 @@ test "parse：import 六个插件 + --merge 任意位置" {
 }
 
 ///|
-test "parse：import 非法用法归 Unknown" {
+test "parse: import\'s illegal usages go Unknown" {
   @debug.assert_eq(
     @cli.parse(["import"]),
     @cli.Invalid(

@@ -1,6 +1,6 @@
 ///|
-/// describe 参数解析：<path> [--note <text>]；标注拒绝换行/回车（export 的
-/// Markdown 表格与 CLI 单行输出完整性）；未知 flag/缺值归 Unknown
+/// describe\'s argument parsing: <path> [--note <text>]; the note rejects newlines and carriage returns (they would break export\'s
+/// Markdown table and the CLI\'s single-line output); an unknown flag or a missing value goes Unknown
 fn parse_describe(args : Array[String]) -> Command {
   let mut path : String? = None
   let mut note : String? = None
@@ -37,7 +37,7 @@ fn parse_describe(args : Array[String]) -> Command {
     i += 1
   }
   if bad is None && note is Some(t) {
-    // 明文持久化后 note 走 notes.tsv(TSV 列分隔),tab 与换行一并拒绝
+    // now that persisting is plaintext, the note goes into notes.tsv (tab-separated), so tab is rejected along with newline
     if t.contains("\n") || t.contains("\r") || t.contains("\t") {
       return Invalid("note cannot contain newline or tab")
     }

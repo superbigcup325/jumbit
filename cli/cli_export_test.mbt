@@ -1,5 +1,5 @@
 ///|
-test "parse：export --agents 与坏参" {
+test "parse: export --agents and its bad arguments" {
   @debug.assert_eq(
     @cli.parse(["export", "--agents"]),
     @cli.Export({ agents: true, }),

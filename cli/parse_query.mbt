@@ -1,5 +1,5 @@
 ///|
-/// query 参数解析：四个 flag + 关键词；未知 flag / 缺值归 Unknown
+/// query\'s argument parsing: four flags plus keywords; an unknown flag or a missing value goes Unknown
 fn parse_query(args : Array[String]) -> Command {
   let opts : QueryOptions = {
     keywords: [],
@@ -14,7 +14,7 @@ fn parse_query(args : Array[String]) -> Command {
     tsv: false,
   }
   let mut bad : String? = None
-  // 参数值语义错误（--limit 缺值/值非法）：归 Invalid 而非 Unknown
+  // a semantic value error (--limit missing its value or given an invalid one): Invalid, not Unknown
   let mut invalid : String? = None
   let mut escaped = false
   let n = args.length()
@@ -26,7 +26,7 @@ fn parse_query(args : Array[String]) -> Command {
     } else {
       None
     }
-    // 等号形式只认带值 flag；布尔/未知 flag 的等号形式报原文归 Unknown
+    // the equals form is only recognised for value-taking flags; a boolean or unknown flag\'s equals form reports the original wording as Unknown
     match pair {
       Some((name, _)) =>
         if name != "--limit" && name != "--exclude" {
@@ -56,7 +56,7 @@ fn parse_query(args : Array[String]) -> Command {
         "--fuzzy" => opts.fuzzy = true
         "--tsv" => opts.tsv = true
         "--limit" =>
-          // 值非法归 Invalid，重复出现后者覆盖
+          // an invalid value goes Invalid; a repeat lets the last one win
           match eq_val {
             Some(value) =>
               match parse_limit_value(value) {
@@ -105,8 +105,8 @@ fn parse_query(args : Array[String]) -> Command {
     return Invalid(msg)
   }
   if bad is None {
-    // 输出通道互斥（jumbit 扩展 flag 两两冲突；--list --tsv 沿用 --list --json
-    // 既有先例：--list 胜出，另一通道被忽略，不校验）
+    // the output channels are exclusive (jumbit extension flags conflict pairwise; --list --tsv follows the --list --json
+    // precedent: --list wins, the other channel is ignored, unchecked)
     if opts.tsv && opts.json {
       return Invalid("the argument '--tsv' cannot be used with '--json'")
     }
@@ -129,8 +129,8 @@ fn parse_query(args : Array[String]) -> Command {
 }
 
 ///|
-/// --limit 值解析：非负十进制整数（core parse_uint64，与 import last_accessed
-/// 同源——拒前导 +/负数/浮点/垃圾）；超 Int 上限同拒（截断数无更大语义）
+/// --limit value parsing: a non-negative decimal integer (core parse_uint64, the same source as import\'s last_accessed
+/// -- rejecting a leading +, negatives, floats and garbage); over the Int cap it is rejected too (a larger truncation count means nothing)
 fn parse_limit_value(s : String) -> Result[Int32, String] {
   let v = @string.parse_uint64(s) catch {
     _ =>

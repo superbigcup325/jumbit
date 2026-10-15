@@ -1,5 +1,5 @@
 ///|
-/// export 参数解析：当前仅 --agents 一个目标；缺 --agents / 未知 flag 归 Unknown
+/// export\'s argument parsing: --agents is the only target for now; a missing --agents or an unknown flag goes Unknown
 fn parse_export(args : Array[String]) -> Command {
   let opts : ExportOptions = { agents: false, }
   let mut bad : String? = None

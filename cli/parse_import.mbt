@@ -1,12 +1,12 @@
 ///|
-/// import 支持的插件（对齐上游 ImportFrom 枚举；z.lua / zsh-z 带点与连字符）
+/// The plugins import supports (matching upstream\'s ImportFrom enum; z.lua and zsh-z carry a dot and a hyphen)
 pub fn import_plugins() -> Array[String] {
   ["atuin", "autojump", "fasd", "z", "z.lua", "zsh-z"]
 }
 
 ///|
-/// import 参数解析：一个插件名位置参数 + 任意位置的 --merge；
-/// 未知 flag / 多余位置参数 / 非法插件名归 Unknown（对齐 clap 退出码 2）
+/// import\'s argument parsing: one plugin-name positional plus --merge anywhere;
+/// an unknown flag, a surplus positional or an illegal plugin name goes Unknown (matching clap\'s exit code 2)
 fn parse_import(args : Array[String]) -> Command {
   let mut plugin : String? = None
   let mut merge = false

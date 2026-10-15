@@ -1,5 +1,5 @@
 ///|
-/// status 参数解析（jumbit 扩展）：--json / --check，无位置参数
+/// status\'s argument parsing (a jumbit extension): --json / --check, with no positional
 fn parse_status(args : Array[String]) -> Command {
   let opts : StatusOptions = { json: false, check: false, }
   let mut bad : String? = None

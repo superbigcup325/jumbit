@@ -1,15 +1,15 @@
 ///|
-test "parse：describe 基本/显示模式/清除" {
+test "parse: describe basic / view mode / clear" {
   @debug.assert_eq(
     @cli.parse(["describe", "/a", "--note", "后端项目"]),
     @cli.Describe({ path: "/a", note: Some("后端项目"), }),
   )
-  // 无 --note 为显示模式
+  // without --note it is view mode
   @debug.assert_eq(
     @cli.parse(["describe", "/a"]),
     @cli.Describe({ path: "/a", note: None, }),
   )
-  // 空串即清除
+  // an empty string clears
   @debug.assert_eq(
     @cli.parse(["describe", "/a", "--note", ""]),
     @cli.Describe({ path: "/a", note: Some(""), }),
@@ -17,7 +17,7 @@ test "parse：describe 基本/显示模式/清除" {
 }
 
 ///|
-test "parse：describe 坏参族" {
+test "parse: describe\'s bad-argument family" {
   @debug.assert_eq(
     @cli.parse(["describe"]),
     @cli.Invalid("describe: missing required argument '<PATH>'"),

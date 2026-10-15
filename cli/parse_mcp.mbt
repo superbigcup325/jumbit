@@ -1,5 +1,5 @@
 ///|
-/// mcp 参数解析（jumbit 扩展）：无常服 flag，任何位置参数/flag 归 Unknown
+/// mcp\'s argument parsing (a jumbit extension): no persistent flag, so any positional or flag goes Unknown
 fn parse_mcp(args : Array[String]) -> Command {
   let mut bad : String? = None
   for a in args {

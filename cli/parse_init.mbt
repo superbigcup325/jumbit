@@ -1,8 +1,8 @@
 ///|
-/// init 参数解析：shell ∈ {bash, zsh, fish, elvish, nushell, posix, powershell, tcsh, xonsh}；
+/// init\'s argument parsing: shell in {bash, zsh, fish, elvish, nushell, posix, powershell, tcsh, xonsh};
 /// --cmd C / --hook pwd|prompt|none / --no-cmd。
-/// flag 与 positional 任意穿插（对齐上游 clap：`init --cmd zz bash` 合法）；
-/// 首个非 flag token 为 shell，其余非 flag token 报意外参数；`--` 之后一律按 positional
+/// flags and positionals interleave freely (matching upstream clap: `init --cmd zz bash` is valid);
+/// the first non-flag token is the shell and any further non-flag token reports an unexpected argument; after `--` everything is a positional
 fn parse_init(args : Array[String]) -> Command {
   let supported = "bash, elvish, fish, nushell, posix, powershell, tcsh, xonsh"
   let mut shell : String? = None
@@ -16,7 +16,7 @@ fn parse_init(args : Array[String]) -> Command {
   while i < n {
     let raw = args[i]
     if !dd && raw == "--" {
-      // clap 转义符：其后 token 一律按 positional（首个仍可为 shell）
+      // clap\'s escape: everything after it is a positional (the first may still be the shell)
       dd = true
       i += 1
       continue
@@ -31,7 +31,7 @@ fn parse_init(args : Array[String]) -> Command {
       i += 1
       continue
     }
-    // 等号形式只认带值 flag；--no-cmd/未知 flag 的等号形式报原文归 Unknown
+    // the equals form is only recognised for value-taking flags; --no-cmd or an unknown flag\'s equals form reports the original wording as Unknown
     match pair {
       Some((name, _)) =>
         if name != "--cmd" && name != "--hook" {
@@ -116,7 +116,7 @@ fn parse_init(args : Array[String]) -> Command {
               "invalid value '\{sh}' for '<SHELL>'\n  [possible values: \{supported}]",
             )
           } else {
-            // 默认对齐上游 cmd.rs：--cmd 默认定义命令（jumbit → "j"），--hook 默认 pwd
+            // defaults match upstream cmd.rs: --cmd defines the command by default (jumbit -> "j"), --hook defaults to pwd
             Init({ shell: sh, cmd, hook, no_cmd, })
           }
       }
