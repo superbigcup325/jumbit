@@ -18,8 +18,8 @@ pub fn codec_error_message(e : @core.CodecError) -> String {
 }
 
 ///|
-/// StoreError -> a user-readable reason (without a scenario prefix; the caller prefixes "数据文件损坏: ", "打开
-/// 数据库失败: " and so on); a plaintext line-level error spans lines (one per line, decode already truncated to 8+N)
+/// StoreError -> a user-readable reason (without a scenario prefix; the caller prefixes "jumbit: corrupted data file: ", "jumbit: could not open
+/// database: " and so on); a plaintext line-level error spans lines (one per line, decode already truncated to 8+N)
 pub fn StoreError::message(self : StoreError) -> String {
   match self {
     Io(msg) => "io failure: \{msg}"
@@ -136,15 +136,15 @@ pub async fn load(data_dir : String) -> Result[Store, StoreError] {
     }
     match @core.decode(data.binary()) {
       Ok(dirs) =>
-        // legacy 态：不在读路径标脏（纯读不迁移，[#2]）；首个真实数据变更
-        // （写命令 / query 懒删）置脏后 save 转明文，内容保持；
-        // note 随 bincode 读入（v2），save 时汇入 notes.tsv
+        // legacy state: the read path does not mark dirty (a read-only load never migrates, [#2]); the first real data change
+        // (a write command, or a query's lazy deletion) dirties it, and the next save converts to plaintext with the content kept;
+        // notes are read with the bincode (v2) and flow into notes.tsv at save time
         Ok({ db: @core.Database::from_dirs(dirs), data_dir, })
       Err(e) => Err(Codec(e))
     }
   } else {
-    // allow_exist=true：目录已存在不报错（mkdir -p 语义，0.22 线参数），
-    // 消 exists-then-mkdir 竞态；0.21.2 时代的 exists 先探测守卫随之移除
+    // allow_exist=true: an existing directory is not an error (mkdir -p semantics, a 0.22-line argument),
+    // removing the exists-then-mkdir race; the exists-probe guard from the 0.21.2 era went with it
     @afs.mkdir(data_dir, recursive=true, allow_exist=true) catch {
       err => return Err(Io(os_error_message(err)))
     }
@@ -153,10 +153,10 @@ pub async fn load(data_dir : String) -> Result[Store, StoreError] {
 }
 
 ///|
-/// 保存：dirty 才写（tmp + sync + rename 原子替换），成功后清 dirty。
-/// 明文面：db.txt（主库）+ notes.tsv（标注侧文件，以内存有标注集合为唯一
-/// 事实源整体重写，孤儿行自然消亡）；先主库后侧文件，双文件无跨文件事务
-/// （note 为 best-effort 标注，崩溃窗口丢失可接受，规格 §1.2）
+/// Save: write only when dirty (tmp + sync + rename, an atomic replacement), clearing dirty on success.
+/// The plaintext side: db.txt (the main database) plus notes.tsv (the annotation side file, rewritten wholesale from the
+/// in-memory set of annotations as the single source of truth, so orphan lines die off naturally); main database first, then the side file, with no cross-file transaction
+/// (annotations are best-effort, so losing the crash window is acceptable, spec §1.2)
 pub async fn Store::save(self : Store) -> Result[Unit, StoreError] {
   if !self.db.is_dirty() {
     return Ok(())
@@ -166,7 +166,7 @@ pub async fn Store::save(self : Store) -> Result[Unit, StoreError] {
   write_atomic(self.data_dir + "/db.txt", bytes) catch {
     err => return Err(Io(os_error_message(err)))
   }
-  // notes.tsv：有标注的条目全量重写
+  // notes.tsv: every annotated entry is rewritten
   let sb = StringBuilder()
   for d in dirs {
     match d.note {
