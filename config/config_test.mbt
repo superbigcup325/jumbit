@@ -1,4 +1,4 @@
-// 环境变量解析测试（get 注入，不读真实环境）
+// Environment-parsing tests (get is injected; the real environment is never read)
 
 ///|
 fn fake_env(pairs : Array[(String, String)]) -> (String) -> String? {
@@ -13,7 +13,7 @@ fn fake_env(pairs : Array[(String, String)]) -> (String) -> String? {
 }
 
 ///|
-test "_JB_DATA_DIR 绝对路径：直接采用" {
+test "_JB_DATA_DIR absolute path: used as is" {
   match
     @config.data_dir(
       fake_env([("_JB_DATA_DIR", "/tmp/data"), ("HOME", "/home/u")]),
@@ -24,7 +24,7 @@ test "_JB_DATA_DIR 绝对路径：直接采用" {
 }
 
 ///|
-test "_JB_DATA_DIR 相对路径：报错" {
+test "_JB_DATA_DIR relative path: errors" {
   match
     @config.data_dir(
       fake_env([("_JB_DATA_DIR", "rel/path"), ("HOME", "/home/u")]),
@@ -35,7 +35,7 @@ test "_JB_DATA_DIR 相对路径：报错" {
 }
 
 ///|
-test "_JB_DATA_DIR 空串：报错" {
+test "_JB_DATA_DIR empty string: errors" {
   match
     @config.data_dir(fake_env([("_JB_DATA_DIR", ""), ("HOME", "/home/u")])) {
     Err(_) => ()
@@ -44,7 +44,7 @@ test "_JB_DATA_DIR 空串：报错" {
 }
 
 ///|
-test "未设 _JB_DATA_DIR：回落 $HOME/.local/share/jumbit" {
+test "_JB_DATA_DIR unset: falls back to $HOME/.local/share/jumbit" {
   match @config.data_dir(fake_env([("HOME", "/home/u")])) {
     Ok(d) => @debug.assert_eq(d, "/home/u/.local/share/jumbit")
     Err(e) => fail(e)
@@ -52,7 +52,7 @@ test "未设 _JB_DATA_DIR：回落 $HOME/.local/share/jumbit" {
 }
 
 ///|
-test "_JB_DATA_DIR 与 HOME 都未设：报错" {
+test "neither _JB_DATA_DIR nor HOME set: errors" {
   match @config.data_dir(fake_env([])) {
     Err(_) => ()
     Ok(d) => fail("expected error, got \{d}")
@@ -60,7 +60,7 @@ test "_JB_DATA_DIR 与 HOME 都未设：报错" {
 }
 
 ///|
-test "HOME 未设但 _JB_DATA_DIR 合法：不受影响" {
+test "HOME unset but _JB_DATA_DIR valid: unaffected" {
   match @config.data_dir(fake_env([("_JB_DATA_DIR", "/data/jumbit")])) {
     Ok(d) => @debug.assert_eq(d, "/data/jumbit")
     Err(e) => fail(e)
@@ -68,7 +68,7 @@ test "HOME 未设但 _JB_DATA_DIR 合法：不受影响" {
 }
 
 ///|
-test "exclude_dirs：冒号切分并忽略空段" {
+test "exclude_dirs: colon split, empty segments ignored" {
   let get = fake_env([("_JB_EXCLUDE_DIRS", "/mnt/*::/tmp/*")])
   match @config.exclude_dirs(get, Some("/home/u")) {
     Ok(globs) => @debug.assert_eq(globs, ["/mnt/*", "/tmp/*"])
@@ -77,7 +77,7 @@ test "exclude_dirs：冒号切分并忽略空段" {
 }
 
 ///|
-test "exclude_dirs：非法 glob 报错" {
+test "exclude_dirs: an invalid glob errors" {
   let get = fake_env([("_JB_EXCLUDE_DIRS", "[unclosed")])
   match @config.exclude_dirs(get, Some("/home/u")) {
     Err(_) => ()
@@ -86,7 +86,7 @@ test "exclude_dirs：非法 glob 报错" {
 }
 
 ///|
-test "exclude_dirs：未设置回落 home 的转义字面 glob" {
+test "exclude_dirs: unset falls back to an escaped literal glob for home" {
   let get = fake_env([])
   match @config.exclude_dirs(get, Some("/home/u [x]")) {
     Ok(globs) => @debug.assert_eq(globs, ["/home/u \\[x\\]"])
@@ -95,7 +95,7 @@ test "exclude_dirs：未设置回落 home 的转义字面 glob" {
 }
 
 ///|
-test "exclude_dirs：未设置且无 home → 空列表" {
+test "exclude_dirs: unset with no home -> an empty list" {
   match @config.exclude_dirs(fake_env([]), None) {
     Ok(globs) => @debug.assert_eq(globs.length(), 0)
     Err(e) => fail(e)
@@ -103,7 +103,7 @@ test "exclude_dirs：未设置且无 home → 空列表" {
 }
 
 ///|
-test "exclude_dirs：显式列表优先于 home 回落" {
+test "exclude_dirs: an explicit list wins over the home fallback" {
   let get = fake_env([("_JB_EXCLUDE_DIRS", "/a*")])
   match @config.exclude_dirs(get, Some("/home/u")) {
     Ok(globs) => @debug.assert_eq(globs, ["/a*"])
@@ -112,7 +112,7 @@ test "exclude_dirs：显式列表优先于 home 回落" {
 }
 
 ///|
-test "resolve_symlinks：仅值 1 生效" {
+test "resolve_symlinks: only the value 1 takes effect" {
   @debug.assert_eq(
     @config.resolve_symlinks(fake_env([("_JB_RESOLVE_SYMLINKS", "1")])),
     true,
@@ -129,8 +129,8 @@ test "resolve_symlinks：仅值 1 生效" {
 }
 
 ///|
-test "maxage：前导正号与前导零（对齐上游 parse::<u32> 语义）" {
-  // Rust "+5".parse::<u32>() 接受前导 +
+test "maxage: leading plus and leading zeros (matching upstream parse::<u32> semantics)" {
+  // Rust\'s "+5".parse::<u32>() accepts a leading +
   match @config.maxage(fake_env([("_JB_MAXAGE", "+5")])) {
     Ok(v) => @debug.assert_eq(v, 5.0)
     Err(e) => fail(e)
@@ -139,7 +139,7 @@ test "maxage：前导正号与前导零（对齐上游 parse::<u32> 语义）" {
     Ok(v) => @debug.assert_eq(v, 7.0)
     Err(e) => fail(e)
   }
-  // u32::MAX 接受、u32::MAX+1 拒绝（0.10.0 探针实测）
+  // u32::MAX is accepted, u32::MAX+1 rejected (probed against 0.10.0)
   match @config.maxage(fake_env([("_JB_MAXAGE", "4294967295")])) {
     Ok(v) => @debug.assert_eq(v, 4294967295.0)
     Err(e) => fail(e)
@@ -151,12 +151,12 @@ test "maxage：前导正号与前导零（对齐上游 parse::<u32> 语义）" {
 }
 
 ///|
-test "maxage：空串 / 空白 / 溢出均拒绝" {
+test "maxage: empty / whitespace / overflow all rejected" {
   @debug.assert_eq(
     @config.maxage(fake_env([("_JB_MAXAGE", "")])) is Err(_),
     true,
   )
-  // Rust parse 不容忍空白
+  // Rust\'s parse tolerates no whitespace
   @debug.assert_eq(
     @config.maxage(fake_env([("_JB_MAXAGE", " 5")])) is Err(_),
     true,
@@ -165,7 +165,7 @@ test "maxage：空串 / 空白 / 溢出均拒绝" {
     @config.maxage(fake_env([("_JB_MAXAGE", "5 ")])) is Err(_),
     true,
   )
-  // 超出整数范围
+  // beyond the integer range
   @debug.assert_eq(
     @config.maxage(fake_env([("_JB_MAXAGE", "99999999999999")])) is Err(_),
     true,
@@ -173,12 +173,12 @@ test "maxage：空串 / 空白 / 溢出均拒绝" {
 }
 
 ///|
-test "escape_glob：特殊字符逐一前置反斜杠" {
+test "escape_glob: every special character gets a leading backslash" {
   @debug.assert_eq(@config.escape_glob("a*b"), "a\\*b")
   @debug.assert_eq(@config.escape_glob("x?y[1]"), "x\\?y\\[1\\]")
   @debug.assert_eq(@config.escape_glob("c\\d"), "c\\\\d")
   @debug.assert_eq(@config.escape_glob("/plain/path"), "/plain/path")
-  // 转义结果可被 glob 引擎按字面量匹配回来
+  // the escaped result matches itself back as a literal through the glob engine
   @debug.assert_eq(
     @core.glob_match(@config.escape_glob("/home/u [x]"), "/home/u [x]"),
     true,

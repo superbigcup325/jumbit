@@ -1,10 +1,10 @@
 ///|
-/// 导入插件的数据文件路径解析（对齐上游 src/import/*.rs 各 data_path 的探测逻辑；
-/// jumbit 按 Linux 语义，不设上游的 macOS/Windows 分支）。
-/// get 注入环境变量读取（cmd/main 传 @env.get_env_var，测试传闭包）。
+/// Data-file path resolution for the import plugins (matching the data_path probing in upstream src/import/*.rs;
+/// jumbit follows Linux semantics and has none of upstream\'s macOS/Windows branches).
+/// Environment reads are injected through `get` (cmd/main passes @env.get_env_var, tests pass a closure).
 
 ///|
-/// z：$_Z_DATA 否则 $HOME/.z（上游不滤空值，空串原样作为路径，打开时报 could not read）
+/// z: $_Z_DATA otherwise $HOME/.z (upstream does not filter empty values, so an empty string is used as the path and reports could not read when opened)
 pub fn z_data_path(get : (String) -> String?) -> Result[String, String] {
   match get("_Z_DATA") {
     Some(p) => Ok(p)
@@ -13,9 +13,9 @@ pub fn z_data_path(get : (String) -> String?) -> Result[String, String] {
 }
 
 ///|
-/// zsh-z：$ZSHZ_DATA 否则 $_Z_DATA 否则 $HOME/.z。
-/// 对齐上游 Rust 代码（var_os 的 Some("") 也命中第一个），与 zsh-z 脚本的
-/// `${ZSHZ_DATA:-$_Z_DATA}`（空值穿透）存在上游已知差异，此处从上游代码。
+/// zsh-z: $ZSHZ_DATA, otherwise $_Z_DATA, otherwise $HOME/.z.
+/// This matches upstream\'s Rust code (var_os\'s Some("") still takes the first one); the zsh-z script\'s
+/// `${ZSHZ_DATA:-$_Z_DATA}` (which lets empty values through) is a known upstream discrepancy, and the upstream code wins here.
 pub fn zsh_z_data_path(get : (String) -> String?) -> Result[String, String] {
   match get("ZSHZ_DATA") {
     Some(p) => Ok(p)
@@ -24,7 +24,7 @@ pub fn zsh_z_data_path(get : (String) -> String?) -> Result[String, String] {
 }
 
 ///|
-/// fasd：$_FASD_DATA 否则 $HOME/.fasd（同样不滤空值）
+/// fasd: $_FASD_DATA otherwise $HOME/.fasd (also without filtering empty values)
 pub fn fasd_data_path(get : (String) -> String?) -> Result[String, String] {
   match get("_FASD_DATA") {
     Some(p) => Ok(p)
@@ -33,7 +33,7 @@ pub fn fasd_data_path(get : (String) -> String?) -> Result[String, String] {
 }
 
 ///|
-/// autojump（Linux）：$XDG_DATA_HOME 否则 $HOME/.local/share，再接 autojump/autojump.txt
+/// autojump (Linux): $XDG_DATA_HOME otherwise $HOME/.local/share, then autojump/autojump.txt
 pub fn autojump_data_path(get : (String) -> String?) -> Result[String, String] {
   let base = match get("XDG_DATA_HOME") {
     Some(x) => x
@@ -47,8 +47,8 @@ pub fn autojump_data_path(get : (String) -> String?) -> Result[String, String] {
 }
 
 ///|
-/// z.lua 主路径：$_ZL_DATA（滤空值；非 Windows 上滤 Windows 风格值，防 Cygwin/MSYS
-/// 环境泄漏，对齐上游 looks_like_windows_path）否则 $HOME/.zlua
+/// z.lua main path: $_ZL_DATA (empty values filtered out; on non-Windows, Windows-style values are filtered too, to keep a Cygwin/MSYS
+/// environment from leaking in, matching upstream looks_like_windows_path), otherwise $HOME/.zlua
 pub fn zlua_data_path(get : (String) -> String?) -> Result[String, String] {
   match get("_ZL_DATA") {
     Some(p) => if p != "" && !looks_like_windows_path(p) { return Ok(p) }
@@ -58,8 +58,8 @@ pub fn zlua_data_path(get : (String) -> String?) -> Result[String, String] {
 }
 
 ///|
-/// z.lua 的 fish 变体数据文件（主路径缺失时的回落目标）：
-/// $XDG_DATA_HOME 否则 $HOME/.local/share，再接 zlua/zlua.txt
+/// z.lua\'s fish-variant data file (the fallback when the main path is missing):
+/// $XDG_DATA_HOME otherwise $HOME/.local/share, then zlua/zlua.txt
 pub fn zlua_fish_path(get : (String) -> String?) -> Result[String, String] {
   let base = match get("XDG_DATA_HOME") {
     Some(x) => x
@@ -73,7 +73,7 @@ pub fn zlua_fish_path(get : (String) -> String?) -> Result[String, String] {
 }
 
 ///|
-/// $HOME 下的相对路径；HOME 未设置报上游同文案错误
+/// A relative path under $HOME; an unset HOME reports the same wording as upstream
 fn home_path(get : (String) -> String?, sub : String) -> Result[String, String] {
   match get("HOME") {
     Some(h) => Ok(h + "/" + sub)
@@ -82,7 +82,7 @@ fn home_path(get : (String) -> String?, sub : String) -> Result[String, String] 
 }
 
 ///|
-/// 匹配 Lua `^%a:[/\\]`：ASCII 字母 + 冒号 + 斜杠或反斜杠
+/// Matches Lua\'s `^%a:[/\\]`: an ASCII letter + colon + a slash or backslash
 fn looks_like_windows_path(s : String) -> Bool {
   if s.length() < 3 {
     return false

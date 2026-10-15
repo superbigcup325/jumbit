@@ -1,4 +1,4 @@
-// 导入插件数据文件路径解析测试（get 注入，不读真实环境；fake_env 复用 config_test）
+// Data-file path resolution tests for the import plugins (get injected, the real environment never read; fake_env is reused from config_test)
 
 ///|
 fn expect_path(r : Result[String, String], want : String) -> Unit raise {
@@ -9,7 +9,7 @@ fn expect_path(r : Result[String, String], want : String) -> Unit raise {
 }
 
 ///|
-test "z_data_path：_Z_DATA 优先，否则 $HOME/.z" {
+test "z_data_path: _Z_DATA first, otherwise $HOME/.z" {
   expect_path(
     @config.z_data_path(fake_env([("_Z_DATA", "/custom/z")])),
     "/custom/z",
@@ -18,12 +18,12 @@ test "z_data_path：_Z_DATA 优先，否则 $HOME/.z" {
     @config.z_data_path(fake_env([("HOME", "/home/u")])),
     "/home/u/.z",
   )
-  // 空串不滤（对齐上游 var_os 原样采用）
+  // empty strings are not filtered (upstream\'s var_os takes them as is)
   expect_path(@config.z_data_path(fake_env([("_Z_DATA", "")])), "")
 }
 
 ///|
-test "z_data_path：无 HOME 报错" {
+test "z_data_path: no HOME errors" {
   match @config.z_data_path(fake_env([])) {
     Err(e) => @debug.assert_eq(e, "jumbit: could not find home directory")
     Ok(p) => fail("expected error, got \{p}")
@@ -31,7 +31,7 @@ test "z_data_path：无 HOME 报错" {
 }
 
 ///|
-test "zsh_z_data_path：ZSHZ_DATA > _Z_DATA > $HOME/.z（上游 Some(\"\") 也命中首位）" {
+test "zsh_z_data_path: ZSHZ_DATA > _Z_DATA > $HOME/.z (upstream's Some(\"\") takes the first too)" {
   expect_path(
     @config.zsh_z_data_path(fake_env([("ZSHZ_DATA", "/a"), ("_Z_DATA", "/b")])),
     "/a",
@@ -51,7 +51,7 @@ test "zsh_z_data_path：ZSHZ_DATA > _Z_DATA > $HOME/.z（上游 Some(\"\") 也�
 }
 
 ///|
-test "fasd_data_path：_FASD_DATA 优先，否则 $HOME/.fasd" {
+test "fasd_data_path: _FASD_DATA first, otherwise $HOME/.fasd" {
   expect_path(
     @config.fasd_data_path(fake_env([("_FASD_DATA", "/custom/fasd")])),
     "/custom/fasd",
@@ -63,7 +63,7 @@ test "fasd_data_path：_FASD_DATA 优先，否则 $HOME/.fasd" {
 }
 
 ///|
-test "autojump_data_path：XDG_DATA_HOME 优先，否则 $HOME/.local/share" {
+test "autojump_data_path: XDG_DATA_HOME first, otherwise $HOME/.local/share" {
   expect_path(
     @config.autojump_data_path(fake_env([("XDG_DATA_HOME", "/xdg")])),
     "/xdg/autojump/autojump.txt",
@@ -75,17 +75,17 @@ test "autojump_data_path：XDG_DATA_HOME 优先，否则 $HOME/.local/share" {
 }
 
 ///|
-test "zlua_data_path：_ZL_DATA 滤空值与 Windows 风格值（非 Windows）" {
+test "zlua_data_path: _ZL_DATA filters empty and Windows-style values (non-Windows)" {
   expect_path(
     @config.zlua_data_path(fake_env([("_ZL_DATA", "/custom/zlua")])),
     "/custom/zlua",
   )
-  // 空串 → 回落默认
+  // an empty string -> fall back to the default
   expect_path(
     @config.zlua_data_path(fake_env([("_ZL_DATA", ""), ("HOME", "/home/u")])),
     "/home/u/.zlua",
   )
-  // Windows 风格（防 Cygwin/MSYS 泄漏）→ 回落默认
+  // a Windows-style value (guarding against Cygwin/MSYS leaks) -> fall back to the default
   expect_path(
     @config.zlua_data_path(
       fake_env([("_ZL_DATA", "C:\\Users\\x"), ("HOME", "/home/u")]),
@@ -98,13 +98,13 @@ test "zlua_data_path：_ZL_DATA 滤空值与 Windows 风格值（非 Windows）"
     ),
     "/home/u/.zlua",
   )
-  // 长度不足 3 / 首段非字母冒号 → 视为普通路径原样采用
+  // shorter than 3, or the first segment is not a letter+colon -> treated as an ordinary path and used as is
   expect_path(@config.zlua_data_path(fake_env([("_ZL_DATA", "C:")])), "C:")
   expect_path(@config.zlua_data_path(fake_env([("_ZL_DATA", "1:/x")])), "1:/x")
 }
 
 ///|
-test "zlua_fish_path：XDG_DATA_HOME 优先，否则 $HOME/.local/share" {
+test "zlua_fish_path: XDG_DATA_HOME first, otherwise $HOME/.local/share" {
   expect_path(
     @config.zlua_fish_path(fake_env([("XDG_DATA_HOME", "/xdg")])),
     "/xdg/zlua/zlua.txt",

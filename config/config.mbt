@@ -1,6 +1,6 @@
 ///|
-/// 数据目录：_JB_DATA_DIR 优先（必须绝对路径），否则回落 $HOME/.local/share/jumbit
-/// get 注入环境变量读取（cmd/main 传 @env.get_env_var，测试传闭包）
+/// The data directory: _JB_DATA_DIR first (and it must be an absolute path), otherwise $HOME/.local/share/jumbit
+/// Environment reads are injected through `get` (cmd/main passes @env.get_env_var, tests pass a closure)
 pub fn data_dir(get : (String) -> String?) -> Result[String, String] {
   match get("_JB_DATA_DIR") {
     Some(dir) =>
@@ -19,9 +19,9 @@ pub fn data_dir(get : (String) -> String?) -> Result[String, String] {
 }
 
 ///|
-/// 绝对路径判定：POSIX 以 / 开头。Windows 另认盘符根（C:\ 或 C:/）、
-/// UNC/设备（\\ 或 // 开头）；/ 开头的 POSIX 形态 Win32 API 同样接受
-/// （Git Bash/MSYS 互操作），一并放行
+/// Absolute-path test: on POSIX it starts with /. On Windows a drive root (C:\ or C:/) counts too,
+/// as do UNC/device paths (leading \\ or //); a POSIX-shaped leading / is accepted by the Win32 API as well
+/// (Git Bash/MSYS interop), so it passes too
 #cfg(platform="windows")
 fn is_absolute(path : String) -> Bool {
   if path.has_prefix("/") || path.has_prefix("\\\\") {
@@ -49,8 +49,8 @@ fn is_absolute(path : String) -> Bool {
 }
 
 ///|
-/// _JB_EXCLUDE_DIRS：冒号分隔的 glob 列表，命中条目在查询时被懒删除。
-/// 未设置时回落 home 目录本身（转义为字面 glob，对齐上游默认值）。
+/// _JB_EXCLUDE_DIRS: a colon-separated glob list; a matching entry is lazily deleted at query time.
+/// When unset it falls back to the home directory itself (escaped into a literal glob, matching upstream\'s default).
 pub fn exclude_dirs(
   get : (String) -> String?,
   home : String?,
@@ -79,7 +79,7 @@ pub fn exclude_dirs(
 }
 
 ///|
-/// _JB_RESOLVE_SYMLINKS：仅值 "1" 生效（对齐上游 config::resolve_symlinks）
+/// _JB_RESOLVE_SYMLINKS: only the value "1" takes effect (matching upstream config::resolve_symlinks)
 pub fn resolve_symlinks(get : (String) -> String?) -> Bool {
   match get("_JB_RESOLVE_SYMLINKS") {
     Some("1") => true
@@ -88,7 +88,7 @@ pub fn resolve_symlinks(get : (String) -> String?) -> Bool {
 }
 
 ///|
-/// glob 转义：对 `\ * ? [ ]` 前置反斜杠（对齐上游 Pattern::escape）
+/// Glob escaping: a backslash in front of `\ * ? [ ]` (matching upstream Pattern::escape)
 pub fn escape_glob(path : String) -> String {
   let sb = StringBuilder()
   for c in path {
@@ -101,8 +101,8 @@ pub fn escape_glob(path : String) -> String {
 }
 
 ///|
-/// _JB_MAXAGE：数据库总分老化阈值（默认 10000；上游解析为 u32，同域：
-/// 0..=4294967295，前导 + 合法——Rust u32::from_str 语义，0.10.0 探针实测）
+/// _JB_MAXAGE: the aging threshold for the database\'s total score (10000 by default; upstream parses it as u32, so the
+/// domain is 0..=4294967295 and a leading + is legal -- Rust u32::from_str semantics, probed against 0.10.0)
 pub fn maxage(get : (String) -> String?) -> Result[Double, String] {
   match get("_JB_MAXAGE") {
     None => Ok(10000.0)
@@ -120,7 +120,7 @@ pub fn maxage(get : (String) -> String?) -> Result[Double, String] {
 }
 
 ///|
-/// _JB_FZF_OPTS：透传给 fzf 的自定义参数（经 FZF_DEFAULT_OPTS 环境变量）
+/// _JB_FZF_OPTS: custom arguments passed through to fzf (via the FZF_DEFAULT_OPTS environment variable)
 pub fn fzf_opts(get : (String) -> String?) -> String? {
   get("_JB_FZF_OPTS")
 }
