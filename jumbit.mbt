@@ -1,5 +1,5 @@
 ///|
-/// 包版本（与 moon.mod 保持一致）
+/// The package version (kept in step with moon.mod)
 pub const VERSION : String = "0.1.3"
 
 ///|

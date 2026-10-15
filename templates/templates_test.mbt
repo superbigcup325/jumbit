@@ -1,4 +1,4 @@
-// 模板参数矩阵测试：3 shell × cmd(2) × hook(3) × echo(2) × resolve_symlinks(2)
+// Template argument-matrix tests: 3 shells x cmd(2) x hook(3) x echo(2) x resolve_symlinks(2)
 
 ///|
 fn render_all() -> Array[(String, String)] {
@@ -23,7 +23,7 @@ fn render_all() -> Array[(String, String)] {
                 @templates.render_powershell(cmd, hook, echo, resolve)
               "tcsh" => @templates.render_tcsh(cmd, hook, echo, resolve)
               "xonsh" => @templates.render_xonsh(cmd, hook, echo, resolve)
-              _ => "" // 不可达：shells 数组仅八种
+              _ => "" // unreachable: the shells array holds only eight
             }
             out.push(
               (
@@ -40,7 +40,7 @@ fn render_all() -> Array[(String, String)] {
 }
 
 ///|
-test "模板矩阵：24 变体 × 9 shell 全部非空且无 zoxide 残留" {
+test "template matrix: 24 variants x 9 shells are all non-empty with no zoxide left" {
   let all = render_all()
   @debug.assert_eq(all.length(), 216)
   for pair in all {
@@ -53,20 +53,20 @@ test "模板矩阵：24 变体 × 9 shell 全部非空且无 zoxide 残留" {
 }
 
 ///|
-test "模板矩阵：--no-cmd 不定义 j 命令并输出 not configured" {
+test "template matrix: --no-cmd defines no j command and prints not configured" {
   for pair in render_all() {
     let src = pair.1
     if pair.0.contains("nocmd=true") {
-      // cmd=None 变体：不定义 j/ji 命令，输出 not configured 占位
+      // the cmd=None variant: no j/ji command, with the not-configured placeholder
       let defines_j = src.contains("function j(") ||
         src.contains("alias j=") ||
         src.contains("edit:add-var j~")
       if defines_j {
-        fail("no-cmd 变体定义了 j 命令: \{pair.0}")
+        fail("the no-cmd variant defined a j command: \{pair.0}")
       }
       @debug.assert_eq(src.contains("# -- not configured --"), true)
     } else if src.contains("# -- not configured --") {
-      // fish/elvish 语义：hook=none 时 hook 段输出 not configured（与 cmd 无关，对齐上游）
+      // fish/elvish semantics: with hook=none the hook section prints not configured (independent of cmd, matching upstream)
       let none_not_configured = pair.0.contains("hook=HookNone") &&
         (
           pair.0.contains("fish") ||
@@ -77,41 +77,41 @@ test "模板矩阵：--no-cmd 不定义 j 命令并输出 not configured" {
           pair.0.contains("xonsh")
         )
       if !none_not_configured {
-        fail("有命令的变体却输出 not configured: \{pair.0}")
+        fail("a variant with a command still printed not configured: \{pair.0}")
       }
     }
   }
 }
 
 ///|
-test "模板矩阵：hook=pwd/prompt 生成对应钩子，none 不生成" {
+test "template matrix: hook=pwd/prompt emit the right hook, none emits nothing" {
   for pair in render_all() {
     let src = pair.1
-    // elvish 无 __jumbit_hook 函数（钩子内联在 init 体中，下方单独断言）
+    // elvish has no __jumbit_hook function (the hook is inlined in the init body; asserted separately below)
     if pair.0.contains("HookPrompt") && !pair.0.contains("elvish") {
       @debug.assert_eq(src.contains("__jumbit_hook"), true)
     }
   }
-  // hook=none 的 bash 变体：__jumbit_hook 函数体不存在定义
+  // the hook=none bash variant: no __jumbit_hook body is defined
   let none_bash = @templates.render_bash(None, HookNone, false, false)
   @debug.assert_eq(none_bash.contains("function __jumbit_hook"), false)
-  // hook=pwd 的 zsh 变体挂 chpwd_functions
+  // the hook=pwd zsh variant hangs off chpwd_functions
   let pwd_zsh = @templates.render_zsh(Some("j"), HookPwd, false, false)
   @debug.assert_eq(pwd_zsh.contains("chpwd_functions+=(__jumbit_hook)"), true)
-  // hook=prompt 的 fish 变体挂 fish_prompt 事件
+  // the hook=prompt fish variant hangs off the fish_prompt event
   let prompt_fish = @templates.render_fish(Some("j"), HookPrompt, false, false)
   @debug.assert_eq(prompt_fish.contains("--on-event fish_prompt"), true)
-  // posix：none 输出 not configured；pwd 不支持（提示替代）；prompt 挂 PS1
+  // posix: none prints not configured; pwd is unsupported (an alternative is suggested); prompt hangs off PS1
   let none_posix = @templates.render_posix(None, HookNone, false, false)
   @debug.assert_eq(none_posix.contains("# -- not configured --"), true)
   let pwd_posix = @templates.render_posix(Some("j"), HookPwd, false, false)
   @debug.assert_eq(pwd_posix.contains("PWD hooks are not supported"), true)
-  // tcsh：prompt 别名 __jumbit_hook，pwd 挂 precmd
+  // tcsh: prompt aliases __jumbit_hook, pwd hangs off precmd
   let prompt_tcsh = @templates.render_tcsh(Some("j"), HookPrompt, false, false)
   @debug.assert_eq(prompt_tcsh.contains("alias __jumbit_hook"), true)
   let pwd_tcsh = @templates.render_tcsh(Some("j"), HookPwd, false, false)
   @debug.assert_eq(pwd_tcsh.contains("alias precmd"), true)
-  // powershell：none 输出 not configured，prompt 定义 __jumbit_hook
+  // powershell: none prints not configured, prompt defines __jumbit_hook
   let none_powershell = @templates.render_powershell(
     None,
     HookNone,
@@ -129,7 +129,7 @@ test "模板矩阵：hook=pwd/prompt 生成对应钩子，none 不生成" {
     hook_powershell.contains("function global:__jumbit_hook"),
     true,
   )
-  // xonsh：none 输出 not configured；prompt/pwd 挂 events 装饰器
+  // xonsh: none prints not configured; prompt/pwd hang off the events decorator
   let none_xonsh = @templates.render_xonsh(None, HookNone, false, false)
   @debug.assert_eq(none_xonsh.contains("# -- not configured --"), true)
   let prompt_xonsh = @templates.render_xonsh(
@@ -141,7 +141,7 @@ test "模板矩阵：hook=pwd/prompt 生成对应钩子，none 不生成" {
   @debug.assert_eq(prompt_xonsh.contains("on_post_prompt"), true)
   let pwd_xonsh = @templates.render_xonsh(Some("j"), HookPwd, false, false)
   @debug.assert_eq(pwd_xonsh.contains("on_chdir"), true)
-  // hook=prompt/pwd 的 elvish 变体挂 before-readline/after-chdir；none 输出 not configured
+  // the hook=prompt/pwd elvish variants hang off before-readline/after-chdir; none prints not configured
   let prompt_elvish = @templates.render_elvish(
     Some("j"),
     HookPrompt,
@@ -153,7 +153,7 @@ test "模板矩阵：hook=pwd/prompt 生成对应钩子，none 不生成" {
   @debug.assert_eq(pwd_elvish.contains("builtin:after-chdir"), true)
   let none_elvish = @templates.render_elvish(None, HookNone, false, false)
   @debug.assert_eq(none_elvish.contains("# -- not configured --"), true)
-  // nushell：prompt 挂 pre_prompt，pwd 挂 env_change.PWD，none 输出 not configured
+  // nushell: prompt hangs off pre_prompt, pwd off env_change.PWD, none prints not configured
   let prompt_nushell = @templates.render_nushell(
     Some("j"),
     HookPrompt,
@@ -165,7 +165,7 @@ test "模板矩阵：hook=pwd/prompt 生成对应钩子，none 不生成" {
   @debug.assert_eq(pwd_nushell.contains("hooks.env_change.PWD"), true)
   let none_nushell = @templates.render_nushell(None, HookNone, false, false)
   @debug.assert_eq(none_nushell.contains("# -- not configured --"), true)
-  // posix：none 输出 not configured；pwd 钩子不支持（输出替代提示）；prompt 挂 PS1
+  // posix: none prints not configured; the pwd hook is unsupported (an alternative is printed); prompt hangs off PS1
   let none_posix = @templates.render_posix(None, HookNone, false, false)
   @debug.assert_eq(none_posix.contains("# -- not configured --"), true)
   let pwd_posix = @templates.render_posix(Some("j"), HookPwd, false, false)
@@ -177,7 +177,7 @@ test "模板矩阵：hook=pwd/prompt 生成对应钩子，none 不生成" {
     false,
   )
   @debug.assert_eq(prompt_posix.contains("__jumbit_hook"), true)
-  // powershell：none 输出 not configured；prompt/pwd 均定义 __jumbit_hook
+  // powershell: none prints not configured; both prompt and pwd define __jumbit_hook
   let none_powershell = @templates.render_powershell(
     None,
     HookNone,
@@ -198,7 +198,7 @@ test "模板矩阵：hook=pwd/prompt 生成对应钩子，none 不生成" {
 }
 
 ///|
-test "模板矩阵：echo 开关控制 cd 后回显" {
+test "template matrix: the echo switch controls echoing after cd" {
   let echo_on = @templates.render_bash(Some("j"), HookNone, true, false)
   @debug.assert_eq(
     echo_on.contains("builtin cd -- \"$@\" && __jumbit_pwd"),
@@ -209,7 +209,7 @@ test "模板矩阵：echo 开关控制 cd 后回显" {
 }
 
 ///|
-test "模板矩阵：resolve_symlinks 切换 pwd -P/-L" {
+test "template matrix: resolve_symlinks switches pwd -P/-L" {
   let resolved = @templates.render_bash(Some("j"), HookNone, false, true)
   @debug.assert_eq(resolved.contains("pwd -P"), true)
   @debug.assert_eq(resolved.contains("pwd -L"), false)
@@ -218,10 +218,10 @@ test "模板矩阵：resolve_symlinks 切换 pwd -P/-L" {
 }
 
 ///|
-test "模板矩阵：--cmd=cd 循环防护（fish 专属 guard）" {
+test "template matrix: the --cmd=cd loop guard (fish only)" {
   let fish_cd = @templates.render_fish(Some("cd"), HookPwd, false, false)
   @debug.assert_eq(fish_cd.contains("__jumbit_loop"), true)
-  // bash/zsh 用 \builtin cd 直调，天然无循环
+  // bash/zsh call \builtin cd directly, so there is no loop by construction
   let bash_cd = @templates.render_bash(Some("cd"), HookPwd, false, false)
   @debug.assert_eq(bash_cd.contains("function cd() {"), true)
   @debug.assert_eq(bash_cd.contains("\\builtin cd --"), true)

@@ -1,5 +1,5 @@
 ///|
-/// hook 触发方式（对齐上游 InitHook）
+/// How the hook fires (matching upstream InitHook)
 pub(all) enum Hook {
   HookNone
   HookPrompt
