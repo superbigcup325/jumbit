@@ -131,7 +131,7 @@ fn parse_query(args : Array[String]) -> Command {
 ///|
 /// --limit 值解析：非负十进制整数（core parse_uint64，与 import last_accessed
 /// 同源——拒前导 +/负数/浮点/垃圾）；超 Int 上限同拒（截断数无更大语义）
-fn parse_limit_value(s : String) -> Result[Int, String] {
+fn parse_limit_value(s : String) -> Result[Int32, String] {
   let v = @string.parse_uint64(s) catch {
     _ =>
       return Err(

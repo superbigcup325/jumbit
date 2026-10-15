@@ -2,7 +2,7 @@
 /// 导入源的单条记录：行号（1 起，空行/空记录同样计数，对齐上游逐行读取语义）
 /// result 为 UTF-8 解码结果；解码失败的行给原因，由调用方拼 `<来源>:<行号>` 上报
 pub(all) struct ImportRecord {
-  line_num : Int
+  line_num : Int32
   result : Result[String, String]
 } derive(Debug)
 
@@ -13,7 +13,7 @@ pub(all) struct ImportRecord {
 /// 上游 import.rs::run 本就是惰性迭代器单趟消费，此为结构回归而非优化
 pub async fn for_each_import_line(
   path : String,
-  f : (Int, Result[String, String]) -> Unit,
+  f : (Int32, Result[String, String]) -> Unit,
 ) -> Result[Unit, String] {
   let data = @afs.read_file(path) catch {
     err =>
@@ -79,7 +79,7 @@ fn for_each_record(
   bytes : Bytes,
   sep : Byte,
   strip_cr : Bool,
-  f : (Int, Result[String, String]) -> Unit,
+  f : (Int32, Result[String, String]) -> Unit,
 ) -> Unit {
   let n = bytes.length()
   let mut start = 0
@@ -110,8 +110,8 @@ fn for_each_record(
 /// - 序列在切片末尾截断：`incomplete utf-8 byte sequence from index M`
 fn decode_view(
   bytes : Bytes,
-  start : Int,
-  end_ : Int,
+  start : Int32,
+  end_ : Int32,
   strip_cr : Bool,
 ) -> Result[String, String] {
   let mut e = end_
@@ -134,10 +134,10 @@ fn decode_view(
 /// UTF-8 校验（RFC 3629，复刻 std 校验器的错误定位语义）；None = 合法。
 /// 仅解码失败后的慢路调用，负责产出与 std 一致的逐类错误文案。
 /// 行切片内的截断与文件尾截断同型：std 对切片末尾的不完整序列报 incomplete
-fn utf8_error(bytes : Bytes, start : Int, end_ : Int) -> String? {
+fn utf8_error(bytes : Bytes, start : Int32, end_ : Int32) -> String? {
   let n = end_
   // 续字节域 80..BF
-  fn cont(i : Int) -> Bool {
+  fn cont(i : Int32) -> Bool {
     let v = bytes[i].to_int()
     v >= 0x80 && v < 0xC0
   }

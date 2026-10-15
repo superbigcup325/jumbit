@@ -173,7 +173,7 @@ fn parse_atuin_timestamp(ts : String) -> Result[Int64, AtuinTsError] {
   let widths = [4, 2, 2, 2, 2, 2]
   // 分隔符 UTF-16 码元：'-','=45、' '=32、':'=58（String 索引返回码元）
   let seps : Array[UInt16] = [45, 45, 32, 58, 58, 58]
-  let vals : Array[Int] = []
+  let vals : Array[Int32] = []
   let mut pos = 0
   let n = ts.length()
   for seg in 0..<6 {
@@ -221,7 +221,7 @@ fn parse_atuin_timestamp(ts : String) -> Result[Int64, AtuinTsError] {
 }
 
 ///|
-fn days_in_month(year : Int, month : Int) -> Int {
+fn days_in_month(year : Int32, month : Int32) -> Int32 {
   match month {
     1 | 3 | 5 | 7 | 8 | 10 | 12 => 31
     4 | 6 | 9 | 11 => 30
@@ -231,14 +231,14 @@ fn days_in_month(year : Int, month : Int) -> Int {
 }
 
 ///|
-fn is_leap_year(year : Int) -> Bool {
+fn is_leap_year(year : Int32) -> Bool {
   (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
 }
 
 ///|
 /// 公历日期 → 自 1970-01-01 起的天数（Howard Hinnant days_from_civil 算法，
 /// 除法向零截断与 Int 语义一致；范围仅处理 0000-9999 年，溢出无需 Int64）
-fn days_from_civil(year : Int, month : Int, day : Int) -> Int64 {
+fn days_from_civil(year : Int32, month : Int32, day : Int32) -> Int64 {
   let y = if month <= 2 { year - 1 } else { year }
   let era = (if y >= 0 { y } else { y - 399 }) / 400
   let yoe = y - era * 400

@@ -3,7 +3,7 @@
 // 规模 1 万条与 perf 数据集同量级；it.keep 防死码消除
 
 ///|
-fn bench_dirs(n : Int) -> Array[@core.Dir] {
+fn bench_dirs(n : Int32) -> Array[@core.Dir] {
   // chacha8 种子定长 32 字节（不足 abort，@alert unsafe）
   let rand = @random.Rand::chacha8(seed=b"jumbit-bench-seed000000000000000")
   let out : Array[@core.Dir] = []

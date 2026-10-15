@@ -37,7 +37,7 @@ fn finish_interactive(
   score : Bool,
   errs : Array[String],
   outs : Array[String],
-) -> Int {
+) -> Int32 {
   match selection {
     Ok(s) => {
       if score {
@@ -106,8 +106,8 @@ async fn open_store(
 async fn finish(
   store : @platform.Store,
   errs : Array[String],
-  code : Int,
-) -> Int {
+  code : Int32,
+) -> Int32 {
   match store.save() {
     Ok(_) => code
     Err(err) => {
@@ -125,7 +125,7 @@ pub async fn run(
   args : Array[String],
   getenv : (String) -> String?,
   errs : Array[String],
-) -> Int {
+) -> Int32 {
   match @cli.parse(args) {
     @cli.Help => {
       println(@cli.usage())
@@ -200,7 +200,7 @@ fn try_twice(
 
 ///|
 /// 双重查找：try_twice 的查找版（describe 显示路需要下标而非布尔）
-fn find_twice(db : @core.Database, path : String, cwd : String) -> Int? {
+fn find_twice(db : @core.Database, path : String, cwd : String) -> Int32? {
   match db.find_idx(path) {
     Some(i) => Some(i)
     None => db.find_idx(@core.resolve_path(path, cwd))

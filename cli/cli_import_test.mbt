@@ -1,5 +1,5 @@
 ///|
-fn import_opts(plugin~ : String, merge? : Bool = false) -> @cli.ImportOptions {
+fn import_opts(plugin~ : String, merge~ : Bool = false) -> @cli.ImportOptions {
   { plugin, merge, }
 }
 

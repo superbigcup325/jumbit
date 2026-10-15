@@ -4,7 +4,7 @@ fn run_init(
   iopts : @cli.InitOptions,
   getenv : (String) -> String?,
   errs : Array[String],
-) -> Int {
+) -> Int32 {
   let echo = echo_enabled(getenv)
   let resolve_symlinks = @config.resolve_symlinks(getenv)
   let cmd : String? = if iopts.no_cmd { None } else { iopts.cmd }

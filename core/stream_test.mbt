@@ -4,11 +4,11 @@
 /// 构造测试选项：now 固定，其余给默认
 fn opts(
   now : Int64,
-  keywords? : Array[String] = [],
-  exclude? : Array[String] = [],
-  base_dir? : String? = None,
-  exists? : Bool = false,
-  resolve_symlinks? : Bool = false,
+  keywords~ : Array[String] = [],
+  exclude~ : Array[String] = [],
+  base_dir~ : String? = None,
+  exists~ : Bool = false,
+  resolve_symlinks~ : Bool = false,
 ) -> @core.StreamOptions {
   {
     now,
@@ -25,7 +25,9 @@ fn opts(
 ///|
 /// exists 回调桩：固定返回 should_exist 并计数。
 /// 体内探测真实 async fs（结果丢弃）以满足 async 语义（无 async 调用的 async fn 是警告）。
-fn counting_exists(should_exist : Bool) -> (async (String) -> Bool, Array[Int]) {
+fn counting_exists(
+  should_exist : Bool,
+) -> (async (String) -> Bool, Array[Int32]) {
   let counter = [0]
   let f : async (String) -> Bool = async fn(_path : String) -> Bool {
     counter[0] = counter[0] + 1

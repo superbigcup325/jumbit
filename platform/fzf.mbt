@@ -14,14 +14,14 @@ pub(all) enum FzfError {
   /// "fzf was terminated"）
   Terminated
   /// 其余退出码：3..=127 与 255（上游文案 "fzf returned an unknown error"）
-  UnknownExit(Int)
+  UnknownExit(Int32)
 } derive(Debug, Eq)
 
 ///|
 /// fzf 退出码映射（对齐上游 FzfChild::wait，zoxide 0.10.0 伪 fzf 探针矩阵
 /// 2026-09-13 实测：0 成功 / 1 无选择 / 2 自身错误 / 130 中断静默 /
 /// 128..=254 与信号杀死视为被终止 / 3..=127 与 255 未知错误，均 exit 1）
-fn map_fzf_exit(code : Int) -> FzfError? {
+fn map_fzf_exit(code : Int32) -> FzfError? {
   if code == 0 {
     None
   } else if code == 1 {

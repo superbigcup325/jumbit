@@ -124,7 +124,7 @@ pub fn Database::add_update(
 
 ///|
 /// 按 path 查条目下标（不存在返回 None）
-pub fn Database::find_idx(self : Database, path : String) -> Int? {
+pub fn Database::find_idx(self : Database, path : String) -> Int32? {
   for i, d in self.dirs {
     if d.path == path {
       return Some(i)
@@ -169,7 +169,7 @@ pub fn Database::sort_by_score(self : Database, now : Int64) -> Unit {
 /// 按 i64 位型折叠符号位后比较——+NaN 大于一切、-NaN 小于一切、-0.0 < +0.0。
 /// import 的 nan/inf 字面量会使 score 出现 NaN，上游排序因此把 NaN 条目排在
 /// 降序输出最前，普通 compare 做不到这一点
-fn total_cmp(a : Double, b : Double) -> Int {
+fn total_cmp(a : Double, b : Double) -> Int32 {
   let la = a.reinterpret_as_uint64()
   let lb = b.reinterpret_as_uint64()
   let sa = (la.reinterpret_as_int64() >> 63).reinterpret_as_uint64() >> 1
@@ -181,7 +181,7 @@ fn total_cmp(a : Double, b : Double) -> Int {
 
 ///|
 /// O(1) 删除指定下标（不保序，对齐上游 swap_remove）；懒删除专用
-pub fn Database::swap_remove(self : Database, idx : Int) -> Unit {
+pub fn Database::swap_remove(self : Database, idx : Int32) -> Unit {
   let last = self.dirs.length() - 1
   self.dirs[idx] = self.dirs[last]
   ignore(self.dirs.pop())
@@ -222,7 +222,7 @@ pub fn Database::add_unchecked(
 /// 不能直接用 String::compare：MoonBit 实现为 shortlex（长度优先），
 /// 与上游 Rust String cmp 的字典序在混合长度路径集下条目序不同
 /// （实测分歧：同数据集 import 后 db 内首条目 jumbit=/opt/golf… vs 上游=/opt/alpha…）
-fn path_lex_cmp(a : String, b : String) -> Int {
+fn path_lex_cmp(a : String, b : String) -> Int32 {
   let la = a.length()
   let lb = b.length()
   let n = if la < lb { la } else { lb }

@@ -138,7 +138,7 @@ fn f64_nan() -> Double {
 
 ///|
 /// 剩余串与 ASCII 小写字面量逐码元比较（用于 inf/nan 特殊字面量）
-fn eq_lower_ascii(s : StringView, from : Int, lit : String) -> Bool {
+fn eq_lower_ascii(s : StringView, from : Int32, lit : String) -> Bool {
   if s.length() - from != lit.length() {
     return false
   }

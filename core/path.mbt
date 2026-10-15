@@ -55,7 +55,7 @@ priv struct WinPrefix {
   verbatim : Bool
   unc : String?
   rooted : Bool
-  consumed : Int
+  consumed : Int32
 }
 
 ///|
@@ -202,8 +202,8 @@ fn resolve_path_windows(path : String, base : String) -> String {
 fn push_windows_segments(
   normals : Array[String],
   path : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
 ) -> Unit {
   let mut seg_start = start
   let mut i = start
@@ -235,7 +235,7 @@ fn push_one_segment(normals : Array[String], seg : String) -> Unit {
 }
 
 ///|
-fn is_windows_sep(path : String, i : Int) -> Bool {
+fn is_windows_sep(path : String, i : Int32) -> Bool {
   path.get_char(i) == Some('/') || path.get_char(i) == Some('\\')
 }
 

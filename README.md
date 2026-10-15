@@ -50,7 +50,7 @@ moon install superbigcup325/jumbit/cmd/jumbit   # 全局安装二进制
 
 注：二进制落在 `~/.moon/bin/jumbit`，与可执行名一致，装完即用（`~/.moon/bin` 已在 PATH，否则 `moon` 命令本身无法运行）
 
-**方式三：从源码构建**（锚定 `moon 0.1.20260920`，CI 以此钉死可复现构建）：
+**方式三：从源码构建**（锚定 `moon 0.1.20261012`，CI 以此钉死可复现构建）：
 
 ```bash
 git clone https://github.com/superbigcup325/jumbit && cd jumbit

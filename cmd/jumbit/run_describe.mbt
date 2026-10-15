@@ -5,7 +5,7 @@ async fn run_describe(
   dopts : @cli.DescribeOptions,
   getenv : (String) -> String?,
   errs : Array[String],
-) -> Int {
+) -> Int32 {
   let data_dir = match cfg(@config.data_dir(getenv), errs) {
     Some(data_dir) => data_dir
     None => return 1

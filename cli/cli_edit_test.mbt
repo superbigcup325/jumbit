@@ -3,9 +3,9 @@
 
 ///|
 fn edit_opts(
-  rename_old? : String? = None,
-  rename_new? : String? = None,
-  prune? : Bool = false,
+  rename_old~ : String? = None,
+  rename_new~ : String? = None,
+  prune~ : Bool = false,
 ) -> @cli.EditOptions {
   { rename_old, rename_new, prune, }
 }

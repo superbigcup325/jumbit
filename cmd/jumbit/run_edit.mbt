@@ -7,7 +7,7 @@ async fn run_edit(
   eopts : @cli.EditOptions,
   getenv : (String) -> String?,
   errs : Array[String],
-) -> Int {
+) -> Int32 {
   let data_dir = match cfg(@config.data_dir(getenv), errs) {
     Some(data_dir) => data_dir
     None => return 1
@@ -46,7 +46,7 @@ async fn run_edit_rename(
   old : String,
   new : String,
   errs : Array[String],
-) -> Int {
+) -> Int32 {
   let cwd = match @env.current_dir() {
     Some(d) => d
     None => "/"
@@ -79,7 +79,7 @@ async fn run_edit_prune(
   db : @core.Database,
   store : @platform.Store,
   errs : Array[String],
-) -> Int {
+) -> Int32 {
   let removed : Array[String] = []
   for d in db.all() {
     if !(@afs.exists(d.path) catch { _ => false }) {
@@ -114,7 +114,7 @@ async fn run_edit_interactive(
   store : @platform.Store,
   getenv : (String) -> String?,
   errs : Array[String],
-) -> Int {
+) -> Int32 {
   // 编辑面内容 = 当前主库序列化（不含 note 列）
   let before = @core.encode_plaintext(db.all())
   let tmp = data_dir + "/db.txt.edit"

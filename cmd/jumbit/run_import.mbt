@@ -5,7 +5,7 @@
 ///|
 /// 坏行定位前缀（`<来源>:<行号>`；atuin 无文件来源时为 `line N`）。
 /// 只对坏行调用——成功行不构造定位串
-fn make_location(source : String?, line_num : Int) -> String {
+fn make_location(source : String?, line_num : Int32) -> String {
   match source {
     Some(path) => "\{path}:\{line_num}"
     None => "line \{line_num}"
@@ -18,7 +18,7 @@ async fn run_import(
   iopts : @cli.ImportOptions,
   getenv : (String) -> String?,
   errs : Array[String],
-) -> Int {
+) -> Int32 {
   let data_dir = match cfg(@config.data_dir(getenv), errs) {
     Some(data_dir) => data_dir
     None => return 1
@@ -52,7 +52,7 @@ async fn run_import(
   // location 串只对坏行构造（成功行下游不读它；百万行级每行拼串是可测开销）
   let process_line = fn(
     source : String?,
-    line_num : Int,
+    line_num : Int32,
     line : Result[String, String],
   ) -> Unit {
     match line {

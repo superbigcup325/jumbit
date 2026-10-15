@@ -21,7 +21,7 @@ pub enum EditorError {
   /// $VISUAL/$EDITOR 未设且 PATH 无 vi
   NotFound
   /// editor 退出码非 0（用户取消编辑/编辑器自身故障）
-  Failed(Int)
+  Failed(Int32)
   /// spawn 失败（解析通过但 exec 失败等；@process 绑定不暴露错误类别）
   Spawn
 } derive(Debug)

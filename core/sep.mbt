@@ -4,14 +4,14 @@
 /// 此判定（glob 通配符已对齐 glob crate 默认语义、跨分隔符，不再依赖本判定），
 /// 语义权威单一（上游 stream.rs:90 同款）
 #cfg(platform="windows")
-fn is_path_separator(c : Int) -> Bool {
+fn is_path_separator(c : Int32) -> Bool {
   c == 47 || c == 92
 }
 
 ///|
 #warnings("-unused_value")
 #cfg(not(platform="windows"))
-fn is_path_separator(c : Int) -> Bool {
+fn is_path_separator(c : Int32) -> Bool {
   c == 47
 }
 
@@ -50,7 +50,7 @@ fn normalize_separators(path : String) -> String {
 /// POSIX 恒 false（无等价）
 #warnings("-unused_value")
 #cfg(not(platform="windows"))
-fn literal_sep_equiv(sc : Int, c : Int) -> Bool {
+fn literal_sep_equiv(sc : Int32, c : Int32) -> Bool {
   let _ = sc
   let _ = c
   false
@@ -58,6 +58,6 @@ fn literal_sep_equiv(sc : Int, c : Int) -> Bool {
 
 ///|
 #cfg(platform="windows")
-fn literal_sep_equiv(sc : Int, c : Int) -> Bool {
+fn literal_sep_equiv(sc : Int32, c : Int32) -> Bool {
   c == 47 && is_path_separator(sc)
 }

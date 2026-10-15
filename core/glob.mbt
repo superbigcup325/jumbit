@@ -123,7 +123,7 @@ fn glob_match_compiled(p : Array[Char], s : String) -> Bool {
 /// 侧推进位置；不匹配返回 None。token 语义对齐 glob crate 默认选项：
 /// `?` 与 `[...]` 匹配任意单字符（含分隔符）；`\x` 按字面量（含分隔符）；
 /// 字面量 token 在 Windows 下与 path 侧分隔符等价匹配
-fn match_single(p : Array[Char], pi : Int, sc : Int) -> Int? {
+fn match_single(p : Array[Char], pi : Int32, sc : Int32) -> Int32? {
   let pn = p.length()
   let c = p[pi].to_int()
   if c == 63 {

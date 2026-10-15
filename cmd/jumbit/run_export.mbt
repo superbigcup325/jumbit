@@ -6,7 +6,7 @@ async fn run_export(
   eopts : @cli.ExportOptions,
   getenv : (String) -> String?,
   errs : Array[String],
-) -> Int {
+) -> Int32 {
   export_exec(eopts, getenv, errs, fn(s) { println(s) })
 }
 
@@ -18,7 +18,7 @@ async fn export_exec(
   getenv : (String) -> String?,
   errs : Array[String],
   emit : (String) -> Unit,
-) -> Int {
+) -> Int32 {
   let data_dir = match cfg(@config.data_dir(getenv), errs) {
     Some(data_dir) => data_dir
     None => return 1

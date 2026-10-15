@@ -7,13 +7,13 @@
 /// 二进制内部版本号不外泄（诊断价值由「数据文件损坏」路径承担）
 struct DbStatus {
   data_file : String
-  file_size : Int
+  file_size : Int32
   format : String?
-  entries : Int
-  notes : Int
+  entries : Int32
+  notes : Int32
   /// _JB_MAXAGE 现值（config 解析产物为 Double）
   maxage : Double
-  existing : Int?
+  existing : Int32?
 } derive(Debug)
 
 ///|
@@ -80,7 +80,7 @@ async fn run_status(
   sopts : @cli.StatusOptions,
   getenv : (String) -> String?,
   errs : Array[String],
-) -> Int {
+) -> Int32 {
   let data_dir = match cfg(@config.data_dir(getenv), errs) {
     Some(data_dir) => data_dir
     None => return 1

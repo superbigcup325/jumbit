@@ -31,11 +31,11 @@ async fn remove_quiet(path : String) -> Unit {
 }
 
 ///|
-/// 进程级随机源（[#11]）：Rand::new() 无参为固定种子（deprecated API，默认
-/// "ABCDEFGHIJKLMNOPQRSTUVWXYZ123456"），函数内每次新建会产出同一序列——
-/// 并发下 write_atomic 的 5 次重试反复撞同一 tmp 名、make_tmp_dir 的目录名
-/// 只剩毫秒时间戳兜底。全局单例让每次调用推进序列，进程内唯一性成立
-let global_rand : @random.Rand = @random.Rand::new()
+/// 进程级随机源（[#11]）：全局单例让每次调用推进 ChaCha8 序列，tmp 名在进程内
+/// 唯一。moonc v0.10.15 起无参 Rand() 从平台熵播种（熵不可用才回退内置固定
+/// 种子），跨进程序列也不同；此前 Rand::new() 无参为固定种子，函数内每次新建
+/// 会产出同一序列，write_atomic 的 5 次重试会反复撞同一 tmp 名
+let global_rand : @random.Rand = @random.Rand()
 
 ///|
 /// tmp 随机名：进程级生成器推进，16 位小写字母数字

@@ -2,15 +2,15 @@
 
 ///|
 fn query_opts(
-  keywords? : Array[String] = [],
-  all? : Bool = false,
-  list? : Bool = false,
-  score? : Bool = false,
-  exclude? : String? = None,
-  json? : Bool = false,
-  fuzzy? : Bool = false,
-  limit? : Int? = None,
-  tsv? : Bool = false,
+  keywords~ : Array[String] = [],
+  all~ : Bool = false,
+  list~ : Bool = false,
+  score~ : Bool = false,
+  exclude~ : String? = None,
+  json~ : Bool = false,
+  fuzzy~ : Bool = false,
+  limit~ : Int32? = None,
+  tsv~ : Bool = false,
 ) -> @cli.QueryOptions {
   {
     keywords,
@@ -27,7 +27,7 @@ fn query_opts(
 }
 
 ///|
-fn add_opts(paths~ : Array[String], score? : Double = 1.0) -> @cli.AddOptions {
+fn add_opts(paths~ : Array[String], score~ : Double = 1.0) -> @cli.AddOptions {
   { paths, score, }
 }
 

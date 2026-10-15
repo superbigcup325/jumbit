@@ -5,7 +5,7 @@ async fn run_query(
   qopts : @cli.QueryOptions,
   getenv : (String) -> String?,
   errs : Array[String],
-) -> Int {
+) -> Int32 {
   query_exec(qopts, getenv, errs, fn(s) { println(s) })
 }
 
@@ -17,7 +17,7 @@ async fn query_exec(
   getenv : (String) -> String?,
   errs : Array[String],
   emit : (String) -> Unit,
-) -> Int {
+) -> Int32 {
   let data_dir = match cfg(@config.data_dir(getenv), errs) {
     Some(data_dir) => data_dir
     None => return 1
@@ -128,7 +128,7 @@ async fn query_exec(
 ///|
 /// --limit 截断：None=不截断；取排序后（remaining 已降序）的前 n 条，不重排。
 /// 截断收在各输出分支内——提前统一截 remaining 会让 limit 0 撞上游空检查错误路
-fn take_limit(dirs : Array[@core.Dir], limit : Int?) -> Array[@core.Dir] {
+fn take_limit(dirs : Array[@core.Dir], limit : Int32?) -> Array[@core.Dir] {
   match limit {
     None => dirs
     Some(n) => {

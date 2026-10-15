@@ -11,7 +11,7 @@ pub(all) struct QueryOptions {
   mut json : Bool
   mut fuzzy : Bool
   /// --limit <n>：列表型输出（--list/--json/--tsv）的前 n 条截断，None=未设
-  mut limit : Int?
+  mut limit : Int32?
   /// --tsv：无表头 Tab 分隔数据通道（jumbit 扩展）
   mut tsv : Bool
 } derive(Debug, Eq)

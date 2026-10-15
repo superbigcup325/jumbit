@@ -49,7 +49,7 @@ test "明文 rank clamp：0.005 下界进、1e10 上界截、NaN 兜底为下限
     { path: "/hi", rank: 10000000000.0, last_accessed: 1L, note: None, },
     {
       path: "/nan",
-      rank: @core.parse_f64("nan").or(0.0),
+      rank: @core.parse_f64("nan").unwrap_or(0.0),
       last_accessed: 1L,
       note: None,
     },
@@ -226,7 +226,7 @@ test "明文 encode：空 path 条目跳过（明文行格式无法表达，迁�
   let text = @utf8.decode(@core.encode_plaintext(dirs))
   inspect(text.contains("/kept"), content="true")
   // 空 path 行不落盘（写出让库永久不可读的自锁预防）
-  inspect(text.split("\n").length(), content="2")
+  inspect(text.split("\n").count(), content="2")
 }
 
 ///|

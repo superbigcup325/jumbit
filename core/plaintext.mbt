@@ -8,12 +8,12 @@
 
 ///|
 /// 列宽（timestamp 与 rank 的 0 填充宽度；上游 COL_WIDTH=10）
-const PLAINTEXT_COL_WIDTH : Int = 10
+const PLAINTEXT_COL_WIDTH : Int32 = 10
 
 ///|
 /// 行级错误聚合上限：最多列出 8 行，超出折叠为 "... and N more"
 /// （对齐上游 deserialize 的 MAX_ERRORS=8）
-const PLAINTEXT_MAX_ERRORS : Int = 8
+const PLAINTEXT_MAX_ERRORS : Int32 = 8
 
 ///|
 /// 明文解码行级错误（聚合在解码末尾，整库拒绝；对齐上游 errors 收集语义）。
@@ -207,8 +207,8 @@ fn plaintext_is_ws(b : UInt16) -> Bool {
 /// "expected: <timestamp> <rank> <path>"、"invalid UTF-8"）
 fn decode_plaintext_line(
   bytes : Bytes,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
 ) -> Result[Dir?, String] {
   // UTF-8 校验与解码（非法字节 → 行级错误，上游 str::from_utf8 context）
   let line : String = @utf8.decode(bytes[start:end]) catch {
@@ -298,8 +298,8 @@ fn plaintext_is_ws_byte(b : Byte) -> Bool {
 /// 除法（正确舍入），与 parse_f64 对同一定点小数的最近偶舍入一致
 fn decode_plaintext_line_fast(
   bytes : Bytes,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
 ) -> Result[Dir?, String]? {
   // 行尾 CR 剥离（慢路径同款，先于空行判定）
   let e = if end > start && bytes[end - 1] == 0x0D { end - 1 } else { end }

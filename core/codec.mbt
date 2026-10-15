@@ -1,27 +1,27 @@
 ///|
 /// 数据库文件大小上限：32MiB（对齐上游 MAX_SIZE = 32 << 20）
-pub const MAX_SIZE : Int = 32 * 1024 * 1024
+pub const MAX_SIZE : Int32 = 32 * 1024 * 1024
 
 ///|
 /// jumbit 自有持久化格式版本（与上游 bincode 格式不互通）。
 /// v2 起条目尾部带 note：[u32 LE 长度][UTF-8 内容]，长度 0 表示 None；
 /// v1（无 note 字段）仍可读，读作 None——旧库无需迁移
-const CODEC_VERSION : Int = 2
+const CODEC_VERSION : Int32 = 2
 
 ///|
 /// 解码侧兼容的最低版本
-const MIN_DECODE_VERSION : Int = 1
+const MIN_DECODE_VERSION : Int32 = 1
 
 ///|
 pub enum CodecError {
   CorruptedData
-  UnsupportedVersion(Int)
+  UnsupportedVersion(Int32)
   TooLarge
 } derive(Debug)
 
 ///|
 /// UTF-8 编码长度（按标量值计，与 @utf8.encode 输出一致）；预分配用，避免二次编码
-fn utf8_len(s : String) -> Int {
+fn utf8_len(s : String) -> Int32 {
   let mut n = 0
   for ch in s {
     n += if ch < '\u{0080}' {
@@ -159,7 +159,7 @@ pub fn decode(bytes : Bytes) -> Result[Array[Dir], CodecError] {
 
 ///|
 /// u32 小端写入（预分配缓冲按下标填）
-fn put_u32(buf : Array[Byte], pos : Int, v : Int) -> Unit {
+fn put_u32(buf : Array[Byte], pos : Int32, v : Int32) -> Unit {
   for k in 0..<4 {
     buf[pos + k] = ((v >> (8 * k)) & 0xFF).to_byte()
   }
@@ -167,7 +167,7 @@ fn put_u32(buf : Array[Byte], pos : Int, v : Int) -> Unit {
 
 ///|
 /// u64 小端写入（预分配缓冲按下标填）
-fn put_u64(buf : Array[Byte], pos : Int, v : UInt64) -> Unit {
+fn put_u64(buf : Array[Byte], pos : Int32, v : UInt64) -> Unit {
   for k in 0..<8 {
     buf[pos + k] = ((v >> (8 * k)) & 255UL).to_int().to_byte()
   }
@@ -175,7 +175,7 @@ fn put_u64(buf : Array[Byte], pos : Int, v : UInt64) -> Unit {
 
 ///|
 /// u32 小端读取
-fn get_u32(bytes : Bytes, pos : Int) -> Int {
+fn get_u32(bytes : Bytes, pos : Int32) -> Int32 {
   let mut v = 0
   for k in 0..<4 {
     v = v | (bytes[pos + k].to_int() << (8 * k))
@@ -185,7 +185,7 @@ fn get_u32(bytes : Bytes, pos : Int) -> Int {
 
 ///|
 /// u64 小端读取
-fn get_u64(bytes : Bytes, pos : Int) -> UInt64 {
+fn get_u64(bytes : Bytes, pos : Int32) -> UInt64 {
   let mut v = 0UL
   for k in 0..<8 {
     v = v.lor(bytes[pos + k].to_uint64() << (8 * k))

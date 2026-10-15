@@ -11,7 +11,7 @@ jumbit 与上游 zoxide 的百万行规模对拍基准。裁判是上游真二�
 | 记录日期 | 2026-10-05 |
 | 硬件 | Intel i5-12500H（12th Gen，16 线程）/ 15 GiB / x86_64 |
 | 系统 | CachyOS，kernel 7.2.8-2-cachyos |
-| jumbit | release 构建（2026-10-05 主线，query 热路径两轮优化后），工具链 moon 0.1.20260920（与 ci.yml `MOONBIT_VERSION` 一致） |
+| jumbit | release 构建（2026-10-05 主线，query 热路径两轮优化后），工具链 moon 0.1.20260920（记录时的 ci.yml 锚定版本；2026-10-15 升 0.1.20261012 后 perf_check 复核同量级） |
 | 裁判 | zoxide 0.10.0（PATH 真二进制，非 mock） |
 | 数据集 | z 格式 1,000,000 行 / 300,000 唯一路径 / 43,822,540 字节（`scripts/gen_dataset.py`，seed=20260908，Zipf 访问分布 + 时间衰减 + 边界行 + 确定性坏行） |
 | 环境压脚 | `_JB_MAXAGE`/`_ZO_MAXAGE` = u32::MAX（压住老化削库；1M 行 rank 累计远超默认阈值，不压则两侧同样清库） |

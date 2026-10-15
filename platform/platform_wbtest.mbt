@@ -182,7 +182,7 @@ async test "read_import_lines：坏 UTF-8 逐类文案对齐 std 定位语义" {
     Ok(r) => r
     Err(e) => fail("\{Repr(e)}")
   }
-  let expect = fn(idx : Int, msg : String) -> Unit raise {
+  let expect = fn(idx : Int32, msg : String) -> Unit raise {
     match records[idx].result {
       Err(m) => @debug.assert_eq(m, msg)
       Ok(_) => fail("行 \{idx + 1} 应报坏行")
@@ -287,9 +287,29 @@ async fn make_fake_fzf(bindir : String) -> String {
 
 ///|
 #cfg(not(platform="windows"))
-// cfg 门控：仅被 Windows 门控测试消费（见各测试处注释）
 async fn write_fake_fzf_body(bindir : String, body : String) -> Unit {
   write_atomic(bindir + "/fzf-body", @utf8.encode(body))
+}
+
+///|
+#cfg(not(platform="windows"))
+/// 期望成功的 fzf_select_with 调用统一入口：[#11] CI runner 偶发 fork 压力
+/// 使 spawn/路径解析瞬时抛错，fzf 侧统一映射 NotFound；瞬态重试一次即绿，
+/// 确定性缺陷两次同败仍红（只容忍 NotFound，其余错误原样判红）
+async fn fzf_select_expect_ok(
+  program : String,
+  hits : Array[@core.Dir],
+  now : Int64,
+  fzf_opts : String?,
+  get : (String) -> String?,
+) -> String {
+  for attempt = 0 {
+    match fzf_select_with(program, hits, now, fzf_opts, get) {
+      Ok(out) => break out
+      Err(NotFound) if attempt == 0 => continue attempt + 1
+      Err(e) => fail("\{Repr(e)}")
+    }
+  }
 }
 
 ///|
@@ -300,10 +320,7 @@ async test "fzf_select：选中回传原样 stdout，候选按 score\\tpath\\0 �
   let fake = make_fake_fzf(bindir)
   let dump = bindir + "/stdin-dump"
   write_fake_fzf_body(bindir, "cat > \{dump}\nprintf '  40.0\\t/picked\\n'\n")
-  let out = match fzf_select_with(fake, fzf_hits(), 1000L, None, env_none) {
-    Ok(s) => s
-    Err(e) => fail("\{Repr(e)}")
-  }
+  let out = fzf_select_expect_ok(fake, fzf_hits(), 1000L, None, env_none)
   @debug.assert_eq(out, "  40.0\t/picked\n")
   // 候选格式锁定：6.1f 得分 + \t + 路径 + NUL，按 hits 顺序
   let dumped = @afs.read_file(dump).text()
@@ -324,10 +341,7 @@ async test "fzf_select：FZF_DEFAULT_OPTS 仅在 fzf_opts 传入时注入" {
     bindir,
     "printf '%s' \"$FZF_DEFAULT_OPTS\" > \{dump}\nprintf '  40.0\\t/picked\\n'\n",
   )
-  match fzf_select_with(fake, hits, 1000L, Some("--border"), env_none) {
-    Ok(_) => ()
-    Err(e) => fail("\{Repr(e)}")
-  }
+  let _ = fzf_select_expect_ok(fake, hits, 1000L, Some("--border"), env_none)
   @debug.assert_eq(@afs.read_file(dump).text(), "--border")
   @afs.rmdir(bindir, recursive=true)
   // None → 不注入，fzf 侧视变量为未设置
@@ -338,10 +352,7 @@ async test "fzf_select：FZF_DEFAULT_OPTS 仅在 fzf_opts 传入时注入" {
     bindir2,
     "printf '%s' \"${FZF_DEFAULT_OPTS-UNSET}\" > \{dump2}\nprintf '  40.0\\t/picked\\n'\n",
   )
-  match fzf_select_with(fake2, hits, 1000L, None, env_none) {
-    Ok(_) => ()
-    Err(e) => fail("\{Repr(e)}")
-  }
+  let _ = fzf_select_expect_ok(fake2, hits, 1000L, None, env_none)
   @debug.assert_eq(@afs.read_file(dump2).text(), "UNSET")
   @afs.rmdir(bindir2, recursive=true)
 }
@@ -403,7 +414,7 @@ async test "for_each_import_line：与 read_import_lines 逐行一致（行号/�
   let path = dir + "/zdata"
   // 覆盖：尾 \r 剥离、空行占位计行号、无尾随换行的末行、行内坏 UTF-8 只标记该行
   write_atomic(path, b"/a|1|100\n\n/b|2|200\r\n\xff\xfe\n/c|3|300")
-  let via_cb : Array[(Int, Result[String, String])] = []
+  let via_cb : Array[(Int32, Result[String, String])] = []
   match for_each_import_line(path, fn(n, r) { via_cb.push((n, r)) }) {
     Ok(_) => ()
     Err(e) => fail("\{Repr(e)}")
@@ -472,22 +483,7 @@ async test "fzf_select：裸名沿 PATH 解析——不可执行候选被跳过�
   let _fake = make_fake_fzf(good_dir)
   write_fake_fzf_body(good_dir, "printf '  40.0\\t/picked\\n'\n")
   let get = env_path_only("\{noexec_dir}:\{good_dir}")
-  // [#11]：CI runner 偶发 fork 压力使 spawn 瞬时抛错，fzf 侧统一映射
-  // NotFound（确定性缺陷两次同败仍红，瞬态重试一次即绿）
-  let mut picked : String = ""
-  let mut resolved = false
-  for attempt = 0 {
-    match fzf_select_with("fzf", fzf_hits(), 1000L, None, get) {
-      Ok(s) => {
-        picked = s
-        resolved = true
-        break
-      }
-      Err(NotFound) if attempt == 0 => continue attempt + 1
-      Err(e) => fail("\{Repr(e)}")
-    }
-  }
-  @debug.assert_eq(resolved, true)
+  let picked = fzf_select_expect_ok("fzf", fzf_hits(), 1000L, None, get)
   @debug.assert_eq(picked, "  40.0\t/picked\n")
   @afs.rmdir(noexec_dir, recursive=true)
   @afs.rmdir(good_dir, recursive=true)
@@ -540,14 +536,14 @@ test "codec_error_message：经真实 decode 产物冻结文案（pub enum 只�
 /// （谓词与 fs 层在 Windows 同报 Win32 码，构造值须平台真实；
 /// 勘误辨析见 docs/handoff-os-error-predicate.md）
 #cfg(platform="windows")
-fn test_eexist_errno() -> Int {
+fn test_eexist_errno() -> Int32 {
   183
 }
 
 ///|
 #warnings("-unused_value")
 #cfg(not(platform="windows"))
-fn test_eexist_errno() -> Int {
+fn test_eexist_errno() -> Int32 {
   17
 }
 

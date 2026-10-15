@@ -6,7 +6,7 @@
 /// export_exec），进程退出码 0/1 直接映射 isError；协议层新增决策仅限
 /// JSON-RPC 信封、错误码与 content 包装（协议必需品）。参考实现
 /// atuinsh/atuin crates/atuin-ai/src/mcp.rs（rmcp SDK）的工具面划分。
-async fn run_mcp(getenv : (String) -> String?) -> Int {
+async fn run_mcp(getenv : (String) -> String?) -> Int32 {
   while true {
     match @stdio.stdin.read_until("\n") {
       // EOF：客户端关闭 stdin 即规范 shutdown（关流→等进程退出），静默退出 0
@@ -253,7 +253,7 @@ fn mcp_query_options(
     Some(Json::False) => false
     Some(_) => return Err("Invalid arguments: fuzzy must be a boolean")
   }
-  let limit : Int? = match args.get("limit") {
+  let limit : Int32? = match args.get("limit") {
     None => None
     Some(Json::Number(n, ..)) => {
       if n < 0.0 || n > 2147483647.0 || n != n.floor() {
@@ -299,7 +299,7 @@ fn mcp_ok(id : Json, result : String) -> String {
 }
 
 ///|
-fn mcp_error(id : Json, code : Int, message : String) -> String {
+fn mcp_error(id : Json, code : Int32, message : String) -> String {
   "{\"jsonrpc\":\"2.0\",\"id\":\{id.stringify()},\"error\":{\"code\":\{code},\"message\":\"\{json_escape(message)}\"}}"
 }
 
