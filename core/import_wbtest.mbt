@@ -1,7 +1,7 @@
-// 导入行解析测试：正常路径 + 上游语义锁定的坏行 case
+// Import line-parsing tests: the normal path plus bad-row cases pinned to upstream semantics
 
 ///|
-/// 取 Ok 值或 fail（Dir 无 Eq，字段逐个断言）
+/// Take the Ok value or fail (Dir has no Eq, so the fields are asserted one by one)
 fn expect_dir(r : Result[Dir, String]) -> Dir raise {
   match r {
     Ok(d) => d
@@ -10,16 +10,16 @@ fn expect_dir(r : Result[Dir, String]) -> Dir raise {
 }
 
 ///|
-/// 断言坏行原因
+/// Assert a bad-row reason
 fn expect_err(r : Result[Dir, String], reason : String) -> Unit raise {
   match r {
-    Ok(_) => fail("应报坏行: \{reason}")
+    Ok(_) => fail("should report a bad row: \{reason}")
     Err(msg) => @debug.assert_eq(msg, reason)
   }
 }
 
 ///|
-test "parse_z_line：基础三段" {
+test "parse_z_line: the basic three fields" {
   let d = expect_dir(parse_z_line("/home/user|1.5|1700000000"))
   @debug.assert_eq(d.path, "/home/user")
   @debug.assert_eq(d.rank, 1.5)
@@ -27,7 +27,7 @@ test "parse_z_line：基础三段" {
 }
 
 ///|
-test "parse_z_line：路径含 | 从右切三段（上游 rsplitn 语义）" {
+test "parse_z_line: a path containing | is split into three from the right (upstream rsplitn semantics)" {
   let d = expect_dir(parse_z_line("/a|b|2.0|100"))
   @debug.assert_eq(d.path, "/a|b")
   @debug.assert_eq(d.rank, 2.0)
@@ -35,48 +35,48 @@ test "parse_z_line：路径含 | 从右切三段（上游 rsplitn 语义）" {
 }
 
 ///|
-test "parse_z_line：空白属于路径，不 trim（上游原样保留）" {
+test "parse_z_line: whitespace belongs to the path and is not trimmed (upstream keeps it)" {
   let d = expect_dir(parse_z_line(" /a |1|2"))
   @debug.assert_eq(d.path, " /a ")
 }
 
 ///|
-test "parse_z_line：空路径合法（上游原样通过）" {
+test "parse_z_line: an empty path is legal (upstream passes it through)" {
   let d = expect_dir(parse_z_line("|1.0|0"))
   @debug.assert_eq(d.path, "")
 }
 
 ///|
-test "parse_z_line：负 rank 合法（上游 f64 原样入库）" {
+test "parse_z_line: a negative rank is legal (upstream imports the f64 as is)" {
   let d = expect_dir(parse_z_line("/a|-2.5|0"))
   @debug.assert_eq(d.rank, -2.5)
 }
 
 ///|
-test "parse_z_line：坏行族（缺段/坏数/负时间戳/空串段）" {
+test "parse_z_line: the bad-row family (a missing field / a bad number / a negative timestamp / an empty field)" {
   expect_err(parse_z_line("no-pipe-at-all"), "invalid entry: no-pipe-at-all")
   expect_err(parse_z_line("/a|1.5"), "invalid entry: /a|1.5")
   expect_err(parse_z_line("/a|x|1"), "invalid entry: /a|x|1")
   expect_err(parse_z_line("/a|1.5|y"), "invalid entry: /a|1.5|y")
-  // 上游 last_accessed 按 u64 解析，负数拒为坏行
+  // upstream parses last_accessed as u64, so a negative is a bad row
   expect_err(parse_z_line("/a|1.5|-1"), "invalid entry: /a|1.5|-1")
   expect_err(parse_z_line("|1.5|"), "invalid entry: |1.5|")
   expect_err(parse_z_line("||"), "invalid entry: ||")
 }
 
 ///|
-test "parse_z_line：last_accessed 为 u64 域（0.10.0 探针实测）" {
-  // u64::MAX 接受，i64 字段按位保存为 -1；score 在 u64 域下落 ×4 档
+test "parse_z_line: last_accessed is a u64 domain (probed against 0.10.0)" {
+  // u64::MAX is accepted and stored bitwise as -1 in the i64 field; the score lands in the x4 bucket under the u64 domain
   let d = expect_dir(parse_z_line("/a|1.5|18446744073709551615"))
   @debug.assert_eq(
     d.last_accessed.reinterpret_as_uint64(),
     18446744073709551615UL,
   )
   @debug.assert_eq(d.score(1000L), 6.0)
-  // 前导 + 合法（Rust u64::from_str 语义）
+  // a leading + is legal (Rust u64::from_str semantics)
   let d2 = expect_dir(parse_z_line("/a|1.5|+5"))
   @debug.assert_eq(d2.last_accessed, 5L)
-  // 溢出 u64 拒为坏行
+  // overflowing u64 is a bad row
   expect_err(
     parse_z_line("/a|1.5|18446744073709551616"),
     "invalid entry: /a|1.5|18446744073709551616",
@@ -84,7 +84,7 @@ test "parse_z_line：last_accessed 为 u64 域（0.10.0 探针实测）" {
 }
 
 ///|
-test "parse_autojump_line：rank 过 sigmoid，last_accessed=0" {
+test "parse_autojump_line: the rank goes through sigmoid, last_accessed=0" {
   let d = expect_dir(parse_autojump_line("3.7\t/home/user"))
   @debug.assert_eq(d.path, "/home/user")
   @debug.assert_eq(d.rank, sigmoid(3.7))
@@ -92,20 +92,20 @@ test "parse_autojump_line：rank 过 sigmoid，last_accessed=0" {
 }
 
 ///|
-test "sigmoid：端点与单调性" {
+test "sigmoid: endpoints and monotonicity" {
   @debug.assert_eq(sigmoid(0.0), 0.5)
   assert_true(sigmoid(1.0) > 0.5 && sigmoid(1.0) < 1.0)
   assert_true(sigmoid(-1.0) > 0.0 && sigmoid(-1.0) < 0.5)
 }
 
 ///|
-test "parse_autojump_line：路径含 \t 按首 \t 切（上游 split_once 语义）" {
+test "parse_autojump_line: a path containing \t splits at the first \t (upstream split_once semantics)" {
   let d = expect_dir(parse_autojump_line("1.0\t/a\tb"))
   @debug.assert_eq(d.path, "/a\tb")
 }
 
 ///|
-test "parse_autojump_line：坏行族" {
+test "parse_autojump_line: the bad-row family" {
   expect_err(parse_autojump_line("/a"), "invalid entry: /a")
   expect_err(
     parse_autojump_line("abc\t/a"),
@@ -118,7 +118,7 @@ test "parse_autojump_line：坏行族" {
 }
 
 ///|
-test "parse_atuin_line：时间戳转 UTC epoch，rank=1.0" {
+test "parse_atuin_line: the timestamp becomes a UTC epoch, rank=1.0" {
   let d = expect_dir(parse_atuin_line("2024-01-01 00:00:00\t/home/user"))
   @debug.assert_eq(d.path, "/home/user")
   @debug.assert_eq(d.rank, 1.0)
@@ -127,7 +127,7 @@ test "parse_atuin_line：时间戳转 UTC epoch，rank=1.0" {
 }
 
 ///|
-test "parse_atuin_line：纪元边界（1970-01-01 与 1969-12-31）" {
+test "parse_atuin_line: the epoch boundary (1970-01-01 and 1969-12-31)" {
   let d = expect_dir(parse_atuin_line("1970-01-01 00:00:00\t/a"))
   @debug.assert_eq(d.last_accessed, 0L)
   let d2 = expect_dir(parse_atuin_line("1969-12-31 23:59:59\t/a"))
@@ -135,7 +135,7 @@ test "parse_atuin_line：纪元边界（1970-01-01 与 1969-12-31）" {
 }
 
 ///|
-test "parse_atuin_line：闰日（2000-02-29 闰年合法；1900 非、2100 非百年不闰）" {
+test "parse_atuin_line: leap days (2000-02-29 is a legal leap year; 1900 is not, and 2100 is not since century years need a 400)" {
   let d = expect_dir(parse_atuin_line("2000-02-29 12:00:00\t/a"))
   // 2000-02-29T12:00:00Z
   @debug.assert_eq(d.last_accessed, 951825600L)
@@ -146,13 +146,13 @@ test "parse_atuin_line：闰日（2000-02-29 闰年合法；1900 非、2100 非�
 }
 
 ///|
-test "parse_atuin_line：路径含空格与冒号原样保留" {
+test "parse_atuin_line: a path with spaces and colons is kept as is" {
   let d = expect_dir(parse_atuin_line("2024-06-01 07:08:09\t/my dir:x"))
   @debug.assert_eq(d.path, "/my dir:x")
 }
 
 ///|
-test "parse_atuin_line：坏行族（无 \t/超范围/格式错）" {
+test "parse_atuin_line: the bad-row family (no \t / out of range / a format error)" {
   expect_err(
     parse_atuin_line("2024-01-01 00:00:00"),
     "invalid entry: 2024-01-01 00:00:00",
@@ -188,18 +188,18 @@ test "parse_atuin_line：坏行族（无 \t/超范围/格式错）" {
 }
 
 ///|
-test "days_from_civil：与已知 epoch 交叉验证" {
+test "days_from_civil: cross-checked against known epochs" {
   @debug.assert_eq(days_from_civil(1970, 1, 1), 0L)
-  // 2024-01-01 → 1704067200 / 86400 = 19723 天
+  // 2024-01-01 -> 1704067200 / 86400 = 19723 days
   @debug.assert_eq(days_from_civil(2024, 1, 1), 19723L)
-  // 2000-03-01（闰日次日）→ 951868800 / 86400 = 11017 天
+  // 2000-03-01 (the day after a leap day) -> 951868800 / 86400 = 11017 days
   @debug.assert_eq(days_from_civil(2000, 3, 1), 11017L)
-  // 1969-12-31 → -1 天
+  // 1969-12-31 -> -1 day
   @debug.assert_eq(days_from_civil(1969, 12, 31), -1L)
 }
 
 ///|
-/// 折叠测试辅助：路径 → 带定位条目（rank/时间对折叠不可见，取占位值）
+/// Fold-test helper: a path -> a located entry (rank/time are invisible to folding, so placeholders are used)
 fn loc(path : String) -> LocatedDir {
   {
     location: path,
@@ -208,7 +208,7 @@ fn loc(path : String) -> LocatedDir {
 }
 
 ///|
-/// 折叠测试辅助：坏行条目
+/// Fold-test helper: a bad-row entry
 fn loc_err(reason : String) -> LocatedDir {
   { location: "line 0", result: Err(reason), }
 }

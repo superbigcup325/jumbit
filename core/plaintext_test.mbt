@@ -1,8 +1,8 @@
 ///|
-/// 明文格式测试：round-trip、字节面、行级错误矩阵（规格 docs/spec-plaintext-edit.md §3.2）
+/// Plaintext-format tests: round-trip, the byte surface, the line-level error matrix (spec docs/spec-plaintext-edit.md §3.2)
 
 ///|
-test "明文 roundtrip：多字段经 encode/decode 逐条目相等（note 恒 None）" {
+test "plaintext round-trip: multiple fields survive encode/decode entry by entry (note always None)" {
   let dirs : Array[@core.Dir] = [
     {
       path: "/home/user/projects",
@@ -21,13 +21,13 @@ test "明文 roundtrip：多字段经 encode/decode 逐条目相等（note 恒 N
     Ok(out) => {
       @debug.assert_eq(out.length(), 2)
       @debug.assert_eq(out[0].path, "/home/user/projects")
-      // rank 经两位小数明文：3.14 精确保真
+      // the rank through the two-decimal plaintext: 3.14 stays exactly
       @debug.assert_eq(out[0].rank, 3.14)
       @debug.assert_eq(out[0].last_accessed, 1789054423L)
       @debug.assert_eq(out[1].path, "/tmp/α β/中文目录")
       @debug.assert_eq(out[1].rank, 0.01)
       @debug.assert_eq(out[1].last_accessed, 1L)
-      // note 不进明文主格式（notes.tsv 侧文件承载，store 层接线）
+      // the note does not enter the plaintext main format (the notes.tsv side file carries it, wired at the store layer)
       @debug.assert_eq(out[1].note, None)
     }
     Err(e) => fail("unexpected: \{Repr(e)}")
@@ -35,7 +35,7 @@ test "明文 roundtrip：多字段经 encode/decode 逐条目相等（note 恒 N
 }
 
 ///|
-test "明文字节面：0 填充与列序逐字节（对齐上游 {:010}\\t{:010.2}\\t{path}）" {
+test "the plaintext byte surface: zero padding and column order, byte for byte (matching upstream {:010}\\t{:010.2}\\t{path})" {
   let bytes = @core.encode_plaintext([
     { path: "/a/b", rank: 1.0, last_accessed: 1789054423L, note: None, },
   ])
@@ -43,7 +43,7 @@ test "明文字节面：0 填充与列序逐字节（对齐上游 {:010}\\t{:010
 }
 
 ///|
-test "明文 rank clamp：0.005 下界进、1e10 上界截、NaN 兜底为下限" {
+test "plaintext rank clamp: 0.005 rises to the floor, 1e10 is cut to the ceiling, NaN falls back to the floor" {
   let bytes = @core.encode_plaintext([
     { path: "/lo", rank: 0.005, last_accessed: 1L, note: None, },
     { path: "/hi", rank: 10000000000.0, last_accessed: 1L, note: None, },
@@ -61,8 +61,8 @@ test "明文 rank clamp：0.005 下界进、1e10 上界截、NaN 兜底为下限
 }
 
 ///|
-/// 明文 rank 格式化：半界取偶与正确舍入边界（探针 2026-09-22 转正；
-/// 每个 double 的精确值决定舍入方向，不可凭十进制直觉预测）
+/// Plaintext rank formatting: half-to-even and the correct rounding boundary (the probe was promoted 2026-09-22;
+/// each double\'s exact value decides the rounding direction, so decimal intuition cannot predict it)
 fn fmt_one(x : Double) -> String raise {
   let bytes = @core.encode_plaintext([
     { path: "/p", rank: x, last_accessed: 0L, note: None, },
@@ -73,25 +73,25 @@ fn fmt_one(x : Double) -> String raise {
 }
 
 ///|
-test "明文 rank 格式化：二进制不精确半界按精确值舍入" {
-  // 2.675 精确值 2.6749999…8 → 舍到 2.67（经典坑：×100 二进制乘法会翻转）
+test "plaintext rank formatting: a binary-inexact half boundary rounds by its exact value" {
+  // 2.675\'s exact value is 2.6749999...8 -> rounds down to 2.67 (the classic trap: a x100 binary multiply flips it)
   @debug.assert_eq(fmt_one(2.675), "0000002.67")
-  // 999.995 精确值 999.995000…00104 → 进到 1000.00（方向与 2.675 相反）
+  // 999.995\'s exact value is 999.995000...00104 -> rounds up to 1000.00 (the opposite direction from 2.675)
   @debug.assert_eq(fmt_one(999.995), "0001000.00")
-  // 0.005 精确值略大于半界 → 0.01
+  // 0.005\'s exact value is slightly above the half boundary -> 0.01
   @debug.assert_eq(fmt_one(0.005), "0000000.01")
 }
 
 ///|
-test "明文 rank 格式化：二进制精确半界取偶" {
-  @debug.assert_eq(fmt_one(1.125), "0000001.12") // 112 偶 → 舍
-  @debug.assert_eq(fmt_one(1.375), "0000001.38") // 137 奇 → 进
+test "plaintext rank formatting: a binary-exact half boundary rounds to even" {
+  @debug.assert_eq(fmt_one(1.125), "0000001.12") // 112 is even -> round down
+  @debug.assert_eq(fmt_one(1.375), "0000001.38") // 137 is odd -> round up
   @debug.assert_eq(fmt_one(0.125), "0000000.12")
   @debug.assert_eq(fmt_one(0.375), "0000000.38")
 }
 
 ///|
-test "明文 decode：空文件与纯换行均得空库" {
+test "plaintext decode: an empty file and pure newlines both give an empty database" {
   match @core.decode_plaintext(@utf8.encode("")) {
     Ok(dirs) => @debug.assert_eq(dirs.length(), 0)
     Err(e) => fail("unexpected: \{Repr(e)}")
@@ -103,20 +103,20 @@ test "明文 decode：空文件与纯换行均得空库" {
 }
 
 ///|
-test "明文 decode：CRLF 容忍、行中空白多分隔符、path 前导空白被剥（上游语义）" {
-  // CRLF：行尾 \r 剥除
+test "plaintext decode: CRLF tolerated, mid-line whitespace as multiple separators, a path\'s leading whitespace stripped (upstream semantics)" {
+  // CRLF: a trailing \r is stripped
   match
     @core.decode_plaintext(@utf8.encode("1789054423\t00000001.00\t/a\r\n")) {
     Ok(dirs) => @debug.assert_eq(dirs[0].path, "/a")
     Err(e) => fail("unexpected: \{Repr(e)}")
   }
-  // 多空白分隔（上游 split_once(char::is_whitespace) 语义）
+  // multiple whitespace separators (upstream split_once(char::is_whitespace) semantics)
   match
     @core.decode_plaintext(@utf8.encode("1789054423  \t00000001.00\t/a b\n")) {
     Ok(dirs) => @debug.assert_eq(dirs[0].path, "/a b")
     Err(e) => fail("unexpected: \{Repr(e)}")
   }
-  // path 前导空白剥除（上游 path.trim_start()；round-trip 丢前导空白）
+  // the path\'s leading whitespace is stripped (upstream path.trim_start(); a round trip loses leading whitespace)
   match
     @core.decode_plaintext(@utf8.encode("1789054423\t00000001.00\t  /a\n")) {
     Ok(dirs) => @debug.assert_eq(dirs[0].path, "/a")
@@ -125,14 +125,14 @@ test "明文 decode：CRLF 容忍、行中空白多分隔符、path 前导空白
 }
 
 ///|
-test "明文 decode：行级错误矩阵（文案对齐上游）" {
-  // 缺列
+test "plaintext decode: the line-level error matrix (wording matching upstream)" {
+  // a missing column
   match @core.decode_plaintext(@utf8.encode("1789054423\t00000001.00\n")) {
     Err(e) =>
       @debug.assert_eq(e.lines, ["line 1: expected: <timestamp> <rank> <path>"])
     Ok(_) => fail("expected error")
   }
-  // 垃圾 timestamp / 垃圾 rank / NaN rank
+  // a garbage timestamp / a garbage rank / a NaN rank
   match @core.decode_plaintext(@utf8.encode("xx\t00000001.00\t/a\n")) {
     Err(e) =>
       @debug.assert_eq(e.lines, ["line 1: could not parse timestamp: xx"])
@@ -146,12 +146,12 @@ test "明文 decode：行级错误矩阵（文案对齐上游）" {
     Err(e) => @debug.assert_eq(e.lines, ["line 1: could not parse rank: nan"])
     Ok(_) => fail("expected error")
   }
-  // inf 接受并 clamp 到上限（上游 parse::<Rank> 接受 inf 字面量同款）
+  // inf is accepted and clamped to the ceiling (upstream parse::<Rank> accepts the inf literal too)
   match @core.decode_plaintext(@utf8.encode("1789054423\tinf\t/a\n")) {
     Ok(dirs) => @debug.assert_eq(dirs[0].rank, 9999999.99)
     Err(e) => fail("unexpected: \{Repr(e)}")
   }
-  // 空 path（三段但第三段空白）
+  // an empty path (three fields, but the third is whitespace)
   match @core.decode_plaintext(@utf8.encode("1789054423\t00000001.00\t  \n")) {
     Err(e) =>
       @debug.assert_eq(e.lines, ["line 1: expected: <timestamp> <rank> <path>"])
@@ -160,8 +160,8 @@ test "明文 decode：行级错误矩阵（文案对齐上游）" {
 }
 
 ///|
-test "明文 decode：非法 UTF-8 报行号；错误聚合超 8 条折叠为 ... and N more" {
-  // 非法 UTF-8 字节 0xFF
+test "plaintext decode: invalid UTF-8 reports its line number; beyond 8 errors the aggregate folds to ... and N more" {
+  // an invalid UTF-8 byte, 0xFF
   let bad = b"1789054423\t00000001.00\t/\xff\n"
   match @core.decode_plaintext(bad) {
     Err(e) => @debug.assert_eq(e.lines, ["line 1: invalid UTF-8"])
