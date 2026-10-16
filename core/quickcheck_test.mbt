@@ -1,19 +1,19 @@
-// 性质测试（core @quickcheck）：与单测/golden 的分工=锁语义不变量（随机输入 +
-// 失败收缩），不堆字节断言。check 种子固定保证 CI 复现；A=UInt64 作为「数据
-// 种子」注入 chacha8，性质体内自建随机输入（roadmap 存量条目「quickcheck 纳入
-// 测试面评估」的落地）
+// Property tests (core @quickcheck): their division of labour against unit tests and goldens is pinning semantic invariants
+// (random input plus failure shrinking), not piling on byte assertions. The seed is fixed so CI can reproduce; A=UInt64 is injected
+// into chacha8 as the "data seed" and each property builds its own random input (the landing of the roadmap line item
+// "evaluate bringing quickcheck into the test surface")
 
 ///|
 fn qc_seed_bytes(s : UInt64) -> Bytes {
-  // chacha8 种子定长 32 字节：十进制表示 + 定长填充拼到 32（ASCII 恒 32 字节；
-  // String::to_bytes 已弃用，走 @encoding/utf8.encode）
+  // the chacha8 seed is a fixed 32 bytes: the decimal form plus fixed padding out to 32 (ASCII is always 32 bytes;
+  // String::to_bytes is deprecated, so @encoding/utf8.encode is used)
   let base = s.to_string()
   let filler = "0123456789abcdefghij0123456789abcdefghij"
   @utf8.encode(base + filler[0:32 - base.length()].to_owned())
 }
 
 ///|
-test "property: 明文 codec 往返不变量" {
+test "property: the plaintext codec round-trip invariant" {
   @quickcheck.check(
     fn(seed : UInt64) {
       let rand = @random.Rand::chacha8(seed=qc_seed_bytes(seed))
@@ -21,7 +21,7 @@ test "property: 明文 codec 往返不变量" {
       for i in 0..<rand.int(limit=20) {
         dirs.push({
           path: "/home/user/\{rand.int(limit=64)}/dir-\{i}",
-          // 两位小数域内生成（明文 rank 两位出，域内往返须精确无损）
+          // generated inside the two-decimal domain (plaintext ranks come out with two decimals, so an in-domain round trip must be exact)
           rank: rand.int(limit=1000000).to_double() / 100.0,
           last_accessed: rand.int(limit=100000).to_int64(),
           note: None,
@@ -50,11 +50,11 @@ test "property: 明文 codec 往返不变量" {
 }
 
 ///|
-test "property: glob 星号跨分隔符（对齐 glob crate 默认 require_literal_separator=false）" {
+test "property: a glob star crosses separators (matching the glob crate default require_literal_separator=false)" {
   @quickcheck.check(
     fn(seed : UInt64) {
       let rand = @random.Rand::chacha8(seed=qc_seed_bytes(seed))
-      // 无分隔符 pattern：字母 + `*` + `?`（恒为合法 pattern，避开 `[` 未闭合）
+      // a separator-free pattern: letters + `*` + `?` (always valid, avoiding an unterminated `[`)
       let alphabet = "abcxy*?".to_array()
       let n = 1 + rand.int(limit=8)
       let buf = StringBuilder()
@@ -67,11 +67,11 @@ test "property: glob 星号跨分隔符（对齐 glob crate 默认 require_liter
         buf.write_char(ch)
       }
       let pattern = buf.to_string()
-      // 控制组：pattern 恒匹配自身（防「恒 false」的空洞性质）
+      // a control: the pattern always matches itself (guarding against a vacuous always-false property)
       @core.glob_match(pattern, pattern) &&
-      // 含通配的 pattern 借首尾星号必可跨分隔符匹配多组件路径
+      // with leading and trailing stars, a wildcard pattern must match a multi-component path across separators
       (!has_wild || @core.glob_match("*" + pattern + "*", "/" + pattern + "/x")) &&
-      // 纯字面量 pattern（无通配）仍不能匹配分隔符两侧的多组件路径
+      // a pure literal pattern (no wildcards) still cannot match a multi-component path across a separator
       (has_wild || !@core.glob_match(pattern, "/" + pattern + "/x"))
     },
     count=200U,
@@ -80,7 +80,7 @@ test "property: glob 星号跨分隔符（对齐 glob crate 默认 require_liter
 }
 
 ///|
-test "property: resolve_path 幂等" {
+test "property: resolve_path is idempotent" {
   @quickcheck.check(
     fn(seed : UInt64) {
       let rand = @random.Rand::chacha8(seed=qc_seed_bytes(seed))
@@ -97,7 +97,7 @@ test "property: resolve_path 幂等" {
       }
       let base = ["/x/y", "/", "/x"][rand.int(limit=3)]
       let once = @core.resolve_path(path, base)
-      // 二次规范化是恒等变换（含 .. 越界与点段消除后的不动点）
+      // a second normalization is the identity (the fixed point after .. past the root and dot segments are removed)
       @core.resolve_path(once, base) == once
     },
     count=200U,
