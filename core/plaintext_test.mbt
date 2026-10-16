@@ -167,7 +167,7 @@ test "plaintext decode: invalid UTF-8 reports its line number; beyond 8 errors t
     Err(e) => @debug.assert_eq(e.lines, ["line 1: invalid UTF-8"])
     Ok(_) => fail("expected error")
   }
-  // 10 条坏行 → 前 8 条 + "... and 2 more"
+  // 10 bad rows -> the first 8 plus "... and 2 more"
   let sb = StringBuilder()
   for i in 0..<10 {
     sb.write_string("badline\{i}\n")
@@ -190,15 +190,15 @@ test "plaintext decode: invalid UTF-8 reports its line number; beyond 8 errors t
 }
 
 ///|
-/// 边界补课（coverage 2026-09-25 盲区明细）：pad10 负数路、空 path 跳过、
-/// parse_i64 分支矩阵、多行错误聚合、行首空白
-test "明文 encode：负数 last_accessed 的 pad10（-1 补零、i64::MIN 超宽原样）" {
+/// Boundary catch-up (the blind spots coverage listed on 2026-09-25): the pad10 negative path, empty-path skipping,
+/// the parse_i64 branch matrix, multi-line error aggregation, and leading whitespace
+test "plaintext encode: pad10 for a negative last_accessed (-1 zero-padded, i64::MIN left over-wide)" {
   let dirs : Array[@core.Dir] = [
     { path: "/a", rank: 1.0, last_accessed: -1L, note: None, },
     { path: "/b", rank: 1.0, last_accessed: -9223372036854775808L, note: None, },
   ]
   let text = @core.encode_plaintext(dirs)
-  // -1 → "-000000001"（符号在前 0 填充其后）；MIN 20 位超宽原样不截断
+  // -1 -> "-000000001" (the sign first, zero padding after); MIN\'s 20 digits stay over-wide and are not truncated
   inspect(
     @utf8.decode(text).contains("-0000000001\t0000001.00\t/a"),
     content="true",
@@ -207,7 +207,7 @@ test "明文 encode：负数 last_accessed 的 pad10（-1 补零、i64::MIN 超�
     @utf8.decode(text).contains("-9223372036854775808\t0000001.00\t/b"),
     content="true",
   )
-  // 负数 epoch roundtrip（atuin 数据集 epoch=-1 边界行的另一半）
+  // a round trip on a negative epoch (the other half of the atuin dataset\'s epoch=-1 boundary row)
   match @core.decode_plaintext(text) {
     Ok(out) => {
       @debug.assert_eq(out[0].last_accessed, -1L)
@@ -218,21 +218,21 @@ test "明文 encode：负数 last_accessed 的 pad10（-1 补零、i64::MIN 超�
 }
 
 ///|
-test "明文 encode：空 path 条目跳过（明文行格式无法表达，迁移救库语义）" {
+test "plaintext encode: an empty-path entry is skipped (the plaintext line format cannot express it; the migration\'s rescue semantics)" {
   let dirs : Array[@core.Dir] = [
     { path: "", rank: 1.0, last_accessed: 0L, note: None, },
     { path: "/kept", rank: 1.0, last_accessed: 0L, note: None, },
   ]
   let text = @utf8.decode(@core.encode_plaintext(dirs))
   inspect(text.contains("/kept"), content="true")
-  // 空 path 行不落盘（写出让库永久不可读的自锁预防）
+  // an empty-path line is not written (writing one would make the database permanently unreadable)
   inspect(text.split("\n").count(), content="2")
 }
 
 ///|
-test "明文 decode：timestamp 解析分支矩阵（i64::from_str 语义）" {
-  // 符号位单独出现（"+" / "-"）→ could not parse timestamp
-  // 超过 20 位（必溢出）早拒；2^63 超 i64::MAX 拒；-0 归 0；i64::MIN 接受
+test "plaintext decode: the timestamp parsing branch matrix (i64::from_str semantics)" {
+  // a lone sign ("+" / "-") -> could not parse timestamp
+  // more than 20 digits (certain overflow) is rejected early; 2^63 past i64::MAX is rejected; -0 becomes 0; i64::MIN is accepted
   let cases : Array[(String, Result[Int64, Unit])] = [
     ("+ 00000001.00 /x", Err(())),
     ("- 00000001.00 /x", Err(())),
@@ -250,11 +250,11 @@ test "明文 decode：timestamp 解析分支矩阵（i64::from_str 语义）" {
       Ok(out) =>
         match want {
           Ok(v) => @debug.assert_eq(out[0].last_accessed, v)
-          Err(_) => fail("应拒: \{line}")
+          Err(_) => fail("should reject: \{line}")
         }
       Err(_) =>
         match want {
-          Ok(_) => fail("应收: \{line}")
+          Ok(_) => fail("should accept: \{line}")
           Err(_) => ()
         }
     }
@@ -262,13 +262,13 @@ test "明文 decode：timestamp 解析分支矩阵（i64::from_str 语义）" {
 }
 
 ///|
-test "明文 decode：多坏行错误聚合换行拼接与行号" {
+test "plaintext decode: multi-line error aggregation, newline joining and line numbers" {
   let bad = "garbage\nalso bad\n1789054423\t00000001.00\t/ok\n"
   match @core.decode_plaintext(@utf8.encode(bad)) {
-    Ok(_) => fail("坏行应整库拒绝")
+    Ok(_) => fail("a bad row should make the whole database refuse to load")
     Err(e) => {
       let msg = e.message()
-      // 逐行换行拼接（对齐上游 errors.join("\n")）
+      // joined line by line with newlines (matching upstream errors.join("\n"))
       inspect(msg.contains("\n"), content="true")
       inspect(msg.contains("line 1:"), content="true")
       inspect(msg.contains("line 2:"), content="true")
@@ -277,7 +277,7 @@ test "明文 decode：多坏行错误聚合换行拼接与行号" {
 }
 
 ///|
-test "明文 decode：行首空白 trim_start 与 CR 行尾容忍" {
+test "plaintext decode: trim_start on leading whitespace, and a trailing CR tolerated" {
   let text = "  \t1789054423\t00000001.00\t/x\r\n"
   match @core.decode_plaintext(@utf8.encode(text)) {
     Ok(out) => {

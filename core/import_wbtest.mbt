@@ -214,7 +214,7 @@ fn loc_err(reason : String) -> LocatedDir {
 }
 
 ///|
-/// 折叠结果投影为路径/坏行标记序列，便于断言
+/// Project the fold result into a sequence of paths and bad-row markers, for easier assertions
 fn collapse_paths(items : Array[LocatedDir]) -> Array[String] {
   let out : Array[String] = []
   for it in items {
@@ -227,7 +227,7 @@ fn collapse_paths(items : Array[LocatedDir]) -> Array[String] {
 }
 
 ///|
-test "collapse_consecutive：连续同路径只保留首次（上游 prev_cwd 语义）" {
+test "collapse_consecutive: consecutive same paths keep only the first (upstream prev_cwd semantics)" {
   let out = collapse_consecutive([
     loc("/a"),
     loc("/a"),
@@ -239,8 +239,8 @@ test "collapse_consecutive：连续同路径只保留首次（上游 prev_cwd �
 }
 
 ///|
-test "collapse_consecutive：Err 原样透传且不打断折叠链" {
-  // /a → 坏行 → /a：坏行不改 prev，第二个 /a 仍被折叠（上游错误路径不改 prev_cwd）
+test "collapse_consecutive: an Err passes through as is without breaking the fold chain" {
+  // /a -> a bad row -> /a: the bad row does not change prev, so the second /a is still folded (upstream\'s error path leaves prev_cwd)
   let out = collapse_consecutive([
     loc("/a"),
     loc_err("bad"),
@@ -251,7 +251,7 @@ test "collapse_consecutive：Err 原样透传且不打断折叠链" {
 }
 
 ///|
-test "collapse_consecutive：空序列与单条目" {
+test "collapse_consecutive: an empty sequence and a single entry" {
   @debug.assert_eq(collapse_consecutive([]).length(), 0)
   @debug.assert_eq(collapse_paths(collapse_consecutive([loc("/only")])), [
     "/only",
@@ -259,7 +259,7 @@ test "collapse_consecutive：空序列与单条目" {
 }
 
 ///|
-test "collapse_consecutive：定位随条目保留" {
+test "collapse_consecutive: the location travels with the entry" {
   let items = [
     {
       location: "line 1",
@@ -277,7 +277,7 @@ test "collapse_consecutive：定位随条目保留" {
 }
 
 ///|
-test "parse_autojump_line：坏 rank 消息带 Rust ParseFloatError 后缀（上游对拍）" {
+test "parse_autojump_line: a bad-rank message carries the Rust ParseFloatError suffix (compared against upstream)" {
   expect_err(
     parse_autojump_line("\t/a"),
     "invalid rank: : cannot parse float from empty string",
