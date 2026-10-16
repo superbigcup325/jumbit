@@ -1,7 +1,7 @@
 ///|
-/// pub 类型上的 `derive(Debug, Eq)` 会把 `to_repr`/`equal`/`not_equal` 隐式提升为
-/// 普通方法（moonc v0.10.14 起 `implicit_impl_as_method` 报错）。本仓无这些方法的
-/// 调用点，故显式声明为 deprecated 抑制提升：公开面保持最小，需要时走 trait 形态
+/// A `derive(Debug, Eq)` on a public type implicitly lifts `to_repr`/`equal`/`not_equal` into
+/// ordinary methods (moonc v0.10.14 errors under `implicit_impl_as_method`). This repo has no call sites for
+/// them, so they are declared deprecated to suppress the lift: the public surface stays minimal, and a trait shape is the way if ever needed
 /// （`@debug.Debug::to_repr(x)` / `Eq::equal(a, b)`）
 #deprecated("Use `@debug.Debug::to_repr` instead", skip_current_package=true)
 #doc(hidden)

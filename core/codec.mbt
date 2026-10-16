@@ -1,15 +1,15 @@
 ///|
-/// 数据库文件大小上限：32MiB（对齐上游 MAX_SIZE = 32 << 20）
+/// The database file size cap: 32MiB (matching upstream MAX_SIZE = 32 << 20)
 pub const MAX_SIZE : Int32 = 32 * 1024 * 1024
 
 ///|
-/// jumbit 自有持久化格式版本（与上游 bincode 格式不互通）。
-/// v2 起条目尾部带 note：[u32 LE 长度][UTF-8 内容]，长度 0 表示 None；
-/// v1（无 note 字段）仍可读，读作 None——旧库无需迁移
+/// The version of jumbit\'s own persistence format (not interoperable with upstream\'s bincode format).
+/// From v2 an entry carries a trailing note: [u32 LE length][UTF-8 content], with length 0 meaning None;
+/// v1 (no note field) is still readable as None -- an old database needs no migration
 const CODEC_VERSION : Int32 = 2
 
 ///|
-/// 解码侧兼容的最低版本
+/// The lowest version the decode side accepts
 const MIN_DECODE_VERSION : Int32 = 1
 
 ///|
@@ -20,7 +20,7 @@ pub enum CodecError {
 } derive(Debug)
 
 ///|
-/// UTF-8 编码长度（按标量值计，与 @utf8.encode 输出一致）；预分配用，避免二次编码
+/// The UTF-8 encoded length (counted per scalar value, matching @utf8.encode\'s output); used for pre-sizing, avoiding a second encode
 fn utf8_len(s : String) -> Int32 {
   let mut n = 0
   for ch in s {
@@ -38,9 +38,9 @@ fn utf8_len(s : String) -> Int32 {
 }
 
 ///|
-/// 编码（恒写当前版本）：4 字节 LE 版本号 +
-/// 每条目 [u32 LE 路径字节长][UTF-8 路径][f64 LE rank][u64 LE last_accessed][u32 LE note 字节长][UTF-8 note]。
-/// 两趟：先精确算大小预分配（百万条目级逐字节 push 的倍增拷贝是可测开销），再按下标填充
+/// Encode (always writing the current version): a 4-byte LE version number +
+/// per entry [u32 LE path byte length][UTF-8 path][f64 LE rank][u64 LE last_accessed][u32 LE note byte length][UTF-8 note].
+/// Two passes: compute the exact size and pre-allocate first (the doubling copies of a million-entry byte-by-byte push are a measurable cost), then fill by index
 pub fn encode(dirs : Array[Dir]) -> Bytes {
   let mut size = 4
   for dir in dirs {
@@ -86,8 +86,8 @@ pub fn encode(dirs : Array[Dir]) -> Bytes {
 }
 
 ///|
-/// 解码：校验总长/版本号/条目边界/UTF-8 合法性，任何不规则字节拒绝为 CorruptedData。
-/// 无条目数前缀，按「读满即停」解析，尾部多余字节若凑不成完整条目即报错。
+/// Decode: validate the total length, version, entry boundaries and UTF-8 validity; any irregular byte is rejected as CorruptedData.
+/// There is no entry-count prefix, so parsing runs "until the data is consumed"; trailing extra bytes that cannot form a complete entry are an error.
 pub fn decode(bytes : Bytes) -> Result[Array[Dir], CodecError] {
   let len = bytes.length()
   if len > MAX_SIZE {
@@ -108,7 +108,7 @@ pub fn decode(bytes : Bytes) -> Result[Array[Dir], CodecError] {
     }
     let path_len = get_u32(bytes, pos)
     pos += 4
-    // path_len 按有符号 Int 读出，0xFFFFFFFF 这类字节序列会成为负数，必须一并拒绝
+    // path_len is read as a signed Int, so a byte sequence like 0xFFFFFFFF becomes negative and must be rejected too
     if path_len < 0 || path_len > len - pos {
       return Err(CorruptedData)
     }
@@ -128,7 +128,7 @@ pub fn decode(bytes : Bytes) -> Result[Array[Dir], CodecError] {
     }
     let last_accessed = get_u64(bytes, pos).reinterpret_as_int64()
     pos += 8
-    // v2 条目尾部带 note（长度 0 = None）；v1 无此字段，读作 None
+    // a v2 entry carries a trailing note (length 0 = None); v1 has no such field and reads as None
     let note : String? = if version == 1 {
       None
     } else {
@@ -158,7 +158,7 @@ pub fn decode(bytes : Bytes) -> Result[Array[Dir], CodecError] {
 }
 
 ///|
-/// u32 小端写入（预分配缓冲按下标填）
+/// Write a little-endian u32 (filling the pre-allocated buffer by index)
 fn put_u32(buf : Array[Byte], pos : Int32, v : Int32) -> Unit {
   for k in 0..<4 {
     buf[pos + k] = ((v >> (8 * k)) & 0xFF).to_byte()
@@ -166,7 +166,7 @@ fn put_u32(buf : Array[Byte], pos : Int32, v : Int32) -> Unit {
 }
 
 ///|
-/// u64 小端写入（预分配缓冲按下标填）
+/// Write a little-endian u64 (filling the pre-allocated buffer by index)
 fn put_u64(buf : Array[Byte], pos : Int32, v : UInt64) -> Unit {
   for k in 0..<8 {
     buf[pos + k] = ((v >> (8 * k)) & 255UL).to_int().to_byte()
@@ -174,7 +174,7 @@ fn put_u64(buf : Array[Byte], pos : Int32, v : UInt64) -> Unit {
 }
 
 ///|
-/// u32 小端读取
+/// Read a little-endian u32
 fn get_u32(bytes : Bytes, pos : Int32) -> Int32 {
   let mut v = 0
   for k in 0..<4 {
@@ -184,7 +184,7 @@ fn get_u32(bytes : Bytes, pos : Int32) -> Int32 {
 }
 
 ///|
-/// u64 小端读取
+/// Read a little-endian u64
 fn get_u64(bytes : Bytes, pos : Int32) -> UInt64 {
   let mut v = 0UL
   for k in 0..<8 {

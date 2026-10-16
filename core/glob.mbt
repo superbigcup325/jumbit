@@ -7,8 +7,8 @@ pub(all) enum GlobError {
 } derive(Debug, Eq)
 
 ///|
-/// 校验 glob 合法性（对齐 Rust glob crate 的构造期错误）：
-/// 未闭合 `[`、空类 `[]`/`[!]`、倒序区间 `[z-a]`、以 `\` 结尾均为非法。
+/// Validate a glob (matching the Rust glob crate\'s construction-time errors):
+/// an unterminated `[`, an empty class `[]`/`[!]`, a reversed range `[z-a]` and a trailing `\` are all illegal.
 pub fn validate_glob(pattern : String) -> GlobError? {
   let chars = pattern.to_array()
   let n = chars.length()
@@ -58,26 +58,26 @@ pub fn validate_glob(pattern : String) -> GlobError? {
 }
 
 ///|
-/// glob 匹配（pattern 须先过 validate_glob）。
-/// 语义对齐 Rust glob crate 默认 MatchOptions（require_literal_separator=false，
-/// 上游 _ZO_EXCLUDE_DIRS 即此配置）：`*` 与 `**` 跨分隔符匹配任意序列、
-/// `?` 匹配任意单字符（含分隔符）、`[...]` 同理；`\` 转义下一字符按字面量匹配；
-/// `{a,b}` 不支持，视为字面量（与上游差异，README 注明）。
+/// Glob matching (the pattern must have passed validate_glob first).
+/// Semantics match the Rust glob crate\'s default MatchOptions (require_literal_separator=false, which is what
+/// upstream _ZO_EXCLUDE_DIRS uses): `*` and `**` cross separators matching any sequence,
+/// `?` matches any single character including separators, as does `[...]`; `\` escapes the next character into a literal match;
+/// `{a,b}` is unsupported and treated literally (a difference from upstream, noted in the README).
 pub fn glob_match(pattern : String, path : String) -> Bool {
   glob_match_compiled(pattern.to_array(), path)
 }
 
 ///|
-/// pattern 编译：字符序列只做一次 to_array，供同一 pattern 反复匹配时复用
-/// （查询流对全库条目逐个过 exclude glob，分配是主要开销）。
+/// Pattern compilation: the character sequence is turned into an array once, reused across repeated matches of the same pattern
+/// (the query flow runs every entry in the database through the exclude globs, so allocation is the main cost).
 fn compile_glob(pattern : String) -> Array[Char] {
   pattern.to_array()
 }
 
 ///|
-/// 编译后的 glob 匹配：迭代式双指针 + 单星回溯点，布尔语义与逐字符递归的
-/// 完全回溯搜索等价——星号可吞任意字符（含分隔符，glob crate 默认语义），
-/// 贪心最右星回溯可探索全部可行分解。无递归、无分配（path 走 codeunit 索引）。
+/// Matching a compiled glob: an iterative two-pointer walk with a single-star backtrack point, whose boolean semantics equal a
+/// per-character full-backtracking search -- a star may swallow any character (separators included, the glob crate\'s default), and
+/// greedy backtracking to the rightmost star explores every feasible split. No recursion, no allocation (the path is indexed by code unit).
 fn glob_match_compiled(p : Array[Char], s : String) -> Bool {
   let pn = p.length()
   let sn = s.length()
@@ -89,7 +89,7 @@ fn glob_match_compiled(p : Array[Char], s : String) -> Bool {
     if pi < pn {
       let c = p[pi].to_int()
       if c == 42 {
-        // '*'：记录回溯点，先按零消耗续配
+        // '*': record the backtrack point, then continue matching with zero consumption
         star_pi = pi
         star_si = si
         pi += 1
@@ -104,7 +104,7 @@ fn glob_match_compiled(p : Array[Char], s : String) -> Bool {
       }
     }
     if star_pi >= 0 {
-      // 回溯：最近一个 `*` 多吞一个字符（任意字符，含分隔符）
+      // backtrack: the most recent `*` swallows one more character (any character, separators included)
       star_si += 1
       si = star_si
       pi = star_pi + 1
@@ -119,10 +119,10 @@ fn glob_match_compiled(p : Array[Char], s : String) -> Bool {
 }
 
 ///|
-/// 单字符 token 匹配（`*` 之外）：sc 为 s[si] 的 codeunit 值，返回 pattern
-/// 侧推进位置；不匹配返回 None。token 语义对齐 glob crate 默认选项：
-/// `?` 与 `[...]` 匹配任意单字符（含分隔符）；`\x` 按字面量（含分隔符）；
-/// 字面量 token 在 Windows 下与 path 侧分隔符等价匹配
+/// Single-character token matching (everything but `*`): sc is the code-unit value of s[si]; returns the pattern\'s
+/// advance position, or None on no match. Token semantics match the glob crate\'s default options:
+/// `?` and `[...]` match any single character including separators; `\x` is the literal (separators included);
+/// a literal token matches equivalent separators on the path side under Windows
 fn match_single(p : Array[Char], pi : Int32, sc : Int32) -> Int32? {
   let pn = p.length()
   let c = p[pi].to_int()
@@ -174,7 +174,7 @@ fn match_single(p : Array[Char], pi : Int32, sc : Int32) -> Int32? {
 }
 
 ///|
-/// 校验 + 匹配一步到位（exclude 配置入口用）
+/// Validate and match in one step (for the exclude-config entry point)
 pub fn glob_matches(pattern : String, path : String) -> Result[Bool, GlobError] {
   match validate_glob(pattern) {
     Some(e) => Err(e)

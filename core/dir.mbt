@@ -17,8 +17,8 @@ pub const WEEK : Int64 = 7L * DAY
 pub const MONTH : Int64 = 30L * DAY
 
 ///|
-/// 单条目录记录：path/rank/last_accessed 三字段对齐上游 src/db/dir.rs；
-/// note 为 jumbit 扩展（describe 的人工标注，v2 格式起持久化，None 编码为空）
+/// One directory record: the three fields path/rank/last_accessed match upstream src/db/dir.rs;
+/// note is a jumbit extension (the describe annotation, persisted from the v2 format on, encoded as empty for None)
 pub(all) struct Dir {
   mut path : String
   mut rank : Double
@@ -27,12 +27,12 @@ pub(all) struct Dir {
 } derive(Debug)
 
 ///|
-/// frecency 得分 = rank × 时间衰减系数（Epoch 单位：秒）
-/// 衰减档位：<1h ×4.0 / <1d ×2.0 / <1w ×0.5 / 其余 ×0.25
+/// Frecency score = rank x the time-decay factor (epoch units: seconds)
+/// Decay buckets: <1h x4.0 / <1d x2.0 / <1w x0.5 / otherwise x0.25
 pub fn Dir::score(self : Dir, now : Int64) -> Double {
-  // 衰减间隔对齐上游的 u64 saturating_sub 语义（zoxide 0.10.0 对拍实测）：
-  // last_accessed 为负（1969 边界：i64 域 -1 = u64 域极大值）或未来时间戳时，
-  // u64 域比较下溢饱和为 0 → 落 <1h ×4.0 档，而非 i64 直减得到的大数
+  // the decay interval matches upstream\'s u64 saturating_sub semantics (measured against zoxide 0.10.0):
+  // when last_accessed is negative (the 1969 boundary: -1 in the i64 domain is the maximum in the u64 domain) or in the future,
+  // a u64-domain comparison underflows and saturates to 0 -> the <1h x4.0 bucket, not the large number a straight i64 subtraction would give
   let now_u = now.reinterpret_as_uint64()
   let la_u = self.last_accessed.reinterpret_as_uint64()
   let duration = if now_u >= la_u {
@@ -52,17 +52,17 @@ pub fn Dir::score(self : Dir, now : Int64) -> Double {
 }
 
 ///|
-/// 得分显示：clamp 到 0..9999，总宽 6、1 位小数（对齐上游 `{score:>6.1}`）
-/// 例：40.0 → "  40.0"，9999.95 → "9999.0"（clamp），-1.0 → "   0.0"
+/// Score display: clamped to 0..9999, total width 6 with one decimal (matching upstream `{score:>6.1}`)
+/// Examples: 40.0 -> "  40.0", 9999.95 -> "9999.0" (clamped), -1.0 -> "   0.0"
 pub fn Dir::format_score(self : Dir, now : Int64) -> String {
   let s = self.score(now).clamp(min=0.0, max=9999.0)
-  // Rust {:.1} 对 NaN 显示 "NaN"（:>6.1 即右对齐 6 宽）；NaN 可经 import 的
-  // nan/inf 字面量或 inf+(-inf) 聚合进入库
+  // Rust\'s {:.1} shows NaN as "NaN" (:>6.1 being right-aligned width 6); a NaN can enter the database through import\'s
+  // nan/inf literals or an inf+(-inf) aggregation
   if s.is_nan() {
     return "   NaN"
   }
-  // 舍入对齐 Rust {:.1}（半界取偶，round-half-to-even）：
-  // 精确半界（如陈旧条目 1.0×0.25=0.25）→ 0.2 而非 0.3
+  // rounding matches Rust\'s {:.1} (round-half-to-even):
+  // an exact half boundary (e.g. a stale entry at 1.0x0.25=0.25) -> 0.2, not 0.3
   let m = s * 10.0
   let fl = m.floor()
   let frac = m - fl
