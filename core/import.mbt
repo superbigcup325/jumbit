@@ -1,17 +1,17 @@
 ///|
-/// 导入插件的行解析（对齐上游 src/import/ 各模块的 parse_line；纯函数，I/O 在 platform）
-/// 三种数据格式：
-/// - z 系（z / zsh-z / fasd / z.lua）：`path|rank|last_accessed`
-/// - autojump：`rank\tpath`（rank 过 sigmoid 归一）
+/// Line parsing for the import plugins (matching parse_line in upstream src/import/; pure functions, I/O lives in platform)
+/// Three data formats:
+/// - the z family (z / zsh-z / fasd / z.lua): `path|rank|last_accessed`
+/// - autojump: `rank\tpath` (the rank sigmoid-normalized)
 /// - atuin：`YYYY-MM-DD HH:MM:SS\tpath`（UTC，rank=1.0）
-/// 坏行返回 Err(原因) 由调用方按 `<来源>:<行号>: <原因>` 上报，不中止整批导入。
+/// A bad row returns Err(reason), which the caller reports as `<source>:<line>: <reason>` without aborting the whole import.
 
 ///|
-/// z 系格式：从右往左切 3 段（rsplitn 语义），路径可含 `|`；
-/// last_accessed 为非负整数（上游 u64，负数拒为坏行），rank 任意浮点（可为负）。
-/// 注意：不做 trim——空白属于路径的一部分（上游原样保留）。
+/// The z-family format: split into three fields right to left (rsplitn semantics); the path may contain `|`;
+/// last_accessed is a non-negative integer (upstream u64; a negative one is a bad row) and rank is any float (it may be negative).
+/// Note: no trimming -- whitespace is part of the path (upstream keeps it as is).
 pub fn parse_z_line(line : String) -> Result[Dir, String] {
-  // 坏行消息惰性构造：成功路（绝大多数行）不再为每行预分配错误串
+  // bad-row messages are built lazily: the success path (the vast majority of lines) no longer pre-allocates an error string per line
   fn bad() -> Result[Dir, String] {
     Err("invalid entry: \{line}")
   }
@@ -19,9 +19,9 @@ pub fn parse_z_line(line : String) -> Result[Dir, String] {
     Some(i) => i
     None => return bad()
   }
-  // 上游按 u64 解析（0..=2^64-1，前导 + 合法，溢出/负数拒为坏行）；位模式
-  // 经 i64 字段原样保存（u64::MAX 即 i64 的 -1），下游 score/dedup 已按
-  // u64 域比较（0.10.0 对拍实测：u64::MAX 接受且落 ×4 档）
+  // upstream parses as u64 (0..=2^64-1, a leading + is legal, overflow and negatives are bad rows); the bit pattern
+  // is stored as is in an i64 field (u64::MAX is -1 in i64), and the downstream score/dedup already compare in the
+  // u64 domain (measured against 0.10.0: u64::MAX is accepted and lands in the x4 bucket)
   let la_str = line[p1 + 1:]
   let la_body = if la_str.has_prefix("+") { la_str[1:] } else { la_str }
   let last_accessed : UInt64 = @string.parse_uint64(la_body) catch {
@@ -45,8 +45,8 @@ pub fn parse_z_line(line : String) -> Result[Dir, String] {
 }
 
 ///|
-/// autojump 格式：首个 \t 切两段，左 rank 右路径（路径可含 \t）；
-/// autojump 打分体系与 zoxide 差异大，rank 过 sigmoid 归一到 (0,1)，last_accessed=0。
+/// The autojump format: split at the first \t, rank on the left and path on the right (the path may contain \t);
+/// autojump\'s scoring differs greatly from zoxide\'s, so the rank is sigmoid-normalized into (0,1) and last_accessed is 0.
 pub fn parse_autojump_line(line : String) -> Result[Dir, String] {
   let t = match line.find("\t") {
     Some(i) => i
@@ -56,7 +56,7 @@ pub fn parse_autojump_line(line : String) -> Result[Dir, String] {
   let rank = match parse_f64(rank_str) {
     Ok(v) => v
     Err(_) => {
-      // 对齐上游 anyhow 消息的 Rust ParseFloatError Display 后缀
+      // matches the Rust ParseFloatError Display suffix in upstream\'s anyhow message
       let reason = if rank_str == "" {
         "cannot parse float from empty string"
       } else {
@@ -74,8 +74,8 @@ pub fn parse_autojump_line(line : String) -> Result[Dir, String] {
 }
 
 ///|
-/// atuin 格式：首个 \t 切两段，左时间戳右路径；
-/// 时间戳为 atuin 渲染的 UTC `YYYY-MM-DD HH:MM:SS`（上游 assume_utc）。
+/// The atuin format: split at the first \t, timestamp on the left and path on the right;
+/// the timestamp is atuin\'s rendered UTC `YYYY-MM-DD HH:MM:SS` (upstream assume_utc).
 pub fn parse_atuin_line(line : String) -> Result[Dir, String] {
   let t = match line.find("\t") {
     Some(i) => i
@@ -95,18 +95,18 @@ pub fn parse_atuin_line(line : String) -> Result[Dir, String] {
 }
 
 ///|
-/// 带定位的解析条目：location 供错误上报拼 `<来源>:<行号>`（atuin 无文件来源时
-/// 调用方传 `line <N>`），与条目绑定后可整体过折叠器（上游 ImportError 同构）
+/// A parsed entry carrying its location: the caller builds `<source>:<line>` for error reporting (with no file source for atuin it
+/// passes `line <N>`); bound to the entry, it can go through the folder as a whole (isomorphic to upstream ImportError)
 pub(all) struct LocatedDir {
   location : String
   result : Result[Dir, String]
 } derive(Debug)
 
 ///|
-/// atuin 导入的连续同路径折叠（对齐上游 src/import/atuin.rs Iter 的 prev_cwd）：
-/// shell 历史按命令序排列，连住一个目录的多条记录只算一次转换，连续重复仅保留
-/// 首次；Err 原样透传且不更新折叠链（上游错误路径不改 prev_cwd），空记录由调用方
-/// 在解析前跳过、同样不影响链
+/// Consecutive same-path folding for an atuin import (matching prev_cwd in upstream src/import/atuin.rs Iter):
+/// shell history is ordered by command, and several records staying in one directory count as one transition, so consecutive
+/// repeats keep only the first; an Err passes through as is and does not update the folding chain (upstream\'s error path leaves prev_cwd), and an empty record is skipped by the caller
+/// before parsing, also without affecting the chain
 pub fn collapse_consecutive(items : Array[LocatedDir]) -> Array[LocatedDir] {
   let out : Array[LocatedDir] = []
   let mut prev : String? = None
@@ -130,18 +130,18 @@ pub fn collapse_consecutive(items : Array[LocatedDir]) -> Array[LocatedDir] {
 }
 
 ///|
-/// sigmoid：autojump rank 归一（对齐上游 import/autojump.rs sigmoid）
+/// The sigmoid: autojump rank normalization (matching upstream import/autojump.rs sigmoid)
 fn sigmoid(x : Double) -> Double {
   1.0 / (1.0 + @math.exp(-x))
 }
 
 ///|
-/// 时间戳错误原因（对齐上游 time crate 解析 + anyhow {:#} 链式 Display；
-/// 每类消息的真值经与 zoxide 0.10.0 对拍实测）：
-/// - 组件非数字/超出字面范围 → "the 'X' component could not be parsed"（链两层）
-/// - day 符合 1..=31 但超出当月长度（闰日）→ "day was not in range"（链三层）
-/// - 固定布局分隔符错 → "a character literal was not valid"（链两层）
-/// - 前 19 位合法但尾部有多余字符 → "unexpected trailing characters; ..."（链两层）
+/// Timestamp error reasons (matching upstream\'s time-crate parsing plus anyhow\'s `{:#}` chained Display;
+/// each message\'s true wording was measured against zoxide 0.10.0):
+/// - a component that is not numeric or out of its literal range -> "the 'X' component could not be parsed" (two links in the chain)
+/// - a day within 1..=31 but past that month\'s length (a leap day) -> "day was not in range" (three links)
+/// - a wrong separator in the fixed layout -> "a character literal was not valid" (two links)
+/// - the first 19 characters valid but with trailing characters -> "unexpected trailing characters; ..." (two links)
 pub(all) enum AtuinTsError {
   Component(String)
   CharLiteral
@@ -165,13 +165,13 @@ fn atuin_ts_message(ts : String, reason : AtuinTsError) -> String {
 }
 
 ///|
-/// 解析 `YYYY-MM-DD HH:MM:SS`（19 字符固定布局、UTC）→ Unix 秒。
-/// 逐位置状态机复刻上游 time crate 的解析顺序：位置靠前的组件先报错；
-/// 数字段即时做字面范围校验，全部通过后再做当月长度/闰年校验（DayRange）。
+/// Parse `YYYY-MM-DD HH:MM:SS` (a fixed 19-character layout, UTC) -> Unix seconds.
+/// A position-by-position state machine reproduces the upstream time-crate parsing order: an earlier component errors first;
+/// a numeric field is range-checked against its literal bounds immediately, and only once all pass does the month-length/leap-year check run (DayRange).
 fn parse_atuin_timestamp(ts : String) -> Result[Int64, AtuinTsError] {
   let names = ["year", "month", "day", "hour", "minute", "second"]
   let widths = [4, 2, 2, 2, 2, 2]
-  // 分隔符 UTF-16 码元：'-','=45、' '=32、':'=58（String 索引返回码元）
+  // separator UTF-16 code units: '-','=45, ' '=32, ':'=58 (a String index returns code units)
   let seps : Array[UInt16] = [45, 45, 32, 58, 58, 58]
   let vals : Array[Int32] = []
   let mut pos = 0
@@ -189,7 +189,7 @@ fn parse_atuin_timestamp(ts : String) -> Result[Int64, AtuinTsError] {
       v = v * 10 + (c.to_int() - 48)
       pos += 1
     }
-    // 字面范围（组件级）：解析完本段立即校验（上游按组件顺序即时失败）
+    // literal range (per component): validated as soon as this field is parsed (upstream fails per component in order)
     match seg {
       1 => if v < 1 || v > 12 { return Err(Component(names[seg])) }
       3 => if v > 23 { return Err(Component(names[seg])) }
@@ -236,8 +236,8 @@ fn is_leap_year(year : Int32) -> Bool {
 }
 
 ///|
-/// 公历日期 → 自 1970-01-01 起的天数（Howard Hinnant days_from_civil 算法，
-/// 除法向零截断与 Int 语义一致；范围仅处理 0000-9999 年，溢出无需 Int64）
+/// A Gregorian date -> days since 1970-01-01 (Howard Hinnant\'s days_from_civil algorithm; truncating division
+/// toward zero matches Int semantics; only years 0000-9999 are handled, so the overflow needs no Int64)
 fn days_from_civil(year : Int32, month : Int32, day : Int32) -> Int64 {
   let y = if month <= 2 { year - 1 } else { year }
   let era = (if y >= 0 { y } else { y - 399 }) / 400

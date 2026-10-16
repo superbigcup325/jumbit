@@ -1,6 +1,6 @@
 ///|
-/// ASCII 大写预扫：to_lower 仅做 ASCII 归一（见 filter_by_keywords 注），
-/// 路径无 ASCII 大写时可免小写化分配。非 ASCII 字节两路都不动，判定严格等价
+/// An ASCII uppercase pre-scan: to_lower normalizes ASCII only (see the note on filter_by_keywords), so
+/// a path with no ASCII uppercase skips the lowercase allocation. Non-ASCII bytes are untouched either way, so the outcome is strictly equivalent
 fn has_ascii_upper(s : String) -> Bool {
   for i in 0..<s.length() {
     let c = s[i]
@@ -12,9 +12,9 @@ fn has_ascii_upper(s : String) -> Bool {
 }
 
 ///|
-/// 路径小写归一（等价 normalize_separators(path.to_lower())，无 ASCII 大写
-/// 时零分配）：query 逐条目热路上的主要分配源；Windows 下 '\' 归一另计
-/// （normalize_separators 内部自判，无反斜杠同样免分配）
+/// Lowercase normalization of a path (equivalent to normalize_separators(path.to_lower()); with no ASCII uppercase
+/// it allocates nothing): the main allocation source on query's per-entry hot path; the '\\' normalization is counted separately
+/// (normalize_separators decides internally, and a path with no backslash also avoids the allocation)
 fn path_lower(path : String) -> String {
   if has_ascii_upper(path) {
     normalize_separators(path.to_lower())
@@ -24,11 +24,11 @@ fn path_lower(path : String) -> String {
 }
 
 ///|
-/// 关键词预小写（一次）：调用方（stream 每查询一次）先归一关键词数组，
-/// 逐条目匹配不再重复分配
+/// Pre-lowercase the keywords (once): the caller (stream, once per query) normalizes the keyword array first, so
+/// per-entry matching never allocates again
 fn keywords_lower(keywords : Array[String]) -> Array[String] {
-  // 全小写（最常见形态）直接返回原数组零分配：to_lower 仅 ASCII 归一，
-  // 无 ASCII 大写时关键词本就无需变更，非 ASCII 大写两路同样不归一
+  // all-lowercase (the most common shape) returns the original array with zero allocation: to_lower normalizes ASCII only,
+  // so with no ASCII uppercase the keywords need no change, and non-ASCII uppercase is left alone either way
   for kw in keywords {
     if has_ascii_upper(kw) {
       let out : Array[String] = []
@@ -42,13 +42,13 @@ fn keywords_lower(keywords : Array[String]) -> Array[String] {
 }
 
 ///|
-/// 关键词匹配（对齐上游 src/db/stream.rs filter_by_keywords）：
-/// 1. 关键词与路径先做大小写归一（`to_lower` 仅 ASCII；上游为 Unicode 全量，
-///    全角/西里尔等不归一——已知差异，README 注明）
-/// 2. 最后一个关键词取**最右**命中点，且命中点右侧到路径末尾不得再出现分隔符
-///    （末组件锚定）
-/// 3. 其余关键词从右往左逐个消耗，命中区间不许重叠
-/// 空关键词数组恒为 true。
+/// Keyword matching (matching upstream src/db/stream.rs filter_by_keywords):
+/// 1. the keywords and the path are case-normalized first (`to_lower` is ASCII only; upstream folds the full Unicode
+///    range, so full-width and Cyrillic are not folded here -- a known difference, noted in the README)
+/// 2. the last keyword takes its **rightmost** hit, and no separator may appear between that hit and the end of the path
+///    (final-component anchoring)
+/// 3. the earlier keywords are consumed right-to-left, one by one, without overlapping hit ranges
+/// An empty keyword array is always true.
 pub fn filter_by_keywords(keywords : Array[String], path : String) -> Bool {
   if keywords.is_empty() {
     return true
@@ -57,8 +57,8 @@ pub fn filter_by_keywords(keywords : Array[String], path : String) -> Bool {
 }
 
 ///|
-/// 匹配内核：keywords 与 path 均已小写归一。逐条目热路由 stream 层预归一
-/// 关键词后调用，本函数体内零分配
+/// The matching core: keywords and path are already lowercase-normalized. The per-entry hot path is called by the stream
+/// layer after pre-normalizing the keywords, and this body allocates nothing
 fn filter_by_keywords_lower(keywords : Array[String], path : String) -> Bool {
   if keywords.is_empty() {
     return true
@@ -83,10 +83,10 @@ fn filter_by_keywords_lower(keywords : Array[String], path : String) -> Bool {
 }
 
 ///|
-/// 模糊关键词匹配（jumbit 扩展，上游无此语义；README 注明）：
-/// 全部关键词（ASCII 小写归一，与 filter_by_keywords 一致）各自命中至少一个
-/// 路径组件的子串即通过——不限末组件、关键词间无序且允许同组件。
-/// 仅作 `query --fuzzy` 的精确零命中兜底路，不进入默认语义；空数组恒 true。
+/// Fuzzy keyword matching (a jumbit extension with no upstream equivalent; noted in the README):
+/// every keyword (ASCII-lowercase normalized, as in filter_by_keywords) must hit at least one
+/// path component as a substring to pass -- no final-component anchoring, order-free, and the same component may be reused.
+/// Only the exact-miss fallback for `query --fuzzy`, never default semantics; an empty array is always true.
 pub fn filter_by_keywords_fuzzy(
   keywords : Array[String],
   path : String,
