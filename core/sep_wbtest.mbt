@@ -1,12 +1,12 @@
-// 平台分隔符层测试（sep.mbt）：cfg 对称双组，各平台跑各自的断言组。
-// 语义权威 = std::path::is_separator + glob crate（lib.rs:1050 分隔符互等），
-// 上游 stream.rs:90 同源。注意 pattern 侧 '\' 恒为转义字符（与平台无关），
-// Windows 形态 pattern 一律用正斜杠书写
+// Platform separator-layer tests (sep.mbt): two cfg-symmetric groups, each platform running its own assertions.
+// The semantic authority = std::path::is_separator plus the glob crate (separator equivalence at lib.rs:1050),
+// the same origin as upstream stream.rs:90. Note that a '\' on the pattern side is always an escape (platform-independent), so
+// a Windows-shaped pattern is always written with forward slashes
 
 ///|
-// POSIX 组：Windows 构建不编译（双认语义下 92 也是分隔符，断言不成立）
+// The POSIX group: not compiled in a Windows build (under double-recognition 92 is a separator too, so the assertion would not hold)
 #cfg(not(platform="windows"))
-test "posix：is_path_separator 仅 '/'，归一恒等" {
+test "posix: is_path_separator is only '/', normalization is the identity" {
   assert_eq(is_path_separator(47), true) // '/'
   assert_eq(is_path_separator(92), false) // '\'
   assert_eq(normalize_separators("C:\\a\\b"), "C:\\a\\b")
@@ -15,33 +15,33 @@ test "posix：is_path_separator 仅 '/'，归一恒等" {
 }
 
 ///|
-// Windows 组：反斜杠库内路径的全链路语义
+// The Windows group: the full-chain semantics of backslash paths in the database
 #cfg(platform="windows")
-test "win32：is_path_separator 双认与归一" {
+test "win32: is_path_separator recognises both, and normalization" {
   assert_eq(is_path_separator(47), true)
   assert_eq(is_path_separator(92), true)
   assert_eq(normalize_separators("C:\\a\\b"), "C:/a/b")
-  // 关键词末组件锚定：反斜杠库内路径按平台分隔符判定
+  // keyword final-component anchoring: a backslash path in the database is judged by the platform separator
   assert_eq(filter_by_keywords(["user", "work"], "C:\\home\\user\\work"), true)
   assert_eq(filter_by_keywords(["work", "user"], "C:\\home\\user\\work"), false)
-  // fuzzy 组件子串：反斜杠组件化
+  // fuzzy component substrings: the backslash splits components
   assert_eq(filter_by_keywords_fuzzy(["ork"], "C:\\home\\user\\work"), true)
 }
 
 ///|
 #cfg(platform="windows")
-test "win32：glob 通配跨分隔符与字面量等价" {
-  // pattern 侧 '\' 恒为转义字符，Windows 形态 pattern 用正斜杠书写
-  // '*' 跨分隔符（glob crate 默认 require_literal_separator=false；
-  // 旧实现拦截分隔符时本用例为 #skip 悬案，对齐默认语义后悬案消解）
+test "win32: glob wildcards cross separators, and literal equivalence" {
+  // a backslash on the pattern side is always an escape, so a Windows-shaped pattern uses forward slashes
+  // '*' crosses separators (the glob crate default require_literal_separator=false;
+  // while the old implementation blocked separators this case was a #skip open question, dissolved once the default semantics were adopted)
   assert_eq(glob_match("C:/*", "C:\\a\\b"), true)
   assert_eq(glob_match("C:/*/*", "C:\\a\\b"), true)
-  // pattern 侧字面 '/' 等价匹配 path 侧 '\'（glob crate Windows 同款）
+  // a literal '/' on the pattern side matches a backslash on the path side (the glob crate's Windows behaviour)
   assert_eq(glob_match("C:/home/*", "C:\\home\\user"), true)
   assert_eq(glob_match("C:/home/*", "C:\\home\\a\\b"), true)
-  // '?' 与 [...] 匹配任意单字符（含分隔符 '\\'）
+  // '?' and [...] match any single character (the separator included)
   assert_eq(glob_match("C:/?ome", "C:\\home"), true)
-  // starts_with 组件级前缀（反斜杠形态）
+  // starts_with is a component-level prefix (backslash form)
   assert_eq(starts_with("C:\\foo\\bar\\baz", "C:\\foo\\bar"), true)
   assert_eq(starts_with("C:\\foo\\ba", "C:\\foo\\bar"), false)
 }

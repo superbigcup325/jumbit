@@ -1,7 +1,7 @@
-// Stream 过滤链测试（exists 回调注入，不碰真实 FS）
+// Stream filter-chain tests (the exists callback is injected, so the real filesystem is never touched)
 
 ///|
-/// 构造测试选项：now 固定，其余给默认
+/// Build test options: now is fixed, the rest take defaults
 fn opts(
   now : Int64,
   keywords~ : Array[String] = [],
@@ -23,8 +23,8 @@ fn opts(
 }
 
 ///|
-/// exists 回调桩：固定返回 should_exist 并计数。
-/// 体内探测真实 async fs（结果丢弃）以满足 async 语义（无 async 调用的 async fn 是警告）。
+/// The exists callback stub: always returns should_exist and counts calls.
+/// The body probes the real async fs (discarding the result) to satisfy async semantics (an async fn with no async call is a warning).
 fn counting_exists(
   should_exist : Bool,
 ) -> (async (String) -> Bool, Array[Int32]) {
@@ -38,13 +38,13 @@ fn counting_exists(
 }
 
 ///|
-/// 不关心计数时的固定 exists 桩
+/// A fixed exists stub for when the count does not matter
 fn fixed_exists(should_exist : Bool) -> async (String) -> Bool {
   counting_exists(should_exist).0
 }
 
 ///|
-async test "exclude glob 命中即懒删除（复查库状态与 dirty）" {
+async test "an exclude glob hit is lazily deleted (re-checking the database state and dirty)" {
   let db = @core.Database::new()
   db.add("/a/x", 1.0, 0L)
   db.add("/b/y", 1.0, 0L)
@@ -58,11 +58,11 @@ async test "exclude glob 命中即懒删除（复查库状态与 dirty）" {
 }
 
 ///|
-async test "exists=false 且超 TTL → 懒删除" {
+async test "exists=false and past the TTL -> lazily deleted" {
   let db = @core.Database::new()
   db.add("/stale", 1.0, 0L)
   let (exists_fn, _) = counting_exists(false)
-  // now = 4 个月 → ttl = now - 3 个月 = 1 个月 > last_accessed(0)
+  // now = 4 months -> ttl = now - 3 months = 1 month > last_accessed(0)
   let o = opts(4L * @core.MONTH, exists=true)
   let hits = db.query_all(o, exists_fn)
   @debug.assert_eq(hits.length(), 0)
@@ -70,19 +70,19 @@ async test "exists=false 且超 TTL → 懒删除" {
 }
 
 ///|
-async test "exists=false 但近期访问 → 保留不删" {
+async test "exists=false but visited recently -> kept, not deleted" {
   let db = @core.Database::new()
   db.add("/recent", 1.0, 3L * @core.MONTH + 1L)
   let (exists_fn, _) = counting_exists(false)
   let o = opts(4L * @core.MONTH, exists=true)
   let hits = db.query_all(o, exists_fn)
-  // last_accessed(3 个月+1 秒) ≥ ttl(1 个月) → 不删但也不返回
+  // last_accessed (3 months + 1 second) >= ttl (1 month) -> not deleted, but not returned either
   @debug.assert_eq(hits.length(), 0)
   @debug.assert_eq(db.all().length(), 1)
 }
 
 ///|
-async test "单遍多次懒删除：exclude 连删多条，幸存者完整且倒序输出" {
+async test "several lazy deletions in one pass: exclude removes several, the survivors are intact and output descending" {
   let db = @core.Database::new()
   db.add("/a/x", 1.0, 0L)
   db.add("/b/y", 1.0, 0L)
@@ -91,7 +91,7 @@ async test "单遍多次懒删除：exclude 连删多条，幸存者完整且倒
   db.mark_clean()
   let o = opts(1000L, exclude=["/a/*", "/c/*"])
   let hits = db.query_all(o, fixed_exists(true))
-  // 倒序遍历 + swap_remove 交错：/keep 与 /b/y 幸存，且命中序从高到低
+  // reverse traversal interleaved with swap_remove: /keep and /b/y survive, and hits come highest first
   @debug.assert_eq(hits.length(), 2)
   @debug.assert_eq(hits[0].path, "/keep")
   @debug.assert_eq(hits[1].path, "/b/y")
@@ -102,7 +102,7 @@ async test "单遍多次懒删除：exclude 连删多条，幸存者完整且倒
 }
 
 ///|
-async test "exists=false 且多条超 TTL → 单遍全删，近期条目幸存" {
+async test "exists=false with several past the TTL -> all deleted in one pass, recent entries surviving" {
   let db = @core.Database::new()
   db.add("/s1", 1.0, 0L)
   db.add("/s2", 1.0, 0L)
@@ -116,9 +116,9 @@ async test "exists=false 且多条超 TTL → 单遍全删，近期条目幸存"
 }
 
 ///|
-async test "exists 回调在所有前置过滤之后才调用（exists 最慢放最后）" {
+async test "the exists callback runs only after every earlier filter (the slowest, so it goes last)" {
   let db = @core.Database::new()
-  db.add("/miss", 1.0, 0L) // 关键词不命中
+  db.add("/miss", 1.0, 0L) // the keyword does not hit
   db.add("/hit", 1.0, 0L)
   let (exists_fn, counter) = counting_exists(true)
   let o = opts(1000L, keywords=["hit"], exists=true)
@@ -128,22 +128,22 @@ async test "exists 回调在所有前置过滤之后才调用（exists 最慢放
 }
 
 ///|
-async test "关键词不命中时 exclude 不执行（不懒删）" {
+async test "exclude does not run on a keyword miss (no lazy deletion)" {
   let db = @core.Database::new()
   db.add("/a/x", 1.0, 0L)
   let o = opts(1000L, keywords=["zzz"], exclude=["/a/*"])
   let hits = db.query_all(o, fixed_exists(true))
   @debug.assert_eq(hits.length(), 0)
-  // 关键词先行短路，exclude 未触碰条目
+  // the keyword short-circuits first, so exclude never touches the entry
   @debug.assert_eq(db.all().length(), 1)
 }
 
 ///|
-async test "base_dir：组件级前缀（字符串前缀陷阱被排除）" {
+async test "base_dir: component-level prefix (the string-prefix trap is excluded)" {
   let db = @core.Database::new()
   db.add("/foo/bar/x", 1.0, 0L)
   db.add("/foo/baz/y", 1.0, 0L)
-  // 字符串前缀会误中 /foo/baz，组件前缀不会
+  // a string prefix would wrongly hit /foo/baz; a component prefix does not
   let o = opts(1000L, base_dir=Some("/foo/ba"))
   let hits = db.query_all(o, fixed_exists(true))
   @debug.assert_eq(hits.length(), 0)
@@ -154,7 +154,7 @@ async test "base_dir：组件级前缀（字符串前缀陷阱被排除）" {
 }
 
 ///|
-async test "query_all 顺序：得分从高到低" {
+async test "query_all order: highest score first" {
   let db = @core.Database::new()
   let now = 1788833590L
   db.add("/old", 1.0, now - 60L * @core.DAY)
@@ -167,7 +167,7 @@ async test "query_all 顺序：得分从高到低" {
 }
 
 ///|
-test "remove：删返回 true，重复删返回 false" {
+test "remove: a deletion returns true, a repeat returns false" {
   let db = @core.Database::new()
   db.add("/a", 1.0, 0L)
   db.add("/b", 1.0, 0L)
@@ -179,7 +179,7 @@ test "remove：删返回 true，重复删返回 false" {
 }
 
 ///|
-test "starts_with：组件级前缀语义" {
+test "starts_with: component-level prefix semantics" {
   @debug.assert_eq(@core.starts_with("/foo/bar/x", "/foo/bar"), true)
   @debug.assert_eq(@core.starts_with("/foo/bar/x", "/foo/ba"), false)
   @debug.assert_eq(@core.starts_with("/foo/bar", "/"), true)
@@ -188,9 +188,9 @@ test "starts_with：组件级前缀语义" {
 }
 
 ///|
-/// --fuzzy 兜底单趟收集：关键词全未命中时 out 空，链路通过集进 superset；
-/// glob 懒删对未命中条目同样生效（与原兜底二趟语义一致）
-async test "fuzzy_superset 收集：关键词未命中留链路通过集，glob 懒删同删" {
+/// --fuzzy\'s single-pass fallback collection: with no keyword hit, out is empty and the chain\'s through-set enters the superset;
+/// glob lazy deletion applies to non-hit entries too (matching the old second pass)
+async test "fuzzy_superset collection: a keyword miss keeps the chain\'s through-set, and glob lazy deletion still applies" {
   let db = @core.Database::new()
   db.add("/a/hit", 2.0, 0L)
   db.add("/b/two", 1.0, 0L)
@@ -201,7 +201,7 @@ async test "fuzzy_superset 收集：关键词未命中留链路通过集，glob 
     ..opts(1000L, keywords=["hit"], exclude=["/c/*"]),
     fuzzy_superset: Some(superset),
   }
-  // 关键词 "hit" 命中 /hit/one，其余两条进 superset（/del/three 先被 glob 懒删）
+  // the keyword "hit" hits /hit/one and the other two enter the superset (/del/three is lazily deleted by the glob first)
   let hits = db.query_all(o, fixed_exists(true))
   @debug.assert_eq(hits.length(), 1)
   @debug.assert_eq(hits[0].path, "/a/hit")
@@ -209,7 +209,7 @@ async test "fuzzy_superset 收集：关键词未命中留链路通过集，glob 
   @debug.assert_eq(superset[0].path, "/b/two")
   @debug.assert_eq(db.all().length(), 2)
   @debug.assert_eq(db.is_dirty(), true)
-  // 收集开启时精确命中路径的懒删行为不变
+  // with collection on, the lazy deletion on the exact-hit path is unchanged
   let superset2 : Array[@core.Dir] = []
   let o2 = { ..opts(1000L), fuzzy_superset: Some(superset2), }
   let hits2 = db.query_all(o2, fixed_exists(true))
