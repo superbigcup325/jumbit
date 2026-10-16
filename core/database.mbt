@@ -1,6 +1,6 @@
 ///|
-/// 数据库：条目数组 + dirty 标志（对齐上游 src/db/mod.rs；MoonBit 无借用约束，直接持数组）
-/// pub struct：外部可读字段但不可构造/原地修改，变更一律走方法（保 dirty 一致性）
+/// The database: an entry array plus a dirty flag (matching upstream src/db/mod.rs; MoonBit has no borrow constraints, so it holds the array directly)
+/// A pub struct: the fields are readable from outside but cannot be constructed or mutated in place, and every change goes through a method (keeping dirty consistent)
 pub struct Database {
   mut dirs : Array[Dir]
   mut dirty : Bool
@@ -12,25 +12,25 @@ pub fn Database::new() -> Database {
 }
 
 ///|
-/// 从解码结果构建（platform/load 专用；dirty=false）
+/// Build from a decode result (for platform/load only; dirty=false)
 pub fn Database::from_dirs(dirs : Array[Dir]) -> Database {
   { dirs, dirty: false, }
 }
 
 ///|
-/// rank 下限（上游 MIN_RANK=0.01：两位小数格式下不塌 0）
+/// The rank floor (upstream MIN_RANK=0.01: with two decimals it never collapses to 0)
 pub const RANK_MIN : Double = 0.01
 
 ///|
-/// rank 上限（上游 MAX_RANK=9_999_999.99）
+/// The rank ceiling (upstream MAX_RANK=9_999_999.99)
 pub const RANK_MAX : Double = 9999999.99
 
 ///|
-/// 非 finite 与越界 rank 的入库归一（[#3]）：nan / -inf → 下限，+inf → 上限，
-/// 有限值 clamp [RANK_MIN, RANK_MAX]。在入库口（add_update / add_unchecked）
-/// 执行而非编码层：老化以 total 参与分母，inf 混进 total 会把 factor 归零、
-/// rank 相乘成 NaN（黑盒实测归 0.01，与「inf 钳到上限」的文档口径相反）；
-/// 钳位前移后两条入库路（add/import）与手改库的物化保存路行为一致
+/// Import-time normalization of non-finite and out-of-range ranks ([#3]): nan / -inf -> the floor, +inf -> the ceiling,
+/// finite values clamped to [RANK_MIN, RANK_MAX]. It runs at the entry point (add_update / add_unchecked) rather than in
+/// the encoding layer: aging puts the total in the denominator, so an inf in the total zeroes the factor and multiplies rank
+/// into NaN (measured in a blackbox as landing on 0.01, the opposite of the documented "inf clamps to the ceiling");
+/// with the clamp moved forward, both import paths (add/import) and the hand-edited database\'s save path behave alike
 fn sanitize_rank(r : Double) -> Double {
   if r != r {
     RANK_MIN
@@ -44,8 +44,8 @@ fn sanitize_rank(r : Double) -> Double {
 }
 
 ///|
-/// 改路径（edit --rename 专用）：note/权重/时间全保留；new 撞既有条目返回
-/// false（不合并，调用方报错——语义裁定见规格 §1.4）
+/// Change a path (for edit --rename): the note, weight and time are all kept; if new collides with an existing entry it returns
+/// false (no merge; the caller errors -- the ruling is in spec §1.4)
 pub fn Database::rename(self : Database, old : String, new : String) -> Bool {
   match self.find_idx(old) {
     Some(i) => {
@@ -58,23 +58,23 @@ pub fn Database::rename(self : Database, old : String, new : String) -> Bool {
 }
 
 ///|
-/// 整库替换（edit 交互形态专用：编辑后的全量条目集替换现有集合；note 已由
-/// 调用方按 path 附着），置 dirty
+/// Replace the whole database (for edit\'s interactive form: the edited full entry set replaces the current one; the caller has
+/// already attached notes by path), marking dirty
 pub fn Database::replace_all(self : Database, dirs : Array[Dir]) -> Unit {
   self.dirs = dirs
   self.dirty = true
 }
 
 ///|
-/// 强制标脏（platform/load 迁移专用）：legacy db.zo 读入后置 dirty，下次
-/// save 落成明文 db.txt；只读命令不 save 故不触发迁移（规格 §1.3）
+/// Force a dirty mark (for platform/load\'s migration): after reading a legacy db.zo it marks dirty, so the next
+/// save lands as plaintext db.txt; a read-only command never saves, so it triggers no migration (spec §1.3)
 pub fn Database::mark_dirty(self : Database) -> Unit {
   self.dirty = true
 }
 
 ///|
-/// 增加权重：已存在则 rank 累加（负增量 clamp 到 0），不存在则新建。
-/// 与 add_update 的区别：不更新 last_accessed（上游语义）。
+/// Add weight: an existing entry accumulates the rank (a negative delta clamps to 0); otherwise a new entry is created.
+/// Unlike add_update it does not update last_accessed (upstream semantics).
 pub fn Database::add(
   self : Database,
   path : String,
@@ -98,7 +98,7 @@ pub fn Database::add(
 }
 
 ///|
-/// 增加权重并更新最后访问时间：已存在则 rank 累加 + last_accessed = now，不存在则新建。
+/// Add weight and update the last access time: an existing entry accumulates the rank and sets last_accessed = now; otherwise a new entry is created.
 pub fn Database::add_update(
   self : Database,
   path : String,
@@ -123,7 +123,7 @@ pub fn Database::add_update(
 }
 
 ///|
-/// 按 path 查条目下标（不存在返回 None）
+/// Look up an entry\'s index by path (None when absent)
 pub fn Database::find_idx(self : Database, path : String) -> Int32? {
   for i, d in self.dirs {
     if d.path == path {
@@ -134,7 +134,7 @@ pub fn Database::find_idx(self : Database, path : String) -> Int32? {
 }
 
 ///|
-/// 只读访问条目数组（返回副本：外部增删/排序不影响库内部结构）
+/// Read-only access to the entry array (a copy is returned, so external add/remove/sort cannot touch the internal structure)
 pub fn Database::all(self : Database) -> Array[Dir] {
   Array::from_iter(self.dirs.iter())
 }
@@ -145,7 +145,7 @@ pub fn Database::is_dirty(self : Database) -> Bool {
 }
 
 ///|
-/// 库是否无条目（import 的空库检查用，对齐上游 db.dirs().is_empty()）
+/// Whether the database has no entries (for import\'s empty-database check, matching upstream db.dirs().is_empty())
 pub fn Database::is_empty(self : Database) -> Bool {
   self.dirs.length() == 0
 }
@@ -156,19 +156,19 @@ pub fn Database::mark_clean(self : Database) -> Unit {
 }
 
 ///|
-/// 按得分升序原地排序（对齐上游：Stream 从尾部倒序取最高分）。
-/// 纯展示序不置脏：排序不是数据变更，query 据此保持「无懒删不落盘」
-/// （[#2]：此前无条件置脏让只读 query 每次都带脏退出，legacy 库被读时
-/// 迁移、只读数据目录直接查询失败）
+/// Sort in place by ascending score (matching upstream: Stream takes the highest score from the tail in reverse).
+/// A display-only order does not mark dirty: sorting is not a data change, which is how query keeps "no lazy deletion, no write"
+/// ([#2]: an unconditional dirty mark used to make every read-only query exit dirty, so a legacy database migrated when merely
+/// read and a query against a read-only data directory failed outright)
 pub fn Database::sort_by_score(self : Database, now : Int64) -> Unit {
   self.dirs.sort_by(fn(a, b) { total_cmp(a.score(now), b.score(now)) })
 }
 
 ///|
-/// IEEE 754 totalOrder 比较（对齐上游 f64::total_cmp 的位技巧）：
-/// 按 i64 位型折叠符号位后比较——+NaN 大于一切、-NaN 小于一切、-0.0 < +0.0。
-/// import 的 nan/inf 字面量会使 score 出现 NaN，上游排序因此把 NaN 条目排在
-/// 降序输出最前，普通 compare 做不到这一点
+/// IEEE 754 totalOrder comparison (matching the bit trick in upstream f64::total_cmp):
+/// compare after folding the sign bit onto the i64 bit pattern -- +NaN is above everything, -NaN below everything, -0.0 < +0.0.
+/// import\'s nan/inf literals can put a NaN in a score, which is why upstream\'s sort puts NaN entries at the very
+/// front of the descending output -- something an ordinary compare cannot do
 fn total_cmp(a : Double, b : Double) -> Int32 {
   let la = a.reinterpret_as_uint64()
   let lb = b.reinterpret_as_uint64()
@@ -180,7 +180,7 @@ fn total_cmp(a : Double, b : Double) -> Int32 {
 }
 
 ///|
-/// O(1) 删除指定下标（不保序，对齐上游 swap_remove）；懒删除专用
+/// O(1) removal at an index (order not preserved, matching upstream swap_remove); for lazy deletion only
 pub fn Database::swap_remove(self : Database, idx : Int32) -> Unit {
   let last = self.dirs.length() - 1
   self.dirs[idx] = self.dirs[last]
@@ -189,7 +189,7 @@ pub fn Database::swap_remove(self : Database, idx : Int32) -> Unit {
 }
 
 ///|
-/// 按路径删除条目，返回是否确实删除了
+/// Remove an entry by path, returning whether anything was removed
 pub fn Database::remove(self : Database, path : String) -> Bool {
   match self.find_idx(path) {
     Some(i) => {
@@ -201,7 +201,7 @@ pub fn Database::remove(self : Database, path : String) -> Bool {
 }
 
 ///|
-/// 新建条目且不查重（会产生重复，调用方需保证先查或随后 dedup；对齐上游 add_unchecked）
+/// Create an entry without a duplicate check (duplicates result; the caller must have checked first or must dedup afterwards; matching upstream add_unchecked)
 pub fn Database::add_unchecked(
   self : Database,
   path : String,
@@ -218,10 +218,10 @@ pub fn Database::add_unchecked(
 }
 
 ///|
-/// 纯字典序（对齐上游 path.cmp：内容逐码元优先，前缀短者在前）。
-/// 不能直接用 String::compare：MoonBit 实现为 shortlex（长度优先），
-/// 与上游 Rust String cmp 的字典序在混合长度路径集下条目序不同
-/// （实测分歧：同数据集 import 后 db 内首条目 jumbit=/opt/golf… vs 上游=/opt/alpha…）
+/// Pure lexicographic order (matching upstream path.cmp: content code unit by code unit, a prefix sorting before the longer string).
+/// String::compare cannot be used directly: MoonBit implements it as shortlex (length first), which orders entries
+/// differently from upstream Rust\'s lexicographic String cmp on a mixed-length path set
+/// (measured divergence: importing the same dataset left jumbit\'s first entry at /opt/golf... against upstream\'s /opt/alpha...)
 fn path_lex_cmp(a : String, b : String) -> Int32 {
   let la = a.length()
   let lb = b.length()
@@ -236,16 +236,16 @@ fn path_lex_cmp(a : String, b : String) -> Int32 {
 }
 
 ///|
-/// 按路径纯字典序原地排序（对齐上游 path.cmp 语义）
+/// Sort in place by pure lexicographic path order (matching upstream path.cmp semantics)
 pub fn Database::sort_by_path(self : Database) -> Unit {
   self.dirs.sort_by(fn(a, b) { path_lex_cmp(a.path, b.path) })
   self.dirty = true
 }
 
 ///|
-/// 老化（对齐上游 Database::age）：总分**严格大于** max_age 才触发
-/// （total=0 与 total==max_age 均不动，天然防除零）；全体 rank 乘
-/// factor = 0.9 × max_age / total，乘后 rank < 1 的条目删除。
+/// Aging (matching upstream Database::age): it fires only when the total is **strictly greater** than max_age
+/// (total=0 and total==max_age do nothing, which guards against division by zero); every rank is multiplied by
+/// factor = 0.9 x max_age / total, and any entry whose rank drops below 1 is deleted.
 pub fn Database::age(self : Database, max_age : Double) -> Unit {
   let mut total = 0.0
   for d in self.dirs {
@@ -265,16 +265,16 @@ pub fn Database::age(self : Database, max_age : Double) -> Unit {
 }
 
 ///|
-/// 合并重复路径：先按路径排序，相邻同路径条目 rank 相加、last_accessed 取最大
-/// （对齐上游 Database::dedup）；note 为 jumbit 扩展，一侧有值则保留（信息不丢）
+/// Merge duplicate paths: sort by path first, then add the ranks of adjacent same-path entries and take the maximum last_accessed
+/// (matching upstream Database::dedup); the note is a jumbit extension and a value on either side is kept (no information lost)
 pub fn Database::dedup(self : Database) -> Unit {
   self.sort_by_path()
   for i in self.dirs.length()>..1 {
     let curr = self.dirs[i]
     let prev = self.dirs[i - 1]
     if curr.path == prev.path {
-      // la 取 max 对齐上游 u64 域语义（Epoch = u64，0.10.0 对拍实测）：
-      // 负 epoch（1969 边界）在 u64 域是极大值，会在合并中胜出
+      // taking max for la matches upstream\'s u64-domain semantics (Epoch = u64, measured against 0.10.0):
+      // a negative epoch (the 1969 boundary) is the maximum in the u64 domain and wins the merge
       let prev_u = prev.last_accessed.reinterpret_as_uint64()
       let curr_u = curr.last_accessed.reinterpret_as_uint64()
       prev.last_accessed = if prev_u >= curr_u {
@@ -292,8 +292,8 @@ pub fn Database::dedup(self : Database) -> Unit {
 }
 
 ///|
-/// 设置条目标注（jumbit 扩展）：None 清除。命中返回 true 并置 dirty；
-/// 路径不在库中返回 false（describe 只标注已记录条目）
+/// Set an entry\'s annotation (a jumbit extension): None clears it. A hit returns true and marks dirty;
+/// a path absent from the database returns false (describe annotates only recorded entries)
 pub fn Database::set_note(
   self : Database,
   path : String,
