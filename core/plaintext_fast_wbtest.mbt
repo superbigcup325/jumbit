@@ -1,11 +1,11 @@
-// 明文解码快路径测试：decode_plaintext_line_fast 与慢路径
-// decode_plaintext_line 逐案例等价对拍（快路径 docstring 的数值等价依据在
-// 此处落地为回归锁定），并断言 writer 形态确实命中快路径（防静默回落）。
-// 路由入口 decode_plaintext 的行为面（错误文案/行级聚合）由既有黑盒套件
-// 与 golden 覆盖，此处补单行全链对拍
+// Plaintext decode fast-path tests: decode_plaintext_line_fast against the slow path
+// decode_plaintext_line case by case (the numeric-equivalence basis in the fast path\'s docstring lands here as
+// a regression pin), plus an assertion that the writer shape really hits the fast path (guarding against a silent fallback).
+// The routing entry decode_plaintext\'s behaviour (error wording / line-level aggregation) is covered by the existing
+// blackbox suite and the goldens; here a single-line full-chain comparison is added
 
 ///|
-/// Dir 无 Eq：字段逐个断言
+/// Dir has no Eq, so the fields are asserted one by one
 fn assert_fast_slow_eq(
   fast : Result[Dir?, String],
   slow : Result[Dir?, String],
@@ -19,15 +19,15 @@ fn assert_fast_slow_eq(
           @debug.assert_eq(dx.last_accessed, dy.last_accessed)
         }
         (None, None) => ()
-        _ => fail("Some/None 不一致")
+        _ => fail("Some/None disagree")
       }
     (Err(ma), Err(mb)) => @debug.assert_eq(ma, mb)
-    _ => fail("Ok/Err 不一致")
+    _ => fail("Ok/Err disagree")
   }
 }
 
 ///|
-/// 路由入口（decode_plaintext）单行结果与慢路径一致
+/// The routing entry (decode_plaintext) gives the same single-line result as the slow path
 fn assert_routed_eq(bytes : Bytes, slow : Result[Dir?, String]) -> Unit raise {
   match decode_plaintext(bytes) {
     Ok(dirs) =>
@@ -39,20 +39,20 @@ fn assert_routed_eq(bytes : Bytes, slow : Result[Dir?, String]) -> Unit raise {
           @debug.assert_eq(dirs[0].last_accessed, d.last_accessed)
         }
         Ok(None) => @debug.assert_eq(dirs.length(), 0)
-        Err(msg) => fail("路由应报错: \{msg}")
+        Err(msg) => fail("the router should error: \{msg}")
       }
     Err(pe) =>
       match slow {
         Err(msg) => @debug.assert_eq(pe.message(), "line 1: \{msg}")
-        _ => fail("路由不应报错")
+        _ => fail("the router should not error")
       }
   }
 }
 
 ///|
-test "快路径命中 writer 形态且与慢路径等价（ts × rank 矩阵）" {
+test "the fast path hits the writer shape and equals the slow path (a ts x rank matrix)" {
   let tss = ["1700000000", "0000000000", "9999999999", "0"]
-  // 均为快路径适用形态（纯数字 ts + 整数/恰两位定点 rank，值 ≤ 2^53/100）
+  // all in a fast-path shape (a plain-digit ts plus an integer or exactly-two-decimal rank, values <= 2^53/100)
   let ranks = [
     "0.01", "0.10", "1.00", "5", "007", "697.78", "9999999.99", "00.00", "0000697.78",
     "123456789.99", "90071992547409.92", "10", "0",
@@ -68,43 +68,43 @@ test "快路径命中 writer 形态且与慢路径等价（ts × rank 矩阵）"
             res,
             decode_plaintext_line(bytes, 0, bytes.length()),
           )
-        None => fail("writer 形态应命中快路径: \{text}")
+        None => fail("the writer shape should hit the fast path: \{text}")
       }
     }
   }
 }
 
 ///|
-test "快路径路由单行全链与慢路径等价（边界/错误/回落形态扫界）" {
-  // (行文本, 快路径是否命中)
+test "the fast path\'s single-line full chain equals the slow path (sweeping the boundary/error/fallback shapes)" {
+  // (line text, whether the fast path hits)
   let cases : Array[(String, Bool)] = [
-    // 空行族：空格/tab 直接判空（快路径命中），其余空白形态回落
+    // the blank-line family: spaces/tabs read as empty directly (the fast path hits), other whitespace shapes fall back
     ("", true),
     ("   ", true),
     ("\t\t", true),
-    ("1700000000 5 /p\r", true), // 行尾 CR 剥离
-    // 定点边界：恰 2 位才快路径；超 2^53 回落
+    ("1700000000 5 /p\r", true), // a trailing CR is stripped
+    // the fixed-point boundary: exactly two decimals hit the fast path; beyond 2^53 falls back
     ("1700000000 5.0 /p", false),
     ("1700000000 1.234 /p", false),
     ("1700000000 1.2 /p", false),
     ("1700000000 90071992547409.93 /p", false),
     ("1700000000 99999999999999.99 /p", false),
     ("1700000000 0.001 /p", false),
-    // 非数字段回落（符号/指数/inf/nan：parse_f64 语义面）
+    // a non-numeric field falls back (sign/exponent/inf/nan: the parse_f64 semantic surface)
     ("1700000000 1e3 /p", false),
     ("1700000000 -3.5 /p", false),
     ("1700000000 +5 /p", false),
     ("1700000000 inf /p", false),
     ("1700000000 nan /p", false),
-    ("-1 5 /p", false), // 负 timestamp（atuin 边界行）
+    ("-1 5 /p", false), // a negative timestamp (an atuin boundary row)
     ("+9 5 /p", false),
     ("abc 5 /p", false),
     ("1700000000 abc /p", false),
-    ("1700000000 123abc /p", false), // 段尾非空白
-    // 结构错误与空 path（缺 path 时快路径直接给出同文案 EXPECTED）
+    ("1700000000 123abc /p", false), // a field not ending in whitespace
+    // structural errors and an empty path (with no path the fast path gives the same EXPECTED wording)
     ("1700000000 5", true),
     ("1700000000 5 ", true),
-    // Unicode path（快路径命中，path 段 UTF-8 校验）
+    // a Unicode path (the fast path hits; the path field is UTF-8 validated)
     ("1700000000 5 /tmp/α β/中文目录", true),
     ("1700000000 5 /p", true),
   ]
@@ -114,8 +114,8 @@ test "快路径路由单行全链与慢路径等价（边界/错误/回落形态
     let fast = decode_plaintext_line_fast(bytes, 0, bytes.length())
     match (fast, fast_expected) {
       (Some(res), true) => assert_fast_slow_eq(res, slow)
-      (Some(_), false) => fail("应回落慢路径: \{text}")
-      (None, true) => fail("应命中快路径: \{text}")
+      (Some(_), false) => fail("should fall back to the slow path: \{text}")
+      (None, true) => fail("should hit the fast path: \{text}")
       (None, false) => ()
     }
     assert_routed_eq(bytes, slow)
@@ -123,12 +123,12 @@ test "快路径路由单行全链与慢路径等价（边界/错误/回落形态
 }
 
 ///|
-test "快路径空行判定与慢路径一致（VT/FF 形态回落由 trim 语义定夺）" {
-  // 纯 VT 行：快路径不判空（回落），慢路径 trim 语义决定结果
+test "the fast path\'s blank-line test matches the slow path (VT/FF shapes fall back, decided by trim semantics)" {
+  // a pure VT line: the fast path does not call it empty (it falls back), and the slow path\'s trim semantics decide
   let vt = @utf8.encode("\u{b}")
   let slow = decode_plaintext_line(vt, 0, vt.length())
   match decode_plaintext_line_fast(vt, 0, vt.length()) {
-    Some(_) => fail("纯 VT 行不应命中快路径")
+    Some(_) => fail("a pure VT line should not hit the fast path")
     None => ()
   }
   assert_routed_eq(vt, slow)
