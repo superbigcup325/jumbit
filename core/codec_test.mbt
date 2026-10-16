@@ -1,7 +1,7 @@
-// 编解码测试：roundtrip + 畸形数据拒绝
+// Codec tests: round-trip plus malformed-data rejection
 
 ///|
-test "roundtrip：空库只有 4 字节版本头" {
+test "roundtrip: an empty database is just the 4-byte version header" {
   let bytes = @core.encode([])
   @debug.assert_eq(bytes.length(), 4)
   match @core.decode(bytes) {
@@ -11,7 +11,7 @@ test "roundtrip：空库只有 4 字节版本头" {
 }
 
 ///|
-test "roundtrip：单条 ASCII 路径，rank 按 bit 精确保真" {
+test "roundtrip: a single ASCII path, with the rank preserved exactly bit for bit" {
   let db = @core.Database::new()
   db.add("/home/user/projects", 3.1400001, 1725561600L)
   match @core.decode(@core.encode(db.all())) {
@@ -26,7 +26,7 @@ test "roundtrip：单条 ASCII 路径，rank 按 bit 精确保真" {
 }
 
 ///|
-test "roundtrip：Unicode 路径" {
+test "roundtrip: a Unicode path" {
   let dirs = [
     @core.Dir::{
       path: "/home/用户/下载/图片",
@@ -42,7 +42,7 @@ test "roundtrip：Unicode 路径" {
 }
 
 ///|
-test "roundtrip：超长路径（10000 字符）" {
+test "roundtrip: an overlong path (10000 characters)" {
   let long = "/" + "a".repeat(9999)
   let dirs = [
     @core.Dir::{ path: long, rank: 1.0, last_accessed: 0L, note: None, },
@@ -54,7 +54,7 @@ test "roundtrip：超长路径（10000 字符）" {
 }
 
 ///|
-test "空文件 → CorruptedData" {
+test "an empty file -> CorruptedData" {
   match @core.decode(Bytes::make(0, 0)) {
     Err(@core.CorruptedData) => ()
     other => fail("unexpected: \{Repr(other)}")
@@ -62,11 +62,11 @@ test "空文件 → CorruptedData" {
 }
 
 ///|
-test "截断于路径长度头 → CorruptedData" {
+test "truncated in the path-length header -> CorruptedData" {
   let dirs = [
     @core.Dir::{ path: "/foo/bar", rank: 1.0, last_accessed: 0L, note: None, },
   ]
-  let bytes = @core.encode(dirs).to_array()[0:6] // 版本 4 字节 + 长度头 2 字节
+  let bytes = @core.encode(dirs).to_array()[0:6] // 4 version bytes + 2 length-header bytes
   match @core.decode(Bytes::from_array(bytes)) {
     Err(@core.CorruptedData) => ()
     other => fail("unexpected: \{Repr(other)}")
@@ -74,11 +74,11 @@ test "截断于路径长度头 → CorruptedData" {
 }
 
 ///|
-test "截断于 rank 中间 → CorruptedData" {
+test "truncated in the middle of rank -> CorruptedData" {
   let dirs = [
     @core.Dir::{ path: "/foo", rank: 1.0, last_accessed: 0L, note: None, },
   ]
-  let bytes = @core.encode(dirs).to_array()[0:16] // 4 版本 + 4 长度 + 4 路径 + 4 rank 半截
+  let bytes = @core.encode(dirs).to_array()[0:16] // 4 version + 4 length + 4 path + half of rank
   match @core.decode(Bytes::from_array(bytes)) {
     Err(@core.CorruptedData) => ()
     other => fail("unexpected: \{Repr(other)}")
@@ -86,12 +86,12 @@ test "截断于 rank 中间 → CorruptedData" {
 }
 
 ///|
-test "版本号不符 → UnsupportedVersion" {
+test "a wrong version number -> UnsupportedVersion" {
   let dirs = [
     @core.Dir::{ path: "/foo", rank: 1.0, last_accessed: 0L, note: None, },
   ]
   let bytes = @core.encode(dirs).to_array()
-  bytes[0] = (999).to_byte() // 小端首字节 = 低 8 位
+  bytes[0] = (999).to_byte() // the first little-endian byte = the low 8 bits
   match @core.decode(Bytes::from_array(bytes)) {
     Err(@core.UnsupportedVersion(v)) => @debug.assert_eq(v % 256, 999 % 256)
     other => fail("unexpected: \{Repr(other)}")
@@ -99,9 +99,9 @@ test "版本号不符 → UnsupportedVersion" {
 }
 
 ///|
-test "伪造超长路径长度 → CorruptedData" {
+test "a forged overlong path length -> CorruptedData" {
   let buf : Array[Byte] = []
-  buf.push((1).to_byte()) // 版本 1 的 LE 首字节
+  buf.push((1).to_byte()) // the first LE byte of version 1
   buf.push(0)
   buf.push(0)
   buf.push(0)
@@ -116,7 +116,7 @@ test "伪造超长路径长度 → CorruptedData" {
 }
 
 ///|
-test "超过 32MiB 上限 → TooLarge（长度检查先于版本检查）" {
+test "past the 32MiB cap -> TooLarge (the length check runs before the version check)" {
   let bytes = Bytes::make(@core.MAX_SIZE + 5, 0)
   match @core.decode(bytes) {
     Err(@core.TooLarge) => ()
@@ -125,8 +125,8 @@ test "超过 32MiB 上限 → TooLarge（长度检查先于版本检查）" {
 }
 
 ///|
-test "非法 UTF-8 路径 → CorruptedData" {
-  // 版本 1 + plen=2 + 两个非法续字节（0x80 0x80 无引导字节）
+test "an invalid UTF-8 path -> CorruptedData" {
+  // version 1 + plen=2 + two illegal continuation bytes (0x80 0x80 with no lead byte)
   let buf : Array[Byte] = [1, 0, 0, 0, 2, 0, 0, 0, 128, 128].map(fn(i) {
     i.to_byte()
   })
@@ -137,17 +137,17 @@ test "非法 UTF-8 路径 → CorruptedData" {
 }
 
 ///|
-test "恰好 32MiB：允许通过大小检查，继续走版本校验" {
+test "exactly 32MiB: the size check passes and the version check runs" {
   let bytes = Bytes::make(@core.MAX_SIZE, 0)
   match @core.decode(bytes) {
-    // 全零字节版本号为 0 ≠ 1，说明大小检查放行、版本检查生效
+    // all-zero bytes give version 0 != 1, showing the size check let it through and the version check fired
     Err(@core.UnsupportedVersion(0)) => ()
     other => fail("unexpected: \{Repr(other)}")
   }
 }
 
 ///|
-test "空路径条目（path_len=0）合法解码" {
+test "an empty-path entry (path_len=0) decodes legally" {
   let buf : Array[Byte] = [
     1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   ].map(fn(i) { i.to_byte() })
@@ -163,16 +163,16 @@ test "空路径条目（path_len=0）合法解码" {
 }
 
 ///|
-test "roundtrip：特殊浮点与边界时间戳按 bit 保真" {
+test "roundtrip: special floats and boundary timestamps stay bit-exact" {
   let dirs = [
-    // NaN：rank 唯一的 f64 非 bit 自反风险点（NaN != NaN）
+    // NaN: the one place a rank f64 is not bit-reflexive (NaN != NaN)
     @core.Dir::{
       path: "/nan",
       rank: 0.0 / 0.0,
       last_accessed: -5L,
       note: None,
     },
-    // ±inf 与 Int64 边界
+    // ±inf and the Int64 boundaries
     @core.Dir::{
       path: "/inf",
       rank: 1.0 / 0.0,
@@ -200,8 +200,8 @@ test "roundtrip：特殊浮点与边界时间戳按 bit 保真" {
 }
 
 ///|
-test "路径含 NUL 字节 → CorruptedData" {
-  // 版本 1 + plen=3 + "a\x00b"（NUL 在路径中间）
+test "a path containing a NUL byte -> CorruptedData" {
+  // version 1 + plen=3 + "a\x00b" (a NUL inside the path)
   let buf : Array[Byte] = [1, 0, 0, 0, 3, 0, 0, 0, 97, 0, 98].map(fn(i) {
     i.to_byte()
   })
@@ -212,8 +212,8 @@ test "路径含 NUL 字节 → CorruptedData" {
 }
 
 ///|
-test "路径含换行字节 → CorruptedData" {
-  // 版本 1 + plen=2 + 0x0A 0x0D
+test "a path containing a newline byte -> CorruptedData" {
+  // version 1 + plen=2 + 0x0A 0x0D
   let buf : Array[Byte] = [1, 0, 0, 0, 2, 0, 0, 0, 10, 13].map(fn(i) {
     i.to_byte()
   })
@@ -224,7 +224,7 @@ test "路径含换行字节 → CorruptedData" {
 }
 
 ///|
-test "roundtrip v2：note Some/None 均保持" {
+test "v2 round-trip: both note Some and None survive" {
   let dirs = [
     @core.Dir::{
       path: "/a",
@@ -245,8 +245,8 @@ test "roundtrip v2：note Some/None 均保持" {
 }
 
 ///|
-test "v1 兼容读：旧格式条目 note 读作 None" {
-  // v2 条目 = v1 条目 + 4 字节 note 头；降版本号并截去 note 头即得合法 v1 字节
+test "v1 compatible read: an old-format entry reads its note as None" {
+  // a v2 entry is a v1 entry plus a 4-byte note header; lowering the version and cutting the note header gives legal v1 bytes
   let dirs = [
     @core.Dir::{ path: "/legacy", rank: 1.5, last_accessed: 42L, note: None, },
   ]
@@ -266,11 +266,11 @@ test "v1 兼容读：旧格式条目 note 读作 None" {
 }
 
 ///|
-test "v2 note 长度非法 → CorruptedData（负值/越界）" {
+test "an illegal v2 note length -> CorruptedData (negative / out of range)" {
   let dirs = [
     @core.Dir::{ path: "/a", rank: 1.0, last_accessed: 0L, note: None, },
   ]
-  // 尾 4 字节为 note 长度：改 0xFFFFFFFF（有符号读负）→ 拒
+  // the last 4 bytes are the note length: 0xFFFFFFFF (read as a negative signed value) -> rejected
   let neg = @core.encode(dirs).to_array()
   for i in (neg.length() - 4)..<neg.length() {
     neg[i] = (255).to_byte()
@@ -279,7 +279,7 @@ test "v2 note 长度非法 → CorruptedData（负值/越界）" {
     Err(@core.CorruptedData) => ()
     other => fail("unexpected: \{Repr(other)}")
   }
-  // 长度超出剩余字节 → 拒
+  // a length past the remaining bytes -> rejected
   let over = @core.encode(dirs).to_array()
   over[over.length() - 1] = (100).to_byte()
   match @core.decode(Bytes::from_array(over)) {
@@ -289,11 +289,11 @@ test "v2 note 长度非法 → CorruptedData（负值/越界）" {
 }
 
 ///|
-test "v2 note 坏 UTF-8 → CorruptedData" {
+test "bad UTF-8 in a v2 note -> CorruptedData" {
   let dirs = [
     @core.Dir::{ path: "/a", rank: 1.0, last_accessed: 0L, note: None, },
   ]
-  // note 长度改 1、内容放 0xFF（非法 UTF-8 起始）
+  // the note length set to 1 with content 0xFF (an illegal UTF-8 start)
   let bad = @core.encode(dirs).to_array()
   bad[bad.length() - 4] = (1).to_byte()
   bad[bad.length() - 1] = (255).to_byte()

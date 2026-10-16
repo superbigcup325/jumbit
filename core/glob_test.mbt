@@ -1,7 +1,7 @@
-// glob 匹配器测试
+// Glob matcher tests
 
 ///|
-test "星号：跨分隔符（对齐上游 glob crate 默认 require_literal_separator=false）" {
+test "star: crosses separators (matching upstream glob crate default require_literal_separator=false)" {
   @debug.assert_eq(@core.glob_match("*", "foo"), true)
   @debug.assert_eq(@core.glob_match("*", ""), true)
   @debug.assert_eq(@core.glob_match("*", "/foo"), true)
@@ -10,12 +10,12 @@ test "星号：跨分隔符（对齐上游 glob crate 默认 require_literal_sep
   @debug.assert_eq(@core.glob_match("/foo/*", "/foo/bar"), true)
   @debug.assert_eq(@core.glob_match("/foo/*", "/foo/bar/baz"), true)
   @debug.assert_eq(@core.glob_match("/*/bar", "/foo/bar"), true)
-  // 纯字面量不含通配时仍须逐字对上（跨分隔符 ≠ 字面量穿越）
+  // a pure literal with no wildcard still has to match exactly (crossing separators != a literal crossing them)
   @debug.assert_eq(@core.glob_match("foobar", "/foobar"), false)
 }
 
 ///|
-test "问号：恰好一字（含分隔符，glob crate 默认语义）" {
+test "question mark: exactly one character (separators included, the glob crate default)" {
   @debug.assert_eq(@core.glob_match("?", "a"), true)
   @debug.assert_eq(@core.glob_match("?", "ab"), false)
   @debug.assert_eq(@core.glob_match("?", "/"), true)
@@ -24,7 +24,7 @@ test "问号：恰好一字（含分隔符，glob crate 默认语义）" {
 }
 
 ///|
-test "字符类：枚举与取反" {
+test "character classes: enumeration and negation" {
   @debug.assert_eq(@core.glob_match("[abc]", "a"), true)
   @debug.assert_eq(@core.glob_match("[abc]", "d"), false)
   @debug.assert_eq(@core.glob_match("[!a]", "b"), true)
@@ -32,12 +32,12 @@ test "字符类：枚举与取反" {
   @debug.assert_eq(@core.glob_match("[!a]", "/"), true)
   @debug.assert_eq(@core.glob_match("[a-z]", "m"), true)
   @debug.assert_eq(@core.glob_match("[a-z]", "M"), false)
-  // '-' 在类尾为字面量
+  // a '-' at the end of a class is a literal
   @debug.assert_eq(@core.glob_match("[a-]", "-"), true)
 }
 
 ///|
-test "转义：下一字符按字面量" {
+test "escaping: the next character matches literally" {
   @debug.assert_eq(@core.glob_match("\\*", "a"), false)
   @debug.assert_eq(@core.glob_match("\\*", "*"), true)
   @debug.assert_eq(@core.glob_match("\\?", "?"), true)
@@ -47,27 +47,27 @@ test "转义：下一字符按字面量" {
 }
 
 ///|
-test "花括号：字面量语义（与上游 glob crate 的差异锁定）" {
+test "braces: literal semantics (pinning the difference from the upstream glob crate)" {
   @debug.assert_eq(@core.glob_match("{a,b}", "{a,b}"), true)
   @debug.assert_eq(@core.glob_match("{a,b}", "a"), false)
 }
 
 ///|
-test "多组件路径与字面量" {
+test "multi-component paths and literals" {
   @debug.assert_eq(@core.glob_match("foo/bar", "foo/bar"), true)
   @debug.assert_eq(@core.glob_match("foo/bar", "foo/baz"), false)
   @debug.assert_eq(@core.glob_match("/foo/ba*", "/foo/bar"), true)
 }
 
 ///|
-test "星号零宽：尾分隔符与空段匹配（对齐上游 glob crate 逐字符语义）" {
+test "a zero-width star: a trailing separator and empty-segment matches (matching the glob crate per-character semantics)" {
   @debug.assert_eq(@core.glob_match("foo/*", "foo/"), true)
   @debug.assert_eq(@core.glob_match("foo/*", "foo"), false)
   @debug.assert_eq(@core.glob_match("foo/*bar", "foo/xxbar"), true)
 }
 
 ///|
-test "校验：非法 pattern 报错" {
+test "validation: an illegal pattern errors" {
   @debug.assert_eq(@core.validate_glob("[abc"), Some(@core.UnclosedBracket))
   @debug.assert_eq(@core.validate_glob("[]"), Some(@core.EmptyClass))
   @debug.assert_eq(@core.validate_glob("[!]"), Some(@core.EmptyClass))
@@ -78,24 +78,24 @@ test "校验：非法 pattern 报错" {
 }
 
 ///|
-test "校验：区间未闭合与类尾 '-' 的边界" {
-  // 含区间的未闭合 '['
+test "validation: an unterminated range, and a '-' at the end of a class" {
+  // an unterminated '[' holding a range
   @debug.assert_eq(@core.validate_glob("[a-z"), Some(@core.UnclosedBracket))
-  // '-' 在类尾为字面量，合法
+  // a '-' at the end of a class is a literal and thus legal
   @debug.assert_eq(@core.validate_glob("[a-]"), None)
   @debug.assert_eq(@core.validate_glob("[-a]"), None)
-  // 区间后紧跟 ']'：']' 终止类，区间合法
+  // a range followed by ']': the ']' terminates the class, so the range is legal
   @debug.assert_eq(@core.validate_glob("[a-z]"), None)
 }
 
 ///|
-test "glob_matches：合法走匹配、非法回传错误" {
+test "glob_matches: a legal one matches, an illegal one returns the error" {
   @debug.assert_eq(@core.glob_matches("*", "foo"), Ok(true))
   @debug.assert_eq(@core.glob_matches("[x", "x"), Err(@core.UnclosedBracket))
 }
 
 ///|
-test "pattern 与路径等长边界" {
+test "the boundary where the pattern and the path are equally long" {
   @debug.assert_eq(@core.glob_match("abc", "abc"), true)
   @debug.assert_eq(@core.glob_match("abc", "abcd"), false)
   @debug.assert_eq(@core.glob_match("abcd", "abc"), false)
@@ -104,25 +104,25 @@ test "pattern 与路径等长边界" {
 }
 
 ///|
-test "越界留档核实：匹配器对非法 pattern 全函数（无 panic）" {
-  // 留档核实（2026-09-25）：validate_glob 拒绝的四类非法 pattern 直接喂
-  // glob_match（绕过前置闸的最坏情况），匹配器所有索引访问均有边界守卫，
-  // 垃圾进垃圾出（返回 Bool）但绝不越界 panic；入口闸=config 解析期逐个
-  // validate + escape_glob 默认值 + glob_matches 公开面（核实记录见 roadmap）
+test "out-of-range record check: the matcher is total over illegal patterns (no panic)" {
+  // record check (2026-09-25): the four kinds of illegal pattern validate_glob rejects are fed straight to
+  // glob_match (the worst case, bypassing the front gate); every index access in the matcher is bounds-guarded, so
+  // garbage in, garbage out (a Bool) but never an out-of-range panic; the entry gates are config\'s per-pattern
+  // validate at parse time, the escape_glob default, and the glob_matches public surface (the record is in the roadmap)
   let invalid = [
-    "[abc", // 未闭合
-     "[]", // 空类
-     "[!]", // 空否定类
-     "[z-a]", // 倒序区间
-     "abc\\", // 尾转义
-     "[", // 裸 [
+    "[abc", // unterminated
+     "[]", // an empty class
+     "[!]", // an empty negated class
+     "[z-a]", // a reversed range
+     "abc\\", // a trailing escape
+     "[", // a bare [
   ]
   for p in invalid {
     let _ = @core.glob_match(p, "/usr/local/bin")
     let _ = @core.glob_match(p, "")
     let _ = @core.glob_match(p, "[abc")
   }
-  // 空 pattern 与空路径的平凡匹配
+  // the trivial match of an empty pattern against an empty path
   inspect(@core.glob_match("", ""), content="true")
   inspect(@core.glob_match("", "/x"), content="false")
 }
