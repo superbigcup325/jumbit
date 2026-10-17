@@ -1,7 +1,7 @@
-// 端到端测试：经 run() 全链路（真实 FS，_JB_DATA_DIR 注入临时目录，stderr 消息可断言）
+// End-to-end tests: the whole chain through run() (a real filesystem, _JB_DATA_DIR pointing at a temp directory, stderr messages assertable)
 
 ///|
-/// 递归清理测试目录（rmdir 失败静默：断言失败场景下残留可接受）
+/// Recursively clean the test directory (an rmdir failure is silent: leftovers are acceptable when an assertion fails)
 async fn cleanup_test_dir(dir : String) -> Unit {
   @afs.rmdir(dir, recursive=true) catch {
     err => ignore(err)
@@ -9,12 +9,12 @@ async fn cleanup_test_dir(dir : String) -> Unit {
 }
 
 ///|
-/// 测试临时根目录：平台 temp（Windows TEMP/TMP、UNIX TMPDIR）回落 /tmp；
-/// 硬编码 /tmp 在 Windows 会落 C:\tmp 触发 mkdir EEXIST 上游问题
-/// （moonbitlang/async recursive mkdir 非幂等，probe run 36044327191）
+/// The tests\' temporary root: the platform temp (Windows TEMP/TMP, UNIX TMPDIR) falling back to /tmp;
+/// a hardcoded /tmp would land on C:\tmp under Windows and trigger the upstream mkdir EEXIST problem
+/// (moonbitlang/async\'s recursive mkdir is not idempotent, probe run 36044327191)
 fn test_temp_root() -> String {
-  // 剥尾斜杠：macOS TMPDIR 以 / 结尾，拼路径出 // 双斜杠，resolve_path
-  // 归一后与原串不一致会打挂 exclude 精确比对/形状断言（macOS CI 实证）
+  // strip the trailing slash: macOS TMPDIR ends in / and joining would produce a // double slash, which resolve_path
+  // normalizes away, breaking the exact exclude comparison and the shape assertions (proved on macOS CI)
   for key in ["TEMP", "TMP", "TMPDIR"] {
     match @env.get_env_var(key) {
       Some(v) => {
@@ -34,12 +34,12 @@ fn test_temp_root() -> String {
 
 ///|
 async fn make_test_dir(prefix : String) -> String {
-  // rand_name 不可见（platform 私有），用毫秒 + exists 重试保证并发测试不撞名
+  // rand_name is private to platform, so milliseconds plus an exists retry keep parallel tests from colliding on a name
   for _attempt = 0 {
     let dir = "\{test_temp_root()}/jumbit-e2e-\{@async.now()}-\{prefix}-\{_attempt}"
     if !@afs.exists(dir) {
-      // 非递归：temp 根父目录恒存在；recursive=true 在 Windows 对已存在
-      // 组件报 EEXIST（async 上游 bug，probe run 36064860009 全量复现）
+      // non-recursive: the temp root\'s parent always exists; recursive=true under Windows reports EEXIST for an
+      // existing component (an async upstream bug, fully reproduced in probe run 36064860009)
       @afs.mkdir(dir)
       break dir
     } else {
@@ -66,20 +66,20 @@ fn env_with(data_dir : String) -> (String) -> String? {
 }
 
 ///|
-test "env_with：命中与未命中" {
+test "env_with: a hit and a miss" {
   @debug.assert_eq(env_with("/d")("_JB_DATA_DIR"), Some("/d"))
   @debug.assert_eq(env_with("/d")("HOME"), None)
 }
 
 ///|
-test "echo_enabled：仅 _JB_ECHO=1 生效" {
+test "echo_enabled: only _JB_ECHO=1 takes effect" {
   @debug.assert_eq(echo_enabled(env_map([("_JB_ECHO", "1")])), true)
   @debug.assert_eq(echo_enabled(env_map([("_JB_ECHO", "0")])), false)
   @debug.assert_eq(echo_enabled(env_map([])), false)
 }
 
 ///|
-async test "add → query 全链路" {
+async test "the full add -> query chain" {
   let data = make_test_dir("data")
   let target = make_test_dir("target")
   let errs : Array[String] = []
@@ -92,18 +92,18 @@ async test "add → query 全链路" {
 }
 
 ///|
-async test "未知命令与缺参数 → 退出码 2" {
+async test "an unknown command and a missing argument -> exit code 2" {
   let data = make_test_dir("unknown")
   let errs : Array[String] = []
   @debug.assert_eq(run(["frobnicate"], env_with(data), errs), 2)
   @debug.assert_eq(run(["add"], env_with(data), errs), 2)
-  // 缺参消息上移 parse 层后走 Invalid 渲染，与未知命令一样带 For more information 尾行（各 2 条）
+  // a missing-argument message is now rendered as Invalid at the parse layer and, like an unknown command, carries the For more information trailer (2 each)
   @debug.assert_eq(errs.length(), 4)
   cleanup_test_dir(data)
 }
 
 ///|
-async test "help → 退出码 0" {
+async test "help -> exit code 0" {
   let data = make_test_dir("help")
   let errs : Array[String] = []
   @debug.assert_eq(run(["help"], env_with(data), errs), 0)
@@ -112,8 +112,8 @@ async test "help → 退出码 0" {
 }
 
 ///|
-test "finish_interactive：fzf 结果映射表（上游探针矩阵 2026-09-13 实测）" {
-  // 选中：剥 7 字符得分前缀后原样输出（含 fzf 尾换行，不追加），exit 0
+test "finish_interactive: the fzf result mapping table (measured with the upstream probe matrix 2026-09-13)" {
+  // a selection: the 7-character score prefix is stripped and the rest printed as is (including fzf\'s trailing newline, no extra), exit 0
   let o1 : Array[String] = []
   let e1 : Array[String] = []
   @debug.assert_eq(
@@ -122,19 +122,19 @@ test "finish_interactive：fzf 结果映射表（上游探针矩阵 2026-09-13 �
   )
   @debug.assert_eq(o1, ["/picked\n"])
   @debug.assert_eq(e1.length(), 0)
-  // --score：整行输出
+  // --score: the whole line is printed
   let o2 : Array[String] = []
   let e2 : Array[String] = []
   @debug.assert_eq(finish_interactive(Ok("  40.0\t/picked\n"), true, e2, o2), 0)
   @debug.assert_eq(o2, ["  40.0\t/picked\n"])
   @debug.assert_eq(e2.length(), 0)
-  // len==7：上游 get(7..) = Some("")，空串原样输出 exit 0
+  // len==7: upstream get(7..) = Some(""), so an empty string is printed, exit 0
   let o3 : Array[String] = []
   let e3 : Array[String] = []
   @debug.assert_eq(finish_interactive(Ok("1234567"), false, e3, o3), 0)
   @debug.assert_eq(o3, [""])
   @debug.assert_eq(e3.length(), 0)
-  // len<7：上游错误路，无输出
+  // len<7: upstream\'s error path, no output
   let o4 : Array[String] = []
   let e4 : Array[String] = []
   @debug.assert_eq(finish_interactive(Ok("abc\n"), false, e4, o4), 1)
@@ -149,13 +149,13 @@ test "finish_interactive：fzf 结果映射表（上游探针矩阵 2026-09-13 �
   )
   @debug.assert_eq(e5[0], "jumbit: could not find fzf, is it installed?")
   @debug.assert_eq(o5.length(), 0)
-  // NoMatch：静默 exit 1（与上游的差异，README 注明）
+  // NoMatch: a silent exit 1 (a difference from upstream, noted in the README)
   let o6 : Array[String] = []
   let e6 : Array[String] = []
   @debug.assert_eq(finish_interactive(Err(@platform.NoMatch), false, e6, o6), 1)
   @debug.assert_eq(e6.length(), 0)
   @debug.assert_eq(o6.length(), 0)
-  // fzf 自身错误族
+  // the fzf-side error family
   let o7 : Array[String] = []
   let e7 : Array[String] = []
   @debug.assert_eq(
@@ -177,7 +177,7 @@ test "finish_interactive：fzf 结果映射表（上游探针矩阵 2026-09-13 �
     1,
   )
   @debug.assert_eq(e9[0], "fzf returned an unknown error")
-  // 用户中断：静默透传 130
+  // a user interrupt: 130 passes through silently
   let o10 : Array[String] = []
   let e10 : Array[String] = []
   @debug.assert_eq(
@@ -189,11 +189,11 @@ test "finish_interactive：fzf 结果映射表（上游探针矩阵 2026-09-13 �
 }
 
 ///|
-async test "等号形式 --flag=value 端到端（clap 双形态对齐）" {
+async test "the equals form --flag=value end to end (matching clap\'s two forms)" {
   let data = make_test_dir("eq-data")
   let target = make_test_dir("eq-target")
   let errs : Array[String] = []
-  // init --cmd= （README 记载的写法，此前实际被拒 exit 2）
+  // init --cmd= (the form the README documents, which used to be rejected with exit 2)
   @debug.assert_eq(run(["init", "bash", "--cmd=zj"], env_with(data), errs), 0)
   // add --score= / describe --note=
   @debug.assert_eq(run(["add", "--score=2.5", target], env_with(data), errs), 0)
@@ -214,7 +214,7 @@ async test "等号形式 --flag=value 端到端（clap 双形态对齐）" {
     ),
     0,
   )
-  // 值非法 → Invalid 退出码 2
+  // an invalid value -> Invalid with exit code 2
   @debug.assert_eq(
     run(["query", "--list", "--limit=x"], env_with(data), errs),
     2,
@@ -225,8 +225,8 @@ async test "等号形式 --flag=value 端到端（clap 双形态对齐）" {
 
 ///|
 #cfg(not(platform="windows"))
-// // Windows 门控：只读目录依赖 chmod 权限位（Windows 无效），待平台化
-async test "save 失败：数据目录不可写 → 清晰文案 exit 1（Repr 不再外泄）" {
+// // Windows-gated: the read-only directory relies on a chmod permission bit (a no-op on Windows), pending platform work
+async test "a failed save: an unwritable data directory -> clear wording and exit 1 (no Repr leak)" {
   let data = make_test_dir("save-ro")
   let target = make_test_dir("save-ro-t")
   let errs : Array[String] = []
@@ -244,27 +244,27 @@ async test "save 失败：数据目录不可写 → 清晰文案 exit 1（Repr �
 }
 
 ///|
-async test "顶层面分发：--version/-V/无参数/顶层坏 flag/run 层接缝" {
+async test "top-level dispatch: --version/-V, no arguments, a bad top-level flag, and the run-layer seam" {
   let data = make_test_dir("toplevel")
-  // --version / -V：版本行走 stdout，退出 0，无 stderr
+  // --version / -V: the version line goes to stdout, exit 0, no stderr
   let errs1 : Array[String] = []
   @debug.assert_eq(run(["--version"], env_with(data), errs1), 0)
   @debug.assert_eq(errs1.length(), 0)
   let errs2 : Array[String] = []
   @debug.assert_eq(run(["-V"], env_with(data), errs2), 0)
   @debug.assert_eq(errs2.length(), 0)
-  // 无参数：帮助全文走 stderr（errs 批量写通道），退出 2
+  // no arguments: the full help goes to stderr (the errs batch-write channel), exit 2
   let errs3 : Array[String] = []
   @debug.assert_eq(run([], env_with(data), errs3), 2)
-  // usage 全文是单条消息（内含 \n），走 errs 批量写通道
+  // the full usage is one message (containing \n) and goes through the errs batch-write channel
   @debug.assert_eq(errs3.length(), 1)
   assert_true(errs3[0].has_prefix("jumbit \{@root.VERSION}"))
   assert_true(errs3[0].contains("Usage:"))
-  // 版本 flag 后随多余参数：用法错误（clap unexpected argument）
+  // a version flag followed by extra arguments: a usage error (clap unexpected argument)
   let errs4 : Array[String] = []
   @debug.assert_eq(run(["--version", "x"], env_with(data), errs4), 2)
   assert_true(errs4[0].contains("unexpected argument 'x'"))
-  // 顶层裸 token：unrecognized subcommand；flag 形态：unexpected argument
+  // a top-level bare token: unrecognized subcommand; a flag shape: unexpected argument
   let errs5 : Array[String] = []
   @debug.assert_eq(run(["frobnicate"], env_with(data), errs5), 2)
   assert_true(errs5[0].contains("unrecognized subcommand 'frobnicate'"))
@@ -275,9 +275,9 @@ async test "顶层面分发：--version/-V/无参数/顶层坏 flag/run 层接�
 }
 
 ///|
-async test "子命令头部配置失败臂抽样：坏 _JB_DATA_DIR 各分发臂 → exit 1" {
-  // 相对路径 data_dir 被 config 层拒：每子命令的 None => return 1 臂同构，
-  // 抽 query/add/status/import 四代表（其余 edit/describe/export 共享同款 cfg 链）
+async test "sampling the per-subcommand config-failure arms: a bad _JB_DATA_DIR on each dispatch arm -> exit 1" {
+  // a relative data_dir is rejected at the config layer, and every subcommand\'s None => return 1 arm is isomorphic, so
+  // query/add/status/import stand in (edit/describe/export share the same cfg chain)
   let bad = env_map([("_JB_DATA_DIR", "relative-not-absolute")])
   @debug.assert_eq(run(["query"], bad, []), 1)
   @debug.assert_eq(run(["add", "/tmp"], bad, []), 1)
@@ -286,9 +286,9 @@ async test "子命令头部配置失败臂抽样：坏 _JB_DATA_DIR 各分发臂
 }
 
 ///|
-async test "run 层分发：import 未知插件臂与 init 七模板臂" {
+async test "run-layer dispatch: the unknown-plugin arm and init\'s seven template arms" {
   let data = make_test_dir("dispatch")
-  // import 未知插件（parse 层已拦，此处锁 run 层兜底臂不达也不崩）
+  // an unknown import plugin (the parse layer already blocks it; this pins that the run-layer fallback arm is neither reached nor crashes)
   let errs : Array[String] = []
   @debug.assert_eq(run(["init", "zsh"], env_with(data), errs), 0)
   @debug.assert_eq(run(["init", "fish"], env_with(data), errs), 0)
@@ -302,8 +302,8 @@ async test "run 层分发：import 未知插件臂与 init 七模板臂" {
 }
 
 ///|
-test "cli 层单臂补遗：--hook pwd 显式/-- 双剥/等号坏值/--prune 重复" {
-  // parse_hook 的 pwd 臂（默认值路径不触发 match，须显式传参）
+test "cli-layer arm leftovers: an explicit --hook pwd, double --, a bad equals value, a repeated --prune" {
+  // parse_hook\'s pwd arm (the default path does not enter the match, so it must be passed explicitly)
   @debug.assert_eq(
     @cli.parse(["init", "bash", "--hook", "pwd"]),
     @cli.Init({
@@ -313,18 +313,18 @@ test "cli 层单臂补遗：--hook pwd 显式/-- 双剥/等号坏值/--prune 重
       no_cmd: false,
     }),
   )
-  // strip_double_dash 的 dropped=true 臂：-- 后参数按 positional 收
+  // strip_double_dash\'s dropped=true arm: what follows -- is taken as a positional
   @debug.assert_eq(@cli.parse(["remove", "--", "/a"]), @cli.Remove(["/a"]))
   @debug.assert_eq(
     @cli.parse(["remove", "/a", "--", "--b"]),
     @cli.Remove(["/a", "--b"]),
   )
-  // --score=abc 等号形态坏值（空格形态已有）
+  // a bad value in the --score=abc equals form (the space form is already covered)
   @debug.assert_eq(
     @cli.parse(["add", "--score=abc", "/tmp"]),
     @cli.Invalid("invalid value 'abc' for '--score <N>'"),
   )
-  // --prune 重复（--rename 重复已有）
+  // a repeated --prune (a repeated --rename is already covered)
   @debug.assert_eq(
     @cli.parse(["edit", "--prune", "--prune"]),
     @cli.Invalid("the argument '--prune' cannot be used multiple times"),
@@ -332,14 +332,14 @@ test "cli 层单臂补遗：--hook pwd 显式/-- 双剥/等号坏值/--prune 重
 }
 
 ///|
-/// [#2] 回归：纯读 query 不落盘——legacy 库读时不迁移、空目录不物化。
-/// 旧实现 sort_by_score 无条件置脏 + load(legacy) mark_dirty，query 每次带脏
-/// 退出：legacy 首查即迁移（违反「只读命令不触发迁移」）、只读数据目录
-/// 直接查询失败、空目录长出空 db.txt/notes.tsv。
-/// 红色验证：修复前本测试在三个断言处失败（db.txt 被创建）
-async test "query 纯读不落盘：legacy 不迁移、空目录不物化" {
-  // legacy 态：db.zo（经 core.encode 造，与 legacy 格式同版本互通）、无 db.txt；
-  // 条目指向真实目录，query 命中且过滤链零删除
+/// [#2] regression: a read-only query writes nothing -- reading a legacy database does not migrate and an empty directory materializes nothing.
+/// The old implementation dirtied unconditionally in sort_by_score and marked dirty in load(legacy), so every query exited
+/// dirty: the first legacy query migrated (breaking "a read-only command triggers no migration"), a query against a read-only
+/// data directory failed outright, and an empty directory grew empty db.txt and notes.tsv files.
+/// Red verification: before the fix this test failed at three assertions (db.txt had been created)
+async test "a read-only query writes nothing: legacy is not migrated and an empty directory materializes nothing" {
+  // the legacy state: a db.zo (built through core.encode, sharing the legacy format\'s version) and no db.txt;
+  // the entry points at a real directory, the query hits, and the filter chain deletes nothing
   let data = make_test_dir("legacy-readonly")
   let hit = make_test_dir("legacy-hit")
   let db = @core.Database::new()
@@ -348,7 +348,7 @@ async test "query 纯读不落盘：legacy 不迁移、空目录不物化" {
   let errs : Array[String] = []
   @debug.assert_eq(run(["query", "legacy-hit"], env_with(data), errs), 0)
   @debug.assert_eq(@afs.exists(data + "/db.txt"), false)
-  // 空数据目录：miss 不物化任何文件
+  // an empty data directory: a miss materializes no file
   let empty = make_test_dir("empty-readonly")
   let errs2 : Array[String] = []
   @debug.assert_eq(run(["query", "nope"], env_with(empty), errs2), 1)
@@ -360,9 +360,9 @@ async test "query 纯读不落盘：legacy 不迁移、空目录不物化" {
 }
 
 ///|
-/// [#2] 回归：legacy + query 懒删（真实数据变更）→ 迁移落盘且内容保持；
-/// db.zo 保留（迁移惯例，可手动删除）
-async test "legacy 加 query 懒删迁移落盘内容保持" {
+/// [#2] regression: legacy + a query lazy deletion (a real data change) -> the migration lands on disk with the content preserved;
+/// db.zo is kept (the migration convention; it can be deleted by hand)
+async test "legacy plus a query lazy deletion migrates to disk with the content preserved" {
   let keep = make_test_dir("legacy-migrate-keep")
   let data = make_test_dir("legacy-migrate")
   let db = @core.Database::new()
@@ -370,9 +370,9 @@ async test "legacy 加 query 懒删迁移落盘内容保持" {
   db.add_update("/nonexistent/stale", 1.0, 1791000000L - 100L * 86400L)
   @platform.write_atomic(data + "/db.zo", @core.encode(db.all()))
   let errs : Array[String] = []
-  // stale 不存在且超 3 个月 TTL → 懒删 → 置脏 → save 迁移为明文。
-  // 用 --list 让 stale 进入候选（带关键词时过滤链先按关键词裁剪，
-  // 不命中的条目走不到 exists/TTL 检查）
+  // stale does not exist and is past the 3-month TTL -> lazily deleted -> dirty -> save migrates to plaintext.
+  // --list brings stale into the candidate set (with a keyword the chain prunes by keyword first, so a non-matching
+  // entry never reaches the exists/TTL check)
   @debug.assert_eq(run(["query", "--list"], env_with(data), errs), 0)
   @debug.assert_eq(@afs.exists(data + "/db.txt"), true)
   let reloaded = match @platform.load(data) {
@@ -387,10 +387,10 @@ async test "legacy 加 query 懒删迁移落盘内容保持" {
 }
 
 ///|
-/// [#2] 回归：只读数据目录 + query（过滤链零删除）→ 退出 0，不再因
-/// 「无变更也 save」撞 EACCES。红色验证：修复前 exit 1 + could not save
+/// [#2] regression: a read-only data directory plus a query (the filter chain deletes nothing) -> exit 0, no longer hitting
+/// EACCES on "save even without changes". Red verification: before the fix, exit 1 with could not save
 #cfg(not(platform="windows"))
-async test "只读数据目录加 query 退出 0" {
+async test "a read-only data directory with a query exits 0" {
   let data = make_test_dir("ro-query")
   let hit = make_test_dir("ro-query-hit")
   let errs : Array[String] = []
@@ -403,9 +403,9 @@ async test "只读数据目录加 query 退出 0" {
 }
 
 ///|
-/// [#3] 回归：add --score inf 落库为上限 9999999.99（文档口径），
-/// 不再经老化毒化落到下限 0.01。红色验证：修复前 rank == 0.01
-async test "add score inf 钳到上限" {
+/// [#3] regression: add --score inf lands in the database as the ceiling 9999999.99 (the documented rule),
+/// no longer poisoned by aging down to the 0.01 floor. Red verification: before the fix rank == 0.01
+async test "add score inf clamps to the ceiling" {
   let data = make_test_dir("inf-score")
   let target = make_test_dir("inf-target")
   let errs : Array[String] = []
@@ -417,8 +417,8 @@ async test "add score inf 钳到上限" {
     Ok(s) => s
     Err(e) => fail("\{Repr(e)}")
   }
-  // 入库钳到上限 9999999.99，写库前老化（total=MAX > 10000）健康缩放：
-  // factor = 0.9×10000/MAX，rank = MAX×factor = 9000 整（明文两位小数无损）
+  // clamped to the ceiling 9999999.99 on import, then aged healthily before the write (total=MAX > 10000):
+  // factor = 0.9x10000/MAX, so rank = MAX x factor = exactly 9000 (lossless in the two-decimal plaintext)
   @debug.assert_eq(store.database().all()[0].rank, 9000.0)
   cleanup_test_dir(data)
   cleanup_test_dir(target)
