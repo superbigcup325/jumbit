@@ -31,7 +31,7 @@ async test "mcp initialize: an unsupported version returns this server\'s newest
   )
   let out = match resp {
     Some(out) => out
-    None => fail("initialize 必须响应")
+    None => fail("initialize must respond")
   }
   assert_true(out.contains("\"id\":\"abc\""))
   assert_true(out.contains("\"protocolVersion\":\"\{mcp_latest_version()}\""))

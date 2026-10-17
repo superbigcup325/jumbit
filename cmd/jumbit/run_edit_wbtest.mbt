@@ -98,7 +98,7 @@ async test "interactive edit: a normal rank edit lands on disk; a missing editor
 
 ///|
 #cfg(not(platform="windows"))
-// 伪 editor 桩经 chmod 可执行位造（Windows 无 exec 位，待 .cmd 桩平台化）
+// the fake-editor stub is made with a chmod executable bit (Windows has no exec bit; a .cmd stub is pending)
 async test "edit --rename: the note follows; a miss or a name collision errors" {
   let data = make_test_dir("ren-data")
   let target = make_test_dir("ren-target")
