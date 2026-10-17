@@ -1,10 +1,10 @@
-// strip_argv0 单测：argv[0] 各真实形态（PATH 裸名 / 完整路径 / moon run exe 路径）一律剥掉
+// strip_argv0 unit tests: every real argv[0] shape (a bare PATH name / a full path / moon run\'s exe path) is stripped
 
 ///|
-test "strip_argv0：裸名与完整路径都剥首参" {
-  // bash/fish/zsh 经 PATH 裸名调用：argv[0] = "jumbit"（不含 /）
+test "strip_argv0: both a bare name and a full path lose the first argument" {
+  // bash/fish/zsh calling by bare name through PATH: argv[0] = "jumbit" (no /)
   @debug.assert_eq(strip_argv0(["jumbit", "help"]), ["help"])
-  // 全路径 / moon run exe 路径调用
+  // a full-path call and a moon run exe-path call
   @debug.assert_eq(strip_argv0(["/usr/local/bin/jumbit", "add", "/tmp"]), [
     "add", "/tmp",
   ])
@@ -12,8 +12,8 @@ test "strip_argv0：裸名与完整路径都剥首参" {
 }
 
 ///|
-test "strip_argv0：空 argv 与形似子命令的首参" {
+test "strip_argv0: an empty argv, and a first argument that looks like a subcommand" {
   @debug.assert_eq(strip_argv0([]), [])
-  // 首参即使恰好是子命令名也剥（argv[0] 永远不是用户输入）
+  // a first argument that happens to be a subcommand name is stripped too (argv[0] is never user input)
   @debug.assert_eq(strip_argv0(["query", "--list"]), ["--list"])
 }

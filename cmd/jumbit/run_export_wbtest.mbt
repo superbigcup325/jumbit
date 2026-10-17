@@ -1,5 +1,5 @@
 ///|
-async test "export --agents：有标注条目出地图，缺 --agents 退出码 2，空库退出码 0" {
+async test "export --agents: annotated entries make the map, a missing --agents exits 2, an empty database exits 0" {
   let data = make_test_dir("exp-data")
   let target = make_test_dir("exp-target")
   let errs : Array[String] = []
@@ -9,13 +9,13 @@ async test "export --agents：有标注条目出地图，缺 --agents 退出码 
     0,
   )
   @debug.assert_eq(run(["export", "--agents"], env_with(data), errs), 0)
-  // 无标注条目不进地图：另一个目录只 add 不 describe
+  // an unannotated entry stays out of the map: another directory is only added, never described
   let plain = make_test_dir("exp-plain")
   @debug.assert_eq(run(["add", plain], env_with(data), errs), 0)
   @debug.assert_eq(run(["export", "--agents"], env_with(data), errs), 0)
-  // 参数错误
+  // an argument error
   @debug.assert_eq(run(["export"], env_with(data), errs), 2)
-  // 空库不报错
+  // an empty database does not error
   let empty = make_test_dir("exp-empty")
   @debug.assert_eq(run(["export", "--agents"], env_with(empty), errs), 0)
   cleanup_test_dir(data)

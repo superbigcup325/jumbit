@@ -1,5 +1,5 @@
 ///|
-test "render_status_human：标签列与 --check 追加行（字节面）" {
+test "render_status_human: the label column and the --check appended line (byte surface)" {
   let r : DbStatus = {
     data_file: "/home/you/.local/share/jumbit/db.txt",
     file_size: 13854848,
@@ -19,7 +19,7 @@ test "render_status_human：标签列与 --check 追加行（字节面）" {
   @debug.assert_eq(lines[2], "format         plaintext")
   @debug.assert_eq(lines[4], "notes          12")
   @debug.assert_eq(lines[5], "aging threshold 10000")
-  // 无库：版本位为 -
+  // no database: the version slot is -
   let empty : DbStatus = {
     data_file: "/tmp/nodir/db.txt",
     file_size: 0,
@@ -30,7 +30,7 @@ test "render_status_human：标签列与 --check 追加行（字节面）" {
     existing: None,
   }
   @debug.assert_eq(render_status_human(empty)[2], "format         -")
-  // --check：追加「存在」行
+  // --check: the existing line is appended
   let checked = { ..r, existing: Some(210000), }
   let lines2 = render_status_human(checked)
   @debug.assert_eq(lines2.length(), 7)
@@ -38,7 +38,7 @@ test "render_status_human：标签列与 --check 追加行（字节面）" {
 }
 
 ///|
-test "render_status_json：键序固定、existing 仅 --check 出现、路径转义" {
+test "render_status_json: fixed key order, existing only under --check, path escaping" {
   let r : DbStatus = {
     data_file: "/home/you/.local/share/jumbit/db.txt",
     file_size: 13854848,
@@ -52,13 +52,13 @@ test "render_status_json：键序固定、existing 仅 --check 出现、路径�
     render_status_json(r),
     "{\"data_file\":\"/home/you/.local/share/jumbit/db.txt\",\"file_size\":13854848,\"format\":\"plaintext\",\"entries\":266618,\"notes\":12,\"maxage\":10000}",
   )
-  // 无库：format 出 null
+  // no database: format is null
   let empty = { ..r, file_size: 0, format: None, entries: 0, notes: 0, }
   assert_true(render_status_json(empty).contains("\"format\":null"))
-  // --check：尾部追加 existing
+  // --check: existing is appended at the end
   let checked = { ..r, existing: Some(210000), }
   assert_true(render_status_json(checked).contains(",\"existing\":210000}"))
-  // 路径经 json_escape（引号转义验证）
+  // the path goes through json_escape (verifying quote escaping)
   let weird = { ..r, data_file: "/tmp/a\"b/db.txt", }
   assert_true(
     render_status_json(weird).contains("data_file\":\"/tmp/a\\\"b/db.txt"),
@@ -66,13 +66,13 @@ test "render_status_json：键序固定、existing 仅 --check 出现、路径�
 }
 
 ///|
-async test "status：空库 / 有库 / 损坏库 / --check 的退出码与 stderr 面" {
+async test "status: the exit codes and stderr surface for an empty / populated / corrupt database and --check" {
   let data = make_test_dir("status-data")
   let errs0 : Array[String] = []
-  // 空库（无 db.zo）：0
+  // an empty database (no db.zo): 0
   @debug.assert_eq(run(["status"], env_with(data), errs0), 0)
   @debug.assert_eq(errs0.length(), 0)
-  // 建库：add 真目录 + describe 标注 → status 0
+  // build a database: add a real directory + describe a note -> status 0
   let dir1 = make_test_dir("status-entry")
   let errs1 : Array[String] = []
   @debug.assert_eq(run(["add", dir1], env_with(data), errs1), 0)
@@ -83,16 +83,16 @@ async test "status：空库 / 有库 / 损坏库 / --check 的退出码与 stder
   let errs2 : Array[String] = []
   @debug.assert_eq(run(["status"], env_with(data), errs2), 0)
   @debug.assert_eq(errs2.length(), 0)
-  // --json 与 --check 退出码 0
+  // --json and --check exit 0
   @debug.assert_eq(run(["status", "--json"], env_with(data), errs2), 0)
   @debug.assert_eq(run(["status", "--check"], env_with(data), errs2), 0)
-  // 损坏库 → 1 + stderr
+  // a corrupt database -> 1 plus stderr
   @platform.write_atomic(data + "/db.txt", b"garbage-not-a-db")
   let errs3 : Array[String] = []
   @debug.assert_eq(run(["status"], env_with(data), errs3), 1)
   @debug.assert_eq(errs3.length(), 1)
   assert_true(errs3[0].has_prefix("jumbit: corrupted data file: "))
-  // 用法错误 → 2（未知 flag）
+  // a usage error -> 2 (an unknown flag)
   let errs4 : Array[String] = []
   @debug.assert_eq(run(["status", "--nope"], env_with(data), errs4), 2)
   cleanup_test_dir(data)
@@ -101,8 +101,8 @@ async test "status：空库 / 有库 / 损坏库 / --check 的退出码与 stder
 
 ///|
 #cfg(not(platform="windows"))
-// // Windows 门控：不可读构造依赖 chmod 权限位（Windows 无效），待平台化
-async test "status：db.txt 不可读 → 无法读取数据文件 + exit 1（Repr 不再外泄）" {
+// // Windows-gated: the unreadable construction relies on a chmod permission bit (a no-op on Windows), pending platform work
+async test "status: an unreadable db.txt -> cannot read the data file plus exit 1 (no Repr leak)" {
   let data = make_test_dir("status-noread")
   let target = make_test_dir("status-noread-t")
   let errs : Array[String] = []

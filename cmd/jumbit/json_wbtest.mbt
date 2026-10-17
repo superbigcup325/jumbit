@@ -1,27 +1,27 @@
-// json 写出层单测：转义/数字/整行形状（字节级断言）
+// json writer unit tests: escaping / numbers / whole-line shape (byte-level assertions)
 
 ///|
-test "json_escape：引号反斜杠与常用控制字符" {
+test "json_escape: quotes, backslashes and the common control characters" {
   @debug.assert_eq(json_escape("a\"b\\c"), "a\\\"b\\\\c")
   @debug.assert_eq(json_escape("l1\nl2\r\t"), "l1\\nl2\\r\\t")
   @debug.assert_eq(json_escape("\u{0008}\u{000C}"), "\\b\\f")
 }
 
 ///|
-test "json_escape：罕见控制字符 \\u 化（4 位补零）" {
+test "json_escape: rare control characters become \\u (zero-padded to 4)" {
   @debug.assert_eq(json_escape("\u{0001}"), "\\u0001")
   @debug.assert_eq(json_escape("\u{001F}"), "\\u001f")
 }
 
 ///|
-test "json_escape：非 ASCII 原样透传、普通串不变" {
+test "json_escape: non-ASCII passes through and an ordinary string is unchanged" {
   @debug.assert_eq(json_escape("/home/用户/博客"), "/home/用户/博客")
   @debug.assert_eq(json_escape("/plain/path"), "/plain/path")
   @debug.assert_eq(json_escape(""), "")
 }
 
 ///|
-test "json_number：有限数原样、NaN/Inf 出 null" {
+test "json_number: finite values as is, NaN/Inf as null" {
   @debug.assert_eq(json_number(12.5), "12.5")
   @debug.assert_eq(json_number(4.0), "4")
   @debug.assert_eq(json_number(-0.75), "-0.75")
@@ -31,10 +31,10 @@ test "json_number：有限数原样、NaN/Inf 出 null" {
 }
 
 ///|
-test "render_json：空数组与多条目形状（键序固定）" {
+test "render_json: the empty array and the multi-entry shape (fixed key order)" {
   let now = 1000L
   @debug.assert_eq(render_json([], now, "exact"), "[]")
-  // last_accessed 距 now 不足 1h → score 含 ×4.0 衰减乘数
+  // last_accessed less than 1h before now -> the score carries the x4.0 decay multiplier
   let d1 : @core.Dir = {
     path: "/a",
     rank: 1.0,
