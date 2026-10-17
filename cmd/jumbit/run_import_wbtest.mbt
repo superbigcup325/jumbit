@@ -1,7 +1,7 @@
 ///|
 
 ///|
-async test "import z：直灌新库 + 坏行上报不中止" {
+async test "import z: pour into a new database, reporting bad rows without aborting" {
   let data = make_test_dir("imp-data")
   let zdir = make_test_dir("imp-z")
   let zfile = zdir + "/zdata"
@@ -11,7 +11,7 @@ async test "import z：直灌新库 + 坏行上报不中止" {
   let errs : Array[String] = []
   let env = env_map([("_JB_DATA_DIR", data), ("_Z_DATA", zfile)])
   @debug.assert_eq(run(["import", "z"], env, errs), 0)
-  // 坏行按 <路径>:<行号>: <原因> 上报，好行照常入库
+  // bad rows are reported as <path>:<line>: <reason>, and good rows still import
   @debug.assert_eq(errs.length(), 1)
   @debug.assert_eq(errs[0], "\{zfile}:3: invalid entry: garbage")
   let store = match @platform.load(data) {
@@ -30,7 +30,7 @@ async test "import z：直灌新库 + 坏行上报不中止" {
 }
 
 ///|
-async test "import 空库检查：非空库无 --merge 拒绝，--merge 合并" {
+async test "import\'s empty check: a non-empty database refuses without --merge, and --merge merges" {
   let data = make_test_dir("imp-merge-data")
   let target = make_test_dir("imp-merge-tgt")
   let zdir = make_test_dir("imp-merge-z")
@@ -39,13 +39,13 @@ async test "import 空库检查：非空库无 --merge 拒绝，--merge 合并" 
   let errs : Array[String] = []
   let env = env_map([("_JB_DATA_DIR", data), ("_Z_DATA", zfile)])
   @debug.assert_eq(run(["add", target], env_with(data), errs), 0)
-  // 非空库 + 无 --merge → 上游同文案拒绝
+  // a non-empty database with no --merge -> the refusal with upstream\'s wording
   @debug.assert_eq(run(["import", "z"], env, errs), 1)
   @debug.assert_eq(
     errs[errs.length() - 1],
     "jumbit: current database is not empty, specify --merge to continue anyway",
   )
-  // --merge 合并
+  // --merge merges
   @debug.assert_eq(run(["import", "--merge", "z"], env, errs), 0)
   let store = match @platform.load(data) {
     Ok(s) => s
@@ -58,7 +58,7 @@ async test "import 空库检查：非空库无 --merge 拒绝，--merge 合并" 
 }
 
 ///|
-async test "import z：重复路径 dedup 合并 rank 与最新时间" {
+async test "import z: duplicate paths dedup, merging the rank and the newest time" {
   let data = make_test_dir("imp-dedup")
   let zdir = make_test_dir("imp-dedup-z")
   let zfile = zdir + "/zdata"
@@ -84,7 +84,7 @@ async test "import z：重复路径 dedup 合并 rank 与最新时间" {
 }
 
 ///|
-async test "import z：_JB_EXCLUDE_DIRS 命中静默跳过" {
+async test "import z: a _JB_EXCLUDE_DIRS hit is skipped silently" {
   let data = make_test_dir("imp-excl")
   let zdir = make_test_dir("imp-excl-z")
   let zfile = zdir + "/zdata"
@@ -108,7 +108,7 @@ async test "import z：_JB_EXCLUDE_DIRS 命中静默跳过" {
 }
 
 ///|
-async test "import autojump：XDG 定位 + sigmoid 归一 + last_accessed=0" {
+async test "import autojump: XDG lookup + sigmoid normalization + last_accessed=0" {
   let data = make_test_dir("imp-aj-data")
   let ajdir = make_test_dir("imp-aj")
   @afs.mkdir(ajdir + "/autojump", recursive=true)
@@ -124,8 +124,8 @@ async test "import autojump：XDG 定位 + sigmoid 归一 + last_accessed=0" {
   @debug.assert_eq(store.database().all().length(), 1)
   let d = store.database().all()[0]
   @debug.assert_eq(d.path, "/aj")
-  // rank 与 core 解析器一致（sigmoid(3.0)=0.9525741…），last_accessed 置 0;
-  // 明文持久化为两位小数(上游 #1288 同款),回读量化为 0.95
+  // the rank matches core\'s parser (sigmoid(3.0)=0.9525741...), and last_accessed is set to 0;
+  // the plaintext persist keeps two decimals (as upstream #1288 does) and the read-back quantizes to 0.95
   @debug.assert_eq(d.rank, 0.95)
   @debug.assert_eq(d.last_accessed, 0L)
   cleanup_test_dir(data)
@@ -133,7 +133,7 @@ async test "import autojump：XDG 定位 + sigmoid 归一 + last_accessed=0" {
 }
 
 ///|
-async test "import z.lua：主路径缺失回落 fish 路径；主路径存在时优先" {
+async test "import z.lua: a missing main path falls back to the fish path, and the main path wins when present" {
   let data = make_test_dir("imp-zlua-data")
   let fishdir = make_test_dir("imp-zlua-fish")
   let home = make_test_dir("imp-zlua-home")
@@ -145,7 +145,7 @@ async test "import z.lua：主路径缺失回落 fish 路径；主路径存在�
     ("XDG_DATA_HOME", fishdir),
     ("HOME", home),
   ])
-  // 主路径 $HOME/.zlua 不存在 → 回落 fish
+  // the main path $HOME/.zlua is absent -> fall back to fish
   @debug.assert_eq(run(["import", "z.lua"], env, errs), 0)
   let store = match @platform.load(data) {
     Ok(s) => s
@@ -153,7 +153,7 @@ async test "import z.lua：主路径缺失回落 fish 路径；主路径存在�
   }
   @debug.assert_eq(store.database().all().length(), 1)
   @debug.assert_eq(store.database().all()[0].path, "/fishy")
-  // 主路径存在时优先主路径（清库重导）
+  // with the main path present it wins (clearing the database and re-importing)
   cleanup_test_dir(data)
   @platform.write_atomic(home + "/.zlua", b"/mainzlua|1|100\n")
   let errs2 : Array[String] = []
@@ -170,7 +170,7 @@ async test "import z.lua：主路径缺失回落 fish 路径；主路径存在�
 }
 
 ///|
-async test "import z：文件缺失 → could not read + 退出码 1，不落盘" {
+async test "import z: a missing file -> could not read plus exit code 1, nothing written" {
   let data = make_test_dir("imp-missing")
   let errs : Array[String] = []
   let env = env_map([
@@ -184,7 +184,7 @@ async test "import z：文件缺失 → could not read + 退出码 1，不落盘
 }
 
 ///|
-async test "import z：超大 rank 触发 age 老化（0.9×maxage/total 因子）" {
+async test "import z: a huge rank triggers age (the 0.9 x maxage/total factor)" {
   let data = make_test_dir("imp-age")
   let zdir = make_test_dir("imp-age-z")
   let zfile = zdir + "/zdata"
@@ -211,11 +211,11 @@ async test "import z：超大 rank 触发 age 老化（0.9×maxage/total 因子�
 
 ///|
 #cfg(not(platform="windows"))
-// 伪 atuin 桩经 chmod 可执行位造（Windows 无 exec 位，待 .cmd 桩平台化）
-async test "import atuin：连续同路径折叠 + 错误不打断链（PATH 注入伪 atuin 走真实子进程）" {
+// the fake-atuin stub is made with a chmod executable bit (Windows has no exec bit; a .cmd stub is pending)
+async test "import atuin: consecutive same-path folding, with an error not breaking the chain (a fake atuin injected on PATH runs as a real subprocess)" {
   let data = make_test_dir("imp-atuin-data")
   let bindir = make_test_dir("imp-atuin-bin")
-  // 记录序：/a /a 坏行 /a /b —— 期望 /a 只收首次（跨坏行仍折叠），/b 照常
+  // record order: /a /a badrow /a /b -- /a is expected to keep only the first (still folding across the bad row), and /b as usual
   let nul = "\u{0000}"
   let records : String = "2024-01-01 00:00:00\t/a\{nul}2024-01-02 00:00:00\t/a\{nul}bad-record\{nul}2024-01-03 00:00:00\t/a\{nul}2024-01-04 00:00:00\t/b\{nul}"
   @platform.write_atomic(bindir + "/records", @utf8.encode(records))
@@ -236,7 +236,7 @@ async test "import atuin：连续同路径折叠 + 错误不打断链（PATH 注
     run(["import", "atuin"], env_map([("_JB_DATA_DIR", data)]), errs),
     0,
   )
-  // 还原 PATH（追加式注入对并行测试无害，礼貌还原）
+  // restore PATH (an append-only injection is harmless to parallel tests, but restore politely anyway)
   match orig_path {
     Some(p) => @env.set_env_var("PATH", p)
     None => @env.unset_env_var("PATH")
@@ -251,7 +251,7 @@ async test "import atuin：连续同路径折叠 + 错误不打断链（PATH 注
   for d in store.database().all() {
     match d.path {
       "/a" => {
-        // rank=1.0 且时间取转换首次（2024-01-01），非折叠前最后一条（01-03）
+        // rank=1.0 and the time is the transition\'s first (2024-01-01), not the last record before folding (01-03)
         @debug.assert_eq(d.rank, 1.0)
         @debug.assert_eq(d.last_accessed, 1704067200L)
       }
@@ -267,7 +267,7 @@ async test "import atuin：连续同路径折叠 + 错误不打断链（PATH 注
 }
 
 ///|
-test "forward_atuin_stderr：剥原文尾换行再透传（上游继承 stderr 字节原样）" {
+test "forward_atuin_stderr: strip the source\'s trailing newline before passing it on (upstream inherits stderr byte-verbatim)" {
   let errs : Array[String] = []
   forward_atuin_stderr(errs, "a\nb\n")
   @debug.assert_eq(errs, ["a\nb"])

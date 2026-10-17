@@ -1,5 +1,5 @@
 ///|
-async test "add 的 -- 分隔符：负号开头路径可正常记录" {
+async test "add\'s -- separator: a path starting with a minus is recorded normally" {
   let data = make_test_dir("dash-data")
   let target = make_test_dir("-dash-target")
   let errs : Array[String] = []
@@ -15,7 +15,7 @@ async test "add 的 -- 分隔符：负号开头路径可正常记录" {
 }
 
 ///|
-async test "add 非目录 → 退出码 1 且报错文案" {
+async test "add a non-directory -> exit code 1 with the error wording" {
   let data = make_test_dir("nondir-bail-1")
   let errs : Array[String] = []
   @debug.assert_eq(run(["add", "/nonexistent-path"], env_with(data), errs), 1)
@@ -24,7 +24,7 @@ async test "add 非目录 → 退出码 1 且报错文案" {
 }
 
 ///|
-async test "add 含换行路径 → 静默跳过（对齐上游，退出码 0）" {
+async test "add a path containing a newline -> skipped silently (matching upstream, exit code 0)" {
   let data = make_test_dir("nl")
   let errs : Array[String] = []
   @debug.assert_eq(run(["add", "/a\nb"], env_with(data), errs), 0)
@@ -34,17 +34,17 @@ async test "add 含换行路径 → 静默跳过（对齐上游，退出码 0）
 }
 
 ///|
-async test "add 非目录 → 立即中止且不落盘" {
+async test "add a non-directory -> aborts immediately and writes nothing" {
   let data = make_test_dir("nondir-bail-2")
   let errs : Array[String] = []
-  // 先给一个合法目录再给非法路径：上游 bail 语义下整条命令失败、不保存
+  // a legal directory first and then an illegal path: under upstream\'s bail semantics the whole command fails and nothing is saved
   @debug.assert_eq(run(["add", "/nonexistent-path"], env_with(data), errs), 1)
   @debug.assert_eq(@afs.exists(data + "/db.txt"), false)
   cleanup_test_dir(data)
 }
 
 ///|
-async test "两次 add 同目录 → 数据库仍单条目" {
+async test "adding the same directory twice -> the database still holds one entry" {
   let data = make_test_dir("dedup")
   let target = make_test_dir("tgt")
   let errs : Array[String] = []
@@ -61,7 +61,7 @@ async test "两次 add 同目录 → 数据库仍单条目" {
 }
 
 ///|
-async test "add：_JB_ECHO=1 时回显且退出码不受影响" {
+async test "add: with _JB_ECHO=1 it echoes without affecting the exit code" {
   let data = make_test_dir("echo-data")
   let target = make_test_dir("echo-target")
   let errs : Array[String] = []
@@ -74,7 +74,7 @@ async test "add：_JB_ECHO=1 时回显且退出码不受影响" {
     0,
   )
   @debug.assert_eq(errs.length(), 0)
-  // 目录里仍只一条记录，echo 只是输出副作用
+  // the database still holds one record; the echo is only an output side effect
   let store = match @platform.load(data) {
     Ok(s) => s
     Err(e) => fail("\{Repr(e)}")
@@ -85,15 +85,15 @@ async test "add：_JB_ECHO=1 时回显且退出码不受影响" {
 }
 
 ///|
-async test "remove：删除后 query 无结果；未记录路径报错" {
+async test "remove: after deletion a query finds nothing, and an unrecorded path errors" {
   let data = make_test_dir("rm-data")
   let target = make_test_dir("rm-target")
   let errs : Array[String] = []
   @debug.assert_eq(run(["add", target], env_with(data), errs), 0)
-  // 按绝对路径删
+  // delete by absolute path
   @debug.assert_eq(run(["remove", target], env_with(data), errs), 0)
   @debug.assert_eq(run(["query"], env_with(data), errs), 1)
-  // 再删同一路径 → path not found
+  // deleting the same path again -> path not found
   let errs2 : Array[String] = []
   @debug.assert_eq(run(["remove", target], env_with(data), errs2), 1)
   @debug.assert_eq(errs2.length(), 1)
@@ -102,12 +102,12 @@ async test "remove：删除后 query 无结果；未记录路径报错" {
 }
 
 ///|
-async test "remove：相对路径形式经规范化后也能删" {
+async test "remove: a relative-path form also deletes once normalized" {
   let data = make_test_dir("rm-rel-data")
   let target = make_test_dir("rm-rel-target")
   let errs : Array[String] = []
   @debug.assert_eq(run(["add", target], env_with(data), errs), 0)
-  // remove 不存在的原始串 → 兜底按规范化路径再试（对齐上游双重尝试）
+  // remove with a nonexistent original string -> retries with the normalized path (matching upstream\'s dual attempt)
   @debug.assert_eq(
     run(["remove", "jumbit-e2e-nonexistent"], env_with(data), errs),
     1,
@@ -117,13 +117,13 @@ async test "remove：相对路径形式经规范化后也能删" {
 }
 
 ///|
-async test "_JB_MAXAGE=0：add 后总分清零全删（预期行为锁定）" {
+async test "_JB_MAXAGE=0: after add the total zeroes and everything is deleted (pinning the expected behaviour)" {
   let data = make_test_dir("age-data")
   let target = make_test_dir("age-target")
   let errs : Array[String] = []
   let env = env_map([("_JB_DATA_DIR", data), ("_JB_MAXAGE", "0")])
   @debug.assert_eq(run(["add", target], env, errs), 0)
-  // total > 0 → factor 0 → rank<1 全删，库文件为空数组
+  // total > 0 -> factor 0 -> every rank < 1, so everything is deleted and the file holds an empty array
   let store = match @platform.load(data) {
     Ok(s) => s
     Err(e) => fail("\{Repr(e)}")
@@ -134,7 +134,7 @@ async test "_JB_MAXAGE=0：add 后总分清零全删（预期行为锁定）" {
 }
 
 ///|
-async test "_JB_MAXAGE 非数字 → 退出码 1（对齐上游运行失败）" {
+async test "a non-numeric _JB_MAXAGE -> exit code 1 (matching upstream\'s runtime failure)" {
   let data = make_test_dir("age-bad")
   let errs : Array[String] = []
   let env = env_map([("_JB_DATA_DIR", data), ("_JB_MAXAGE", "abc")])
@@ -144,7 +144,7 @@ async test "_JB_MAXAGE 非数字 → 退出码 1（对齐上游运行失败）" 
 }
 
 ///|
-async test "add --score：负增量 clamp 到 0" {
+async test "add --score: a negative delta clamps to 0" {
   let data = make_test_dir("score-data")
   let target = make_test_dir("score-target")
   let errs : Array[String] = []
@@ -161,8 +161,8 @@ async test "add --score：负增量 clamp 到 0" {
     Err(e) => fail("\{Repr(e)}")
   }
   @debug.assert_eq(store.database().all().length(), 1)
-  // 内存 clamp 到 0.0;经明文落盘 round-trip 后读回为 MIN_RANK 0.01
-  // (上游 #1288 明文格式同款语义:磁盘 rank 下限 0.01)
+  // clamped to 0.0 in memory; after a plaintext round trip it reads back as MIN_RANK 0.01
+  // (the same semantics as upstream #1288\'s plaintext format: the on-disk rank floor is 0.01)
   @debug.assert_eq(store.database().all()[0].rank, 0.01)
   cleanup_test_dir(data)
   cleanup_test_dir(target)
@@ -170,14 +170,14 @@ async test "add --score：负增量 clamp 到 0" {
 
 ///|
 #cfg(not(platform="windows"))
-// Windows 门控：符号链接创建需特权/开发者模式，probe run 36044327191
-async test "_JB_RESOLVE_SYMLINKS=1：add 符号链接记录真实目录" {
+// Windows-gated: creating a symlink needs privilege or developer mode, probe run 36044327191
+async test "_JB_RESOLVE_SYMLINKS=1: add records a symlink\'s real directory" {
   let data = make_test_dir("sym-data")
   let real = make_test_dir("sym-real")
   let link = "/tmp/jumbit-e2e-sym-link-\{@async.now()}"
   @afs.symlink(target=real, link)
   let errs : Array[String] = []
-  // 解析模式：记录真实目录；默认模式：记录链接路径本身
+  // resolve mode: the real directory is recorded; the default mode: the link path itself
   @debug.assert_eq(
     run(
       ["add", link],
@@ -191,9 +191,9 @@ async test "_JB_RESOLVE_SYMLINKS=1：add 符号链接记录真实目录" {
     Err(e) => fail("\{Repr(e)}")
   }
   @debug.assert_eq(store.database().all().length(), 1)
-  // 期望路径与被测语义同源取 realpath：macOS 下 /tmp 是指向 /private/tmp 的
-  // 符号链接，解析会转义出 /private 前缀（Linux 无此链接，两值相等），
-  // 字面量断言会平台性失败
+  // the expected path takes realpath from the same source as the semantics under test: on macOS /tmp is a symlink to
+  // /private/tmp, so resolving escapes a /private prefix (Linux has no such link and the two values agree), which would
+  // make a literal assertion fail by platform
   let expected = @afs.realpath(real) catch {
     err => fail("\{@platform.os_error_message(err)}")
   }
@@ -206,8 +206,8 @@ async test "_JB_RESOLVE_SYMLINKS=1：add 符号链接记录真实目录" {
 
 ///|
 #cfg(not(platform="windows"))
-// Windows 门控：符号链接创建需特权/开发者模式，probe run 36044327191
-async test "add _JB_RESOLVE_SYMLINKS=1：自环符号链接 → 解析路径失败 + exit 1（ELOOP 走数字后缀）" {
+// Windows-gated: creating a symlink needs privilege or developer mode, probe run 36044327191
+async test "add with _JB_RESOLVE_SYMLINKS=1: a self-looping symlink -> path resolution fails plus exit 1 (ELOOP takes the numeric suffix)" {
   let data = make_test_dir("loop-data")
   let dir = make_test_dir("loop-link")
   let loop_path = dir + "/loop"
@@ -215,9 +215,9 @@ async test "add _JB_RESOLVE_SYMLINKS=1：自环符号链接 → 解析路径失�
   let env = env_map([("_JB_DATA_DIR", data), ("_JB_RESOLVE_SYMLINKS", "1")])
   let errs : Array[String] = []
   @debug.assert_eq(run(["add", loop_path], env, errs), 1)
-  // ELOOP 的 errno 数值平台各异（Linux 40 / macOS 62），锁形状不锁数值：
-  // 前缀文案 + (os error N) 数字后缀（ELOOP 不在 os_error_message 短语集，
-  // 若被误并入短语集或退回 Debug 结构会在此挂）
+  // ELOOP\'s errno value differs by platform (Linux 40 / macOS 62), so the shape is pinned, not the value:
+  // the prefix wording plus an (os error N) numeric suffix (ELOOP is not in os_error_message\'s phrase set, so
+  // wrongly folding it into the phrase set or falling back to a Debug structure would fail here)
   @debug.assert_eq(
     errs[0].has_prefix(
       "jumbit: could not resolve path \{loop_path}: (os error ",
