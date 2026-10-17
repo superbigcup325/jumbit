@@ -1,7 +1,7 @@
 ///|
-/// export --agents（jumbit 扩展）：有标注条目按 frecency 降序输出 Markdown
-/// 「项目地图」，可直接追加进 AGENTS.md 供 coding agent 认识工作区。
-/// 不做存在性检查（离线视图）；路径/标注中的 `|` 转义保表格完整
+/// export --agents (a jumbit extension): annotated entries are printed in frecency-descending order as a Markdown
+/// "project map" to append to AGENTS.md so a coding agent can learn the workspace.
+/// No existence check (an offline view); a `|` in a path or annotation is escaped to keep the table intact
 async fn run_export(
   eopts : @cli.ExportOptions,
   getenv : (String) -> String?,
@@ -11,8 +11,8 @@ async fn run_export(
 }
 
 ///|
-/// export 执行内核：输出行经 emit 回调写出（CLI 直连 println；MCP 工具路
-/// 收集进 content，同字节的行串）
+/// The export execution core: output lines go out through an emit callback (the CLI prints directly; the MCP tool path
+/// collects byte-identical lines into content)
 async fn export_exec(
   _eopts : @cli.ExportOptions,
   getenv : (String) -> String?,
@@ -33,9 +33,9 @@ async fn export_exec(
       noted.push(d)
     }
   }
-  // 经临时 Database 排序：复用 core 的 sort_by_score（含 NaN total_cmp 语义）；
-  // sort_by_score 为升序（Stream 靠倒序遍历取降序），此处倒序遍历实现声明的
-  // frecency 降序
+  // sorted through a temporary Database, reusing core\'s sort_by_score (including its NaN total_cmp semantics);
+  // sort_by_score is ascending (Stream takes descending by traversing in reverse), so this traverses in reverse to deliver the
+  // declared frecency-descending order
   let ranked = @core.Database::from_dirs(noted)
   ranked.sort_by_score(current_second())
   emit("<!-- jumbit export --agents: project map, ordered by frecency -->")
@@ -54,7 +54,7 @@ async fn export_exec(
 }
 
 ///|
-/// Markdown 表格单元格转义：竖线转 `\|` 防破表（换行已在 describe 拒绝）
+/// Markdown table-cell escaping: a pipe becomes `\|` to keep the table intact (newlines are already rejected by describe)
 fn md_cell(text : String) -> String {
   let out : StringBuilder = StringBuilder()
   for ch in text {

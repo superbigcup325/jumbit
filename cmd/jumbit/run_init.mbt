@@ -1,5 +1,5 @@
 ///|
-/// init：按 shell 渲染集成脚本（echo/resolve_symlinks 取自运行时配置，对齐上游 init.rs）
+/// init: render the integration script per shell (echo and resolve_symlinks come from the runtime config, matching upstream init.rs)
 fn run_init(
   iopts : @cli.InitOptions,
   getenv : (String) -> String?,

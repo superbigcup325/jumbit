@@ -1,6 +1,6 @@
 ///|
-/// describe（jumbit 扩展）：为已记录条目设置/清除/显示人工标注。
-/// 路径对齐 remove 的双重尝试：先原串，未中再按 cwd 规范化
+/// describe (a jumbit extension): set, clear or show a human annotation on a recorded entry.
+/// The path uses the same dual attempt as remove: the original string first, then normalized against the cwd
 async fn run_describe(
   dopts : @cli.DescribeOptions,
   getenv : (String) -> String?,
@@ -21,7 +21,7 @@ async fn run_describe(
   let db = store.database()
   match dopts.note {
     Some(text) => {
-      // 空串即清除
+      // an empty string clears
       let note = if text == "" { None } else { Some(text) }
       let ok = try_twice(db, dopts.path, cwd, fn(db, p) { db.set_note(p, note) })
       if !ok {

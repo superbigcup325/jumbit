@@ -1,17 +1,17 @@
 ///|
-/// status 的库状态报表（jumbit 扩展，上游无）：计算与渲染分离（渲染可 wbtest 直断字节）。
-/// existing 仅在 --check 时为 Some（O(N) 逐路径存在性扫描，默认快查不做）；
-/// 无数据文件视为空库（file_size 0 / entries 0 / format None）。
-/// format = 实际加载格式的标识（规格 docs/spec-plaintext-edit.md §3.4）：
-/// "plaintext"（db.txt，主格式）/ "binary"（legacy db.zo，只读不迁移）/ None（无库）——
-/// 二进制内部版本号不外泄（诊断价值由「数据文件损坏」路径承担）
+/// status\'s database report (a jumbit extension with no upstream equivalent): computation is separated from rendering (the wbtest can assert the bytes directly).
+/// existing is Some only under --check (an O(N) per-path existence scan; the default quick check does not run it);
+/// a missing data file counts as an empty database (file_size 0 / entries 0 / format None).
+/// format = the identity of the format actually loaded (spec docs/spec-plaintext-edit.md §3.4):
+/// "plaintext" (db.txt, the main format) / "binary" (legacy db.zo, read-only with no migration) / None (no database) --
+/// the binary\'s internal version number never leaks (the diagnostic value lives on the "corrupted data file" path)
 struct DbStatus {
   data_file : String
   file_size : Int32
   format : String?
   entries : Int32
   notes : Int32
-  /// _JB_MAXAGE 现值（config 解析产物为 Double）
+  /// the current _JB_MAXAGE (config parses it into a Double)
   maxage : Double
   existing : Int32?
 } derive(Debug)
@@ -38,9 +38,9 @@ fn render_status_human(r : DbStatus) -> Array[String] {
 }
 
 ///|
-/// 单行 JSON 对象（键序固定，--json 纪律同 query --json）；existing 仅 --check 出现。
-/// format_version 键 0.1.2 起更名 format、值改格式标识字符串（breaking，
-/// CHANGELOG 注明）
+/// A single-line JSON object (fixed key order, the same --json discipline as query --json); existing appears only under --check.
+/// The format_version key became format in 0.1.2, with the value a format-identifying string (breaking,
+/// noted in the CHANGELOG)
 fn render_status_json(r : DbStatus) -> String {
   let fmt = match r.format {
     Some(v) => "\"\{v}\""
@@ -54,9 +54,9 @@ fn render_status_json(r : DbStatus) -> String {
 }
 
 ///|
-/// 加载库并汇总条目/标注（统一走 platform.load 单一加载路径；legacy db.zo
-/// 被标 dirty 但 status 只读不 save，不触发迁移）。返回 None = 加载失败
-/// （stderr 已报）
+/// Load the database and summarize entries and annotations (all through platform.load\'s single load path; a legacy db.zo
+/// is marked dirty, but status is read-only and never saves, so no migration fires). None means the load failed
+/// (already reported on stderr)
 async fn load_status_dirs(
   data_dir : String,
   errs : Array[String],
@@ -93,7 +93,7 @@ async fn run_status(
     Some(dirs) => dirs
     None => return 1
   }
-  // 数据文件事实：db.txt 主格式优先，回落 legacy db.zo；均无 → 主路径 + 零值
+  // the data-file facts: db.txt (the main format) first, then the legacy db.zo; neither -> the main path with zero values
   let txt_path = data_dir + "/db.txt"
   let zo_path = data_dir + "/db.zo"
   let (data_file, format) = if @afs.exists(txt_path) {

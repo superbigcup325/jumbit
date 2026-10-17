@@ -1,8 +1,8 @@
 ///|
-/// add（对齐上游 add.rs）：
-/// - 按 _JB_RESOLVE_SYMLINKS 选择 realpath（canonicalize）或 resolve_path
-/// - 换行路径 / _JB_EXCLUDE_DIRS glob 命中 → 静默跳过；非目录 → 立即报错中止
-/// - 全部 add_update(score) 后，若 dirty 则 age(_JB_MAXAGE) 再 save
+/// add (matching upstream add.rs):
+/// - _JB_RESOLVE_SYMLINKS chooses realpath (canonicalize) or resolve_path
+/// - a path containing a newline, or a _JB_EXCLUDE_DIRS glob hit -> skipped silently; not a directory -> errors out immediately
+/// - after every add_update(score), if dirty then age(_JB_MAXAGE) runs before the save
 async fn run_add(
   aopts : @cli.AddOptions,
   getenv : (String) -> String?,
@@ -35,7 +35,7 @@ async fn run_add(
     let resolved = if resolve_symlinks {
       @afs.realpath(resolved) catch {
         err => {
-          // os_error_message 自带 (os error N) 后缀，用冒号拼接避免括号嵌套
+          // os_error_message already carries a (os error N) suffix, so a colon joins them to avoid nested parentheses
           err_line(
             errs,
             "jumbit: could not resolve path \{resolved}: \{@platform.os_error_message(err)}",
@@ -46,11 +46,11 @@ async fn run_add(
     } else {
       resolved
     }
-    // 换行/回车无法整洁地打印在单行，静默跳过（对齐上游 EXCLUDE_CHARS）
+    // a newline or carriage return cannot be printed cleanly on one line, so it is skipped silently (matching upstream EXCLUDE_CHARS)
     if resolved.find("\n") is Some(_) || resolved.find("\r") is Some(_) {
       continue
     }
-    // _JB_EXCLUDE_DIRS 命中 → 静默跳过
+    // a _JB_EXCLUDE_DIRS hit -> skipped silently
     if glob_hit(globs, resolved) {
       continue
     }
@@ -76,7 +76,7 @@ async fn run_add(
 }
 
 ///|
-/// remove（对齐上游 remove.rs）：先按原始串删，未中再按规范化路径删，仍未中报错
+/// remove (matching upstream remove.rs): delete by the original string first, then by the normalized path, and error if neither matches
 async fn run_remove(
   paths : Array[String],
   getenv : (String) -> String?,
