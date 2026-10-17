@@ -1,5 +1,5 @@
 ///|
-async test "空库 query → 退出码 1 + 提示语，不 panic" {
+async test "query on an empty database -> exit code 1 with a hint, no panic" {
   let data = make_test_dir("empty")
   let errs : Array[String] = []
   @debug.assert_eq(run(["query"], env_with(data), errs), 1)
@@ -8,19 +8,19 @@ async test "空库 query → 退出码 1 + 提示语，不 panic" {
 }
 
 ///|
-async test "query 关键词：命中末组件的目录" {
+async test "query keywords: the directory whose final component matches" {
   let data = make_test_dir("kw-data")
   let foo_dir = make_test_dir("foo-project")
   let bar_dir = make_test_dir("bar-project")
   let errs : Array[String] = []
   @debug.assert_eq(run(["add", foo_dir, bar_dir], env_with(data), errs), 0)
-  // foo 命中 foo-project（末组件），不命中 bar-project
+  // foo hits foo-project (the final component), not bar-project
   @debug.assert_eq(run(["query", "foo"], env_with(data), errs), 0)
-  // 无匹配关键词 → 退出码 1 + 提示
+  // a non-matching keyword -> exit code 1 with a hint
   let errs2 : Array[String] = []
   @debug.assert_eq(run(["query", "zzz"], env_with(data), errs2), 1)
   @debug.assert_eq(errs2.length(), 1)
-  // 关键词落在首组件（tmp）不满足末组件锚定 → 无匹配
+  // a keyword in the first component (tmp) does not satisfy final-component anchoring -> no match
   @debug.assert_eq(run(["query", "tmp"], env_with(data), errs2), 1)
   cleanup_test_dir(data)
   cleanup_test_dir(foo_dir)
@@ -28,7 +28,7 @@ async test "query 关键词：命中末组件的目录" {
 }
 
 ///|
-async test "query --list 与 --score 退出码" {
+async test "query --list and --score exit codes" {
   let data = make_test_dir("list-data")
   let t1 = make_test_dir("alpha-list")
   let t2 = make_test_dir("beta-list")
@@ -44,8 +44,8 @@ async test "query --list 与 --score 退出码" {
 
 ///|
 #cfg(not(platform="windows"))
-// // Windows 门控：exclude 精确比对对混合分隔符敏感（win32 resolve 归一反斜杠 vs TEMP 环境变量原样），Phase-2 语义决策后恢复
-async test "query --exclude 精确路径：唯一命中被排除报 only match" {
+// // Windows-gated: the exact exclude comparison is sensitive to mixed separators (win32 resolve normalizes to backslashes while the TEMP env var is as is); restore after the phase-2 semantic decision
+async test "query --exclude exact path: excluding the only match reports only match" {
   let data = make_test_dir("excl-data")
   let only = make_test_dir("only-dir")
   let errs : Array[String] = []
@@ -57,12 +57,12 @@ async test "query --exclude 精确路径：唯一命中被排除报 only match" 
 }
 
 ///|
-async test "query --all 跳过存在性检查" {
+async test "query --all skips the existence check" {
   let data = make_test_dir("all-data")
   let gone = make_test_dir("gone-dir")
   let errs : Array[String] = []
   @debug.assert_eq(run(["add", gone], env_with(data), errs), 0)
-  // 目录被删：默认 exists 检查 → 无匹配；--all → 仍返回
+  // the directory is deleted: the default exists check -> no match; --all -> still returned
   @afs.rmdir(gone)
   @debug.assert_eq(run(["query"], env_with(data), errs), 1)
   @debug.assert_eq(run(["query", "--all"], env_with(data), errs), 0)
@@ -71,15 +71,15 @@ async test "query --all 跳过存在性检查" {
 
 ///|
 #cfg(not(platform="windows"))
-// // Windows 门控：_JB_EXCLUDE_DIRS 冒号分隔与盘符冒号冲突 + /tmp/*victim* 字面 pattern 锁死 POSIX 形态，Phase-2 语义决策后恢复
-async test "_JB_EXCLUDE_DIRS glob 命中懒删除（重载后条目消失）" {
+// // Windows-gated: the _JB_EXCLUDE_DIRS colon separator collides with drive-letter colons, and the literal /tmp/*victim* pattern pins POSIX form; restore after phase 2
+async test "a _JB_EXCLUDE_DIRS glob hit is lazily deleted (the entry is gone after a reload)" {
   let data = make_test_dir("glob-data")
   let victim = make_test_dir("victim-dir")
   let keeper = make_test_dir("keeper-dir")
   let errs : Array[String] = []
   @debug.assert_eq(run(["add", victim, keeper], env_with(data), errs), 0)
-  // pattern 同源推导：victim 的父目录 + *victim*（POSIX 字面 /tmp 形态
-  // 在 temp 根平台化后不成立）
+  // the pattern is derived from the same source: victim\'s parent plus *victim* (the literal /tmp form has no standing
+  // once the temp root is made platform-agnostic)
   let parent_end = match victim.rev_find("/") {
     Some(i) => i
     None => 0
@@ -90,7 +90,7 @@ async test "_JB_EXCLUDE_DIRS glob 命中懒删除（重载后条目消失）" {
     ("_JB_EXCLUDE_DIRS", exclude_pattern),
   ])
   @debug.assert_eq(run(["query", "--list"], env, errs), 0)
-  // 懒删除已落盘：重载后只剩 keeper
+  // the lazy deletion is on disk: only keeper remains after a reload
   let store = match @platform.load(data) {
     Ok(s) => s
     Err(e) => fail("\{Repr(e)}")
@@ -103,7 +103,7 @@ async test "_JB_EXCLUDE_DIRS glob 命中懒删除（重载后条目消失）" {
 }
 
 ///|
-async test "_JB_EXCLUDE_DIRS 非法 glob → 退出码 1（对齐上游运行失败）" {
+async test "an illegal glob in _JB_EXCLUDE_DIRS -> exit code 1 (matching upstream\'s runtime failure)" {
   let data = make_test_dir("badglob")
   let errs : Array[String] = []
   let env = env_map([("_JB_DATA_DIR", data), ("_JB_EXCLUDE_DIRS", "[unclosed")])
@@ -113,7 +113,7 @@ async test "_JB_EXCLUDE_DIRS 非法 glob → 退出码 1（对齐上游运行失
 }
 
 ///|
-async test "query --json：--all 可查假路径、miss 退出码 1、--interactive 互斥退出码 2" {
+async test "query --json: --all can query a fake path, a miss exits 1, and --interactive is exclusive with exit code 2" {
   let data = make_test_dir("json-data")
   let zdir = make_test_dir("json-z")
   let zfile = zdir + "/zdata"
@@ -123,7 +123,7 @@ async test "query --json：--all 可查假路径、miss 退出码 1、--interact
   let errs : Array[String] = []
   let env = env_map([("_JB_DATA_DIR", data), ("_Z_DATA", zfile)])
   @debug.assert_eq(run(["import", "z"], env, errs), 0)
-  // --all 跳过存在性检查：假路径不被懒删除（JSON 字节形状由 json_wbtest 与 smoke 锁定）
+  // --all skips the existence check, so the fake path is not lazily deleted (the JSON byte shape is pinned by json_wbtest and smoke)
   @debug.assert_eq(run(["query", "--json", "--all"], env_with(data), errs), 0)
   @debug.assert_eq(
     run(["query", "--json", "--all", "nosuch"], env_with(data), errs),
@@ -138,28 +138,28 @@ async test "query --json：--all 可查假路径、miss 退出码 1、--interact
 }
 
 ///|
-async test "query --fuzzy：精确零命中兜底组件子串（扩展语义，默认行为不变）" {
+async test "query --fuzzy: the component-substring fallback on an exact zero-hit (extension semantics; default behaviour unchanged)" {
   let data = make_test_dir("fz-data")
   let zdir = make_test_dir("fz-z")
   let zfile = zdir + "/zdata"
-  // 关键词落在非末组件：exact 末组件锚定 miss，fuzzy 兜底
+  // a keyword in a non-final component: exact misses on final-component anchoring, fuzzy falls back
   @platform.write_atomic(zfile, b"/imp-fz/blog/work|1|0\n")
   let errs : Array[String] = []
   let env = env_map([("_JB_DATA_DIR", data), ("_Z_DATA", zfile)])
   @debug.assert_eq(run(["import", "z"], env, errs), 0)
-  // 默认语义不变：exact miss → 退出码 1
+  // the default semantics are unchanged: an exact miss -> exit code 1
   @debug.assert_eq(run(["query", "--all", "blog"], env_with(data), errs), 1)
-  // --fuzzy 兜底命中
+  // --fuzzy\'s fallback hits
   @debug.assert_eq(
     run(["query", "--all", "--fuzzy", "blog"], env_with(data), errs),
     0,
   )
-  // 组件内子串（拼错场景）同样兜底
+  // an in-component substring (the typo case) falls back too
   @debug.assert_eq(
     run(["query", "--all", "--fuzzy", "blo"], env_with(data), errs),
     0,
   )
-  // 多关键词缺一不命中
+  // with several keywords, a missing one means no match
   @debug.assert_eq(
     run(["query", "--all", "--fuzzy", "blog", "zzz"], env_with(data), errs),
     1,
@@ -169,18 +169,18 @@ async test "query --fuzzy：精确零命中兜底组件子串（扩展语义，�
 }
 
 ///|
-async test "query --limit：三路截断与 0=空输出（扩展语义）" {
+async test "query --limit: truncation on all three paths, and 0 gives empty output (extension semantics)" {
   let data = make_test_dir("lim-data")
   let zdir = make_test_dir("lim-z")
   let zfile = zdir + "/zdata"
-  // 三条不同得分：beta 8.0 / mid 4.0×?——la=0 全 ×0.25：2.0→0.5、1.0→0.25
+  // three different scores: beta 8.0 / mid 4.0x? -- la=0 makes everything x0.25: 2.0 -> 0.5, 1.0 -> 0.25
   @platform.write_atomic(
     zfile, b"/imp-lim-alpha|1.0|0\n/imp-lim-beta|2.0|1099511627776\n/imp-lim-mid|4.0|0\n",
   )
   let errs : Array[String] = []
   let env = env_map([("_JB_DATA_DIR", data), ("_Z_DATA", zfile)])
   @debug.assert_eq(run(["import", "z"], env, errs), 0)
-  // --list --limit 2：截前两条（排序后），不重排
+  // --list --limit 2: the first two after sorting, without re-sorting
   @debug.assert_eq(
     run(
       ["query", "--list", "--score", "--all", "--limit", "2"],
@@ -189,30 +189,30 @@ async test "query --limit：三路截断与 0=空输出（扩展语义）" {
     ),
     0,
   )
-  // --json --limit 0：空数组 + 退出码 0（不走空检查错误路）
+  // --json --limit 0: an empty array with exit code 0 (never the empty-check error path)
   @debug.assert_eq(
     run(["query", "--json", "--all", "--limit", "0"], env_with(data), errs),
     0,
   )
-  // --limit 大于结果数：全量输出不报错
+  // --limit above the result count: full output, no error
   @debug.assert_eq(
     run(["query", "--list", "--all", "--limit", "99"], env_with(data), errs),
     0,
   )
-  // 裸 query + limit 已被 parse 层拒绝（cli_test 锁定），此处不再覆盖
+  // a bare query with limit is already rejected at the parse layer (pinned by cli_test), so it is not covered again
   cleanup_test_dir(data)
   cleanup_test_dir(zdir)
 }
 
 ///|
-test "take_limit：None 不截断、取排序后前 n 条、0=空、超界取全量" {
+test "take_limit: None means no truncation, it takes the first n after sorting, 0 is empty and an over-large n takes everything" {
   let dir = (p : String, r : Double) => @core.Dir::{
     path: p,
     rank: r,
     last_accessed: 0L,
     note: None,
   }
-  // 模拟 remaining：已按得分降序
+  // a simulated remaining, already descending by score
   let dirs = [dir("/a", 8.0), dir("/b", 1.0), dir("/c", 0.5)]
   @debug.assert_eq(take_limit(dirs, None).length(), 3)
   let two = take_limit(dirs, Some(2))
