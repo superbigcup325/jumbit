@@ -1,15 +1,15 @@
 ///|
-/// edit 执行层测试（规格 docs/spec-plaintext-edit.md §1.4/§3.3）：
-/// 伪 editor 探针矩阵 + --rename/--prune 端到端
+/// Tests for the edit execution layer (spec docs/spec-plaintext-edit.md §1.4/§3.3):
+/// a fake-editor probe matrix plus --rename/--prune end to end
 
 ///|
 #cfg(not(platform="windows"))
-// cfg 门控：仅被 Windows 门控测试消费（见各测试处注释）
-/// 构造伪 editor 脚本：shell 片段在编辑时执行（$1 = 被编辑文件路径）
+// cfg-gated: consumed only by the Windows-gated tests (see the notes at each test)
+/// Build a fake editor script: the shell fragment runs at edit time ($1 = the file being edited)
 async fn make_fake_editor(dir : String, name : String, body : String) -> String {
   let path = dir + "/" + name
-  // ⚠️ String::to_bytes 是 UTF-16 字节(shebang 会烂掉,Exec format error),
-  // 必须走 UTF-8 编码
+  // WARNING: String::to_bytes gives UTF-16 bytes (which mangles the shebang and yields Exec format error),
+  // so UTF-8 encoding is required
   @platform.write_atomic(path, @utf8.encode("#!/bin/sh\n" + body))
   @afs.chmod(path, 0o755)
   path
@@ -17,14 +17,14 @@ async fn make_fake_editor(dir : String, name : String, body : String) -> String 
 
 ///|
 #cfg(not(platform="windows"))
-// 伪 editor 桩经 chmod 可执行位造（Windows 无 exec 位，待 .cmd 桩平台化）
-async test "edit 交互：正常编辑改 rank → 落盘；编辑器缺失 → no editor" {
+// the fake-editor stub is made with a chmod executable bit (Windows has no exec bit; a .cmd stub is pending)
+async test "interactive edit: a normal rank edit lands on disk; a missing editor -> no editor" {
   let data = make_test_dir("edit-data")
   let target = make_test_dir("edit-target")
   let bindir = make_test_dir("edit-bin")
   let errs : Array[String] = []
   @debug.assert_eq(run(["add", target], env_with(data), errs), 0)
-  // editor A：往文件追加一行合法条目（改动 → 落盘）
+  // editor A: appends one legal entry (a change -> written to disk)
   let ed_add = make_fake_editor(
     bindir, "ed-add", "printf '0000000001\\t0000002.00\\t/added-by-editor\\n' >> \"$1\"",
   )
@@ -43,15 +43,15 @@ async test "edit 交互：正常编辑改 rank → 落盘；编辑器缺失 → 
     Err(e) => fail("\{Repr(e)}")
   }
   @debug.assert_eq(store.database().all().length(), 2)
-  // editor B：无任何改动 → 字节一致 → 静默 exit 0 不标 dirty
+  // editor B: no change at all -> identical bytes -> a silent exit 0 with no dirty mark
   let ed_noop = make_fake_editor(bindir, "ed-noop", "exit 0")
   let env2 = env_map([("_JB_DATA_DIR", data), ("VISUAL", ed_noop)])
   let errs2 : Array[String] = []
   @debug.assert_eq(run(["edit"], env2, errs2), 0)
   @debug.assert_eq(errs2.length(), 0)
-  // editor C：退出码非 0 → 报错不落库。
-  // [#11]：CI runner 偶发 fork 压力使 spawn 瞬时抛错（Err(Spawn) →
-  // could not launch editor）；确定性缺陷两次同败仍红，瞬态重试一次即绿
+  // editor C: a non-zero exit -> an error and nothing written.
+  // [#11]: an occasional fork-pressure spike on the CI runner makes spawn throw momentarily (Err(Spawn) ->
+  // could not launch editor); a deterministic defect fails both times and stays red, while one retry clears a transient
   let ed_fail = make_fake_editor(bindir, "ed-fail", "exit 3")
   let env3 = env_map([("_JB_DATA_DIR", data), ("VISUAL", ed_fail)])
   let errs3 : Array[String] = []
@@ -65,7 +65,7 @@ async test "edit 交互：正常编辑改 rank → 落盘；编辑器缺失 → 
     if ok3 {
       break
     }
-    // 两次都未达预期 → 带最后结果落到下方断言判红
+    // neither attempt met the expectation -> fall through to the assertion below with the last result
     if attempt >= 1 {
       break
     }
@@ -73,7 +73,7 @@ async test "edit 交互：正常编辑改 rank → 落盘；编辑器缺失 → 
   }
   @debug.assert_eq(code3, 1)
   @debug.assert_eq(errs3[0], "jumbit: editor exited with code 3")
-  // editor D：写入坏行 → 数据文件损坏（行号），不落库
+  // editor D: writes a bad row -> corrupted data file (with its line number), nothing written
   let ed_bad = make_fake_editor(
     bindir, "ed-bad", "printf 'garbage-line\\n' >> \"$1\"",
   )
@@ -81,7 +81,7 @@ async test "edit 交互：正常编辑改 rank → 落盘；编辑器缺失 → 
   let errs4 : Array[String] = []
   @debug.assert_eq(run(["edit"], env4, errs4), 1)
   assert_true(errs4[0].has_prefix("jumbit: corrupted data file: line "))
-  // 无 editor：VISUAL/EDITOR 均空 + PATH 注入空目录（vi 解析失败）
+  // no editor: VISUAL and EDITOR both empty plus an empty directory injected on PATH (vi resolution fails)
   let env5 = env_map([
     ("_JB_DATA_DIR", data),
     ("VISUAL", ""),
@@ -99,7 +99,7 @@ async test "edit 交互：正常编辑改 rank → 落盘；编辑器缺失 → 
 ///|
 #cfg(not(platform="windows"))
 // 伪 editor 桩经 chmod 可执行位造（Windows 无 exec 位，待 .cmd 桩平台化）
-async test "edit --rename：note 跟随；未命中/撞名报错" {
+async test "edit --rename: the note follows; a miss or a name collision errors" {
   let data = make_test_dir("ren-data")
   let target = make_test_dir("ren-target")
   let errs : Array[String] = []
@@ -108,7 +108,7 @@ async test "edit --rename：note 跟随；未命中/撞名报错" {
     run(["describe", target, "--note", "后端"], env_with(data), errs),
     0,
   )
-  // 命中：改路径 + note 跟随
+  // a hit: the path changes and the note follows
   let errs1 : Array[String] = []
   @debug.assert_eq(
     run(["edit", "--rename", target, "/renamed"], env_with(data), errs1),
@@ -122,10 +122,10 @@ async test "edit --rename：note 跟随；未命中/撞名报错" {
   @debug.assert_eq(store.database().all().length(), 1)
   @debug.assert_eq(store.database().all()[0].path, "/renamed")
   @debug.assert_eq(store.database().all()[0].note, Some("后端"))
-  // 未命中
+  // a miss
   let errs2 : Array[String] = []
   let _ = run(["edit", "--rename", "/nope", "/x"], env_with(data), errs2)
-  // 撞名：/renamed 已存在，改自身到既有条目路径
+  // a collision: /renamed exists, so renaming onto an existing entry
   let errs3 : Array[String] = []
   @debug.assert_eq(
     run(["edit", "--rename", "/renamed", "/renamed"], env_with(data), errs3),
@@ -136,14 +136,14 @@ async test "edit --rename：note 跟随；未命中/撞名报错" {
 }
 
 ///|
-async test "edit --prune：移除不存在条目并输出清单；全存在静默" {
+async test "edit --prune: removes entries that no longer exist and prints the list; all-existing is silent" {
   let data = make_test_dir("prune-data")
   let target = make_test_dir("prune-target")
   let errs : Array[String] = []
   @debug.assert_eq(run(["add", target], env_with(data), errs), 0)
-  // 手工重写库（手编可读性验收）：target（存在，保留）+ /gone、/keep（不存在，
-  // 移除）；/gone 带标注（孤儿 note 随 prune 消亡）。注意 write_atomic 是整体
-  // 覆盖，target 条目必须包含在内
+  // rewrite the database by hand (an acceptance check for hand-editability): target (exists, kept) plus /gone and /keep (nonexistent,
+  // removed); /gone carries an annotation (the orphan note dies with prune). Note that write_atomic overwrites wholesale, so
+  // the target entry must be included
   @platform.write_atomic(
     data + "/db.txt",
     @utf8.encode(
@@ -151,10 +151,10 @@ async test "edit --prune：移除不存在条目并输出清单；全存在静�
     ),
   )
   @platform.write_atomic(data + "/notes.tsv", @utf8.encode("/gone\t待清\n"))
-  // prune：/gone（不存在）移除；清单的 stdout 字节面归 golden 冻结层
+  // prune: /gone (nonexistent) is removed; the list\'s stdout bytes belong to the golden freeze layer
   @debug.assert_eq(run(["edit", "--prune"], env_with(data), errs), 0)
-  // /target 存在保留；/gone 移除（注：/keep 也是编造路径，会被一并移除——
-  // 用 --all 语义的 prune 对所有不存在路径执行，清单按库序）
+  // /target exists and is kept; /gone is removed (note that /keep is also a fabricated path and goes with it --
+  // prune runs with --all semantics over every nonexistent path, and the list follows database order)
   let store = match @platform.load(data) {
     Ok(s) => s
     Err(e) => fail("\{Repr(e)}")
@@ -166,7 +166,7 @@ async test "edit --prune：移除不存在条目并输出清单；全存在静�
   }
   @debug.assert_eq(remaining.length(), 1)
   @debug.assert_eq(remaining[0].path, target)
-  // 孤儿 note 消亡：notes.tsv 重写后只剩 target 的（target 无 note → 空文件）
+  // the orphan note dies: after the notes.tsv rewrite only target\'s remains (target has no note -> an empty file)
   let notes = @afs.read_file(data + "/notes.tsv")
   @debug.assert_eq(notes.text(), "")
   cleanup_test_dir(data)
@@ -175,24 +175,24 @@ async test "edit --prune：移除不存在条目并输出清单；全存在静�
 
 ///|
 #cfg(not(platform="windows"))
-// 伪 editor 桩同款 chmod 形态；sh -c 臂依赖 PATH 有 sh（测试环境恒有）
-async test "edit 编辑器解析链与执行面：EDITOR 回落/含空格 sh -c/退出码非零" {
+// the same chmod shape for the fake-editor stub; the sh -c arm needs sh on PATH (always present in the test environment)
+async test "edit\'s editor resolution chain and execution surface: an EDITOR fallback, a spaced value through sh -c, and a non-zero exit" {
   let data = make_test_dir("edit-chain")
   let target = make_test_dir("edit-chain-t")
   let bindir = make_test_dir("edit-chain-bin")
   let errs : Array[String] = []
   @debug.assert_eq(run(["add", target], env_with(data), errs), 0)
-  // editor：往「最后一个参数」（jumbit 传入的库文件）追加一条合法条目。
-  // 用循环取末参而非 "$1"：含空格 EDITOR（下文 --quiet 用例）经 sh -c 拆分后
-  // 额外参数排在库文件之前，"$1" 会命中 editor 自己的旗标位、把内容写到
-  // 进程 cwd 的同名文件（历史遗留的仓库根 --quiet 残留即此产生，[#5]）
-  // case 门卫：仅在 $last 为绝对路径时落笔。全量并发跑批下观测到偶发
-  // $last 落在旗标位的情形（cwd 长出 --quiet 残留，[#5]/[#11]），门卫使
-  // 该泄漏构造性不可能；用例断言只锁退出码，不受影响
+  // editor: appends one legal entry to "the last argument" (the database file jumbit passes in).
+  // Taking the last argument in a loop rather than "$1": after a spaced EDITOR (the --quiet case below) is split by sh -c,
+  // the extra arguments sit before the database file, so "$1" would land on the editor\'s own flag and write the content
+  // into a same-named file in the process cwd (which is where the historic --quiet left in the repo root came from, [#5])
+  // A case guard: only write when $last is an absolute path. Under a full parallel batch an occasional case was observed
+  // where $last landed on the flag (cwd growing a --quiet leftover, [#5]/[#11]); the guard makes that leak
+  // constructively impossible, and the case assertion pins only the exit code, so it is unaffected
   let ed_add = make_fake_editor(
     bindir, "ed-chain", "for last; do :; done\ncase \"$last\" in /*) printf '0000000001\\t0000002.00\\t/chain-added\\n' >> \"$last\";; esac",
   )
-  // 回落链：VISUAL 缺失 → EDITOR 生效（resolve_editor 的 match 臂）
+  // the fallback chain: VISUAL missing -> EDITOR takes effect (resolve_editor\'s match arm)
   let env_r = env_map([
     ("_JB_DATA_DIR", data),
     ("PATH", bindir + ":/usr/bin:/bin"),
@@ -205,10 +205,10 @@ async test "edit 编辑器解析链与执行面：EDITOR 回落/含空格 sh -c/
     ("PATH", bindir + ":/usr/bin:/bin"),
     ("VISUAL", ed_add + " --quiet"),
   ])
-  // 假 editor 不认识 --quiet 会失败吗？sh 包装把 "$@" 传给桩，桩用 "$1"，
-  // 多余参数被忽略 → 仍成功；此用例锁的是「含空格值按 shell 命令行拆分」
+  // would a fake editor that does not know --quiet fail? The sh wrapper passes "$@" to the stub, which uses "$1", so
+  // the extra argument is ignored and it still succeeds. What this case pins is that a spaced value is split as a shell command line
   @debug.assert_eq(run(["edit"], env_sp, errs), 0)
-  // 编辑器退出码非零 → Failed(code) 臂，文案 + exit 1
+  // a non-zero editor exit -> the Failed(code) arm, with wording plus exit 1
   let ed_fail = make_fake_editor(bindir, "ed-fail", "exit 3")
   let env_f = env_map([
     ("_JB_DATA_DIR", data),
@@ -223,9 +223,9 @@ async test "edit 编辑器解析链与执行面：EDITOR 回落/含空格 sh -c/
 }
 
 ///|
-async test "edit 落盘失败族：tmp 创建被拒 + --rename/--prune save 被拒 → exit 1" {
-  // 交互编辑的 tmp 建在数据目录内（db.txt.edit）：目录只读死在更早的
-  // could not write temporary file 臂（到不了 save），顺手锁该臂
+async test "edit\'s write-failure family: a refused tmp creation plus a refused --rename/--prune save -> exit 1" {
+  // interactive editing builds its tmp inside the data directory (db.txt.edit): a read-only directory dies earlier on the
+  // could not write temporary file arm (never reaching save), so that arm is pinned in passing
   let data = make_test_dir("edit-save-ro")
   let target = make_test_dir("edit-save-ro-t")
   let bindir = make_test_dir("edit-save-ro-bin")
@@ -240,7 +240,7 @@ async test "edit 落盘失败族：tmp 创建被拒 + --rename/--prune save 被�
   @debug.assert_eq(run(["edit"], env_e, errs2), 1)
   assert_true(errs2[0].has_prefix("jumbit: could not write temporary file: "))
   @afs.chmod(data, 0o755)
-  // --rename 落盘被拒
+  // a refused --rename save
   @afs.chmod(data, 0o555)
   let errs3 : Array[String] = []
   @debug.assert_eq(
@@ -249,8 +249,8 @@ async test "edit 落盘失败族：tmp 创建被拒 + --rename/--prune save 被�
   )
   assert_true(errs3[0].has_prefix("jumbit: could not save database: "))
   @afs.chmod(data, 0o755)
-  // --prune 落盘被拒：先入库一个随后消失的路径（无变化时 prune 提前返回
-  // 不落盘，只读目录下回 0，须先造成「有可清条目」的状态）
+  // a refused --prune save: import a path that then disappears first (with no change prune returns early
+  // without writing and returns 0 under a read-only directory, so a "there is something to prune" state must come first)
   @afs.chmod(data, 0o755)
   let gone = make_test_dir("edit-save-ro-gone")
   let errs5 : Array[String] = []

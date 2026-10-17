@@ -1,18 +1,18 @@
 ///|
-/// MCP 信封层 wbtest：只证「壳转发正确」——协议形状、方法分发、错误码、
-/// 参数校验、执行层结果 → content/isError 映射。工具语义（score/matched_by/
-/// 排序/懒删除）不在此重证：语义断言由 CLI 侧测试与 golden 承载，协议字节
-/// 冻结由 scripts/mcp_check.sh 承载。
+/// MCP envelope-layer wbtest: it proves only that the shell forwards correctly -- the protocol shape, method dispatch, error codes,
+/// argument validation, and the execution layer\'s result -> content/isError mapping. Tool semantics (score/matched_by/
+/// sorting/lazy deletion) are not re-proved here: the semantic assertions live in the CLI-side tests and goldens, and the protocol bytes
+/// are frozen by scripts/mcp_check.sh.
 
 ///|
-async test "mcp initialize：支持版本回显 + 能力/服务器信息/instructions" {
+async test "mcp initialize: a supported version echoed back, plus capabilities/server info/instructions" {
   let resp = mcp_handle_line(
     "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-03-26\",\"capabilities\":{},\"clientInfo\":{\"name\":\"t\",\"version\":\"0\"}}}",
     env_map([]),
   )
   let out = match resp {
     Some(out) => out
-    None => fail("initialize 必须响应")
+    None => fail("initialize must respond")
   }
   assert_true(out.contains("\"id\":1"))
   assert_true(out.contains("\"protocolVersion\":\"2025-03-26\""))
@@ -24,7 +24,7 @@ async test "mcp initialize：支持版本回显 + 能力/服务器信息/instruc
 }
 
 ///|
-async test "mcp initialize：不支持版本回自身最新；id 非数字原样回显" {
+async test "mcp initialize: an unsupported version returns this server\'s newest; a non-numeric id is echoed as is" {
   let resp = mcp_handle_line(
     "{\"jsonrpc\":\"2.0\",\"id\":\"abc\",\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"1.0\"}}",
     env_map([]),
@@ -38,14 +38,14 @@ async test "mcp initialize：不支持版本回自身最新；id 非数字原样
 }
 
 ///|
-async test "mcp ping/tools/list：result 形状与工具目录" {
+async test "mcp ping/tools/list: the result shape and the tool directory" {
   let ping = match
     mcp_handle_line(
       "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"ping\"}",
       env_map([]),
     ) {
     Some(out) => out
-    None => fail("ping 必须响应")
+    None => fail("ping must respond")
   }
   assert_true(ping.contains("\"result\":{}"))
   let list = match
@@ -54,7 +54,7 @@ async test "mcp ping/tools/list：result 形状与工具目录" {
       env_map([]),
     ) {
     Some(out) => out
-    None => fail("tools/list 必须响应")
+    None => fail("tools/list must respond")
   }
   assert_true(list.contains("\"tools\":["))
   assert_true(list.contains("\"name\":\"jumbit_query\""))
@@ -63,50 +63,50 @@ async test "mcp ping/tools/list：result 形状与工具目录" {
 }
 
 ///|
-async test "mcp 错误路：Parse error/-32601/未知工具/-32600/通知不响应" {
-  // 非法 JSON → -32700 id null
+async test "mcp error paths: Parse error, -32601, an unknown tool, -32600, and notifications getting no reply" {
+  // illegal JSON -> -32700 with a null id
   let bad = match mcp_handle_line("not json", env_map([])) {
     Some(out) => out
-    None => fail("Parse error 必须响应")
+    None => fail("a Parse error must respond")
   }
   assert_true(bad.contains("\"id\":null"))
   assert_true(bad.contains("\"code\":-32700"))
-  // 未知方法 → -32601
+  // an unknown method -> -32601
   let unknown_method = match
     mcp_handle_line(
       "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"resources/list\"}",
       env_map([]),
     ) {
     Some(out) => out
-    None => fail("未知方法必须响应")
+    None => fail("an unknown method must respond")
   }
   assert_true(unknown_method.contains("\"code\":-32601"))
   assert_true(unknown_method.contains("Method not found: resources/list"))
-  // 未知工具 → -32602（协议层，对齐 atuin 划分）
+  // an unknown tool -> -32602 (the protocol layer, matching atuin\'s split)
   let unknown_tool = match
     mcp_handle_line(
       "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"nope\"}}",
       env_map([]),
     ) {
     Some(out) => out
-    None => fail("未知工具必须响应")
+    None => fail("an unknown tool must respond")
   }
   assert_true(unknown_tool.contains("\"code\":-32602"))
   assert_true(unknown_tool.contains("Unknown tool: nope"))
-  // batch 数组（2025-06-18 已移除）→ -32600 id null
+  // a batch array (removed in 2025-06-18) -> -32600 with a null id
   let batch = match mcp_handle_line("[1,2]", env_map([])) {
     Some(out) => out
-    None => fail("batch 必须响应")
+    None => fail("a batch must respond")
   }
   assert_true(batch.contains("\"code\":-32600"))
-  // jsonrpc 字段缺失的请求 → -32600
+  // a request with no jsonrpc field -> -32600
   let nover = match
     mcp_handle_line("{\"id\":6,\"method\":\"ping\"}", env_map([])) {
     Some(out) => out
-    None => fail("缺版本字段必须响应")
+    None => fail("a missing version field must respond")
   }
   assert_true(nover.contains("\"code\":-32600"))
-  // 通知（无 id）不响应
+  // a notification (no id) gets no reply
   assert_eq(
     mcp_handle_line(
       "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}",
@@ -117,13 +117,13 @@ async test "mcp 错误路：Parse error/-32601/未知工具/-32600/通知不响�
 }
 
 ///|
-async test "mcp tools/call jumbit_query：命中/miss/参数校验三路" {
+async test "mcp tools/call jumbit_query: the hit, miss and argument-validation paths" {
   let data = make_test_dir("mcp-query")
   let zdir = make_test_dir("mcp-query-z")
   let zfile = zdir + "/zdata"
-  // 入库路径用真实存在的 zdir + 新鲜 la：工具路不外露 --all，默认链路有
-  // exists 检查 + 3 个月 TTL 懒删除，la=0 的条目会被直接懒删掉；
-  // bytes 字面量不插值，先构 String 再 encode（atuin 折叠测试同款姿势）
+  // The imported path uses a real zdir plus a fresh la: the tool path does not expose --all, so the default chain has the
+  // exists check plus the 3-month TTL lazy deletion, and an la=0 entry would be lazily deleted outright;
+  // the bytes literal takes no interpolation, so a String is built first and encoded (the same stance as the atuin fold tests)
   let zline = "\{zdir}|1.0|\{current_second()}\n"
   @platform.write_atomic(zfile, @utf8.encode(zline))
   let env = env_map([("_JB_DATA_DIR", data), ("_Z_DATA", zfile)])
@@ -136,37 +136,37 @@ async test "mcp tools/call jumbit_query：命中/miss/参数校验三路" {
       env,
     )
   }
-  // 命中：content 内嵌与 query --json 同源的单行 JSON 数组
+  // a hit: content embeds the single-line JSON array from the same source as query --json
   let hit = match call("{\"keywords\":[\"mcp-query-z\"]}") {
     Some(out) => out
-    None => fail("query 命中必须响应")
+    None => fail("a query hit must respond")
   }
   assert_true(hit.contains("\"isError\":false"))
   assert_true(hit.contains("mcp-query-z"))
   assert_true(hit.contains("matched_by"))
-  // miss：isError=true，文案与 CLI stderr 同源
+  // a miss: isError=true, with the wording from the same source as the CLI\'s stderr
   let miss = match call("{\"keywords\":[\"zzz\"]}") {
     Some(out) => out
-    None => fail("query miss 必须响应")
+    None => fail("a query miss must respond")
   }
   assert_true(miss.contains("\"isError\":true"))
   assert_true(miss.contains("no match found"))
-  // 参数校验失败 → 协议层 -32602
+  // a failed argument validation -> the protocol layer\'s -32602
   let badkw = match call("{\"keywords\":[1]}") {
     Some(out) => out
-    None => fail("keywords 类型错必须响应")
+    None => fail("a wrong keywords type must respond")
   }
   assert_true(badkw.contains("\"code\":-32602"))
   let badlimit = match call("{\"keywords\":[\"x\"],\"limit\":1.5}") {
     Some(out) => out
-    None => fail("limit 小数必须响应")
+    None => fail("a decimal limit must respond")
   }
   assert_true(badlimit.contains("\"code\":-32602"))
-  // keywords 必填（schema required 同款）：缺失走协议层 -32602，
-  // 不静默按「无关键词查最高分」执行
+  // keywords is required (as in the schema): a missing one goes through the protocol layer as -32602,
+  // never a silent "no keywords = highest score"
   let nokw = match call("{}") {
     Some(out) => out
-    None => fail("缺 keywords 必须响应")
+    None => fail("a missing keywords must respond")
   }
   assert_true(nokw.contains("\"code\":-32602"))
   assert_true(nokw.contains("missing keywords"))
@@ -175,7 +175,7 @@ async test "mcp tools/call jumbit_query：命中/miss/参数校验三路" {
 }
 
 ///|
-async test "mcp tools/call jumbit_export_agents：地图进 content" {
+async test "mcp tools/call jumbit_export_agents: the map goes into content" {
   let data = make_test_dir("mcp-export")
   let target = make_test_dir("mcp-export-t")
   let errs : Array[String] = []
@@ -190,7 +190,7 @@ async test "mcp tools/call jumbit_export_agents：地图进 content" {
       env_with(data),
     ) {
     Some(out) => out
-    None => fail("export 必须响应")
+    None => fail("export must respond")
   }
   assert_true(resp.contains("\"isError\":false"))
   assert_true(resp.contains("jumbit export --agents"))
@@ -200,7 +200,7 @@ async test "mcp tools/call jumbit_export_agents：地图进 content" {
 }
 
 ///|
-test "mcp strip_eol：LF/CRLF/裸行三臂（\\r\\n 为 Windows 客户端真实发送形态）" {
+test "mcp strip_eol: the LF/CRLF/bare-line arms (\\r\\n is the shape a real Windows client sends)" {
   assert_eq(strip_eol("ping\n"), "ping")
   assert_eq(strip_eol("ping\r\n"), "ping")
   assert_eq(strip_eol("ping"), "ping")
@@ -209,7 +209,7 @@ test "mcp strip_eol：LF/CRLF/裸行三臂（\\r\\n 为 Windows 客户端真实�
 }
 
 ///|
-async test "mcp tools/call 卫士四臂：params 非对象/缺 tool name/arguments 非对象/fuzzy 非布尔（-32602）" {
+async test "mcp tools/call\'s four guard arms: params not an object, a missing tool name, arguments not an object, a non-boolean fuzzy (-32602)" {
   let data = make_test_dir("mcp-guard")
   let env = env_map([("_JB_DATA_DIR", data)])
   let call = async fn(raw_params : String) -> String {
@@ -219,23 +219,23 @@ async test "mcp tools/call 卫士四臂：params 非对象/缺 tool name/argumen
         env,
       ) {
       Some(out) => out
-      None => fail("tools/call 必须响应")
+      None => fail("tools/call must respond")
     }
   }
-  // params 非对象（数组形态）
+  // params is not an object (an array shape)
   assert_true(call("[]").contains("\"code\":-32602"))
   assert_true(call("[]").contains("missing params object"))
-  // 缺 tool name
+  // the tool name is missing
   assert_true(call("{\"arguments\":{}}").contains("missing tool name"))
-  // tool name 非字符串
+  // the tool name is not a string
   assert_true(call("{\"name\":1}").contains("missing tool name"))
-  // arguments 非对象
+  // arguments is not an object
   assert_true(
     call("{\"name\":\"jumbit_query\",\"arguments\":1}").contains(
       "arguments must be an object",
     ),
   )
-  // fuzzy 非布尔
+  // fuzzy is not a boolean
   assert_true(
     call(
       "{\"name\":\"jumbit_query\",\"arguments\":{\"keywords\":[\"x\"],\"fuzzy\":\"yes\"}}",
