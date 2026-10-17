@@ -204,7 +204,7 @@ test "mcp strip_eol: the LF/CRLF/bare-line arms (\\r\\n is the shape a real Wind
   assert_eq(strip_eol("ping\n"), "ping")
   assert_eq(strip_eol("ping\r\n"), "ping")
   assert_eq(strip_eol("ping"), "ping")
-  // 裸 \r 也剥（先 LF 后 CR 的顺序剥离，行内空白不碰）
+  // a bare \r is stripped too (LF then CR, in that order; whitespace inside the line is untouched)
   assert_eq(strip_eol("ping\r"), "ping")
 }
 

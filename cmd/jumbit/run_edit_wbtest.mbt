@@ -199,7 +199,7 @@ async test "edit\'s editor resolution chain and execution surface: an EDITOR fal
     ("EDITOR", ed_add),
   ])
   @debug.assert_eq(run(["edit"], env_r, errs), 0)
-  // 含空格 EDITOR → sh -c '<值> "$@"' 臂（git EDITOR 惯用法；值带参数）
+  // a spaced EDITOR -> the sh -c '<value> "$@"' arm (the git EDITOR idiom; the value carries arguments)
   let env_sp = env_map([
     ("_JB_DATA_DIR", data),
     ("PATH", bindir + ":/usr/bin:/bin"),
