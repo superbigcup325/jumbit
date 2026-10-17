@@ -1,20 +1,20 @@
 ///|
-/// query --tsv 的写出层（jumbit 扩展，上游无此语义）：无表头，每行
-/// `path\tscore\tlast_accessed\tmatched_by`，列序与 --json 键序一致。
-/// path 原样不转义——路径含 tab（合法但病态）时该行歧义，属已知限制
-/// （README 注记，golden 数据集含此类路径直接冻结行为）。
+/// The writer layer for query --tsv (a jumbit extension with no upstream equivalent): headerless, one
+/// `path\tscore\tlast_accessed\tmatched_by` per line, in the same column order as the --json keys.
+/// The path is written verbatim and unescaped -- a path containing a tab (legal but pathological) makes that line ambiguous, a known limitation
+/// (noted in the README; the golden dataset includes such a path, freezing the behaviour).
 
 ///|
-/// score 列：有限数用与 --json 共用的最短表示（4.0→"4"）；NaN/±Infinity
-/// 无 null 语义（那是 JSON 的招），出 Double::to_string 原文
-/// （"NaN"/"Infinity"/"-Infinity"，golden nan-entry 用例冻结实际字节）
+/// The score column: finite values use the shortest form shared with --json (4.0 -> "4"); NaN/±Infinity have no
+/// null semantics (that is JSON\'s move), so they emit Double::to_string verbatim
+/// ("NaN"/"Infinity"/"-Infinity"; the golden nan-entry case freezes the actual bytes)
 fn tsv_number(v : Double) -> String {
   double_short(v)
 }
 
 ///|
-/// 单行 TSV（path\tscore\tlast_accessed\tmatched_by）。
-/// 命令行走本函数流式输出；整体拼装的 render_tsv 在 tsv_wbtest 作形状冻结器
+/// A single TSV line (path\tscore\tlast_accessed\tmatched_by).
+/// The CLI streams its output through this function; the fully assembled render_tsv acts as a shape freezer in tsv_wbtest
 fn tsv_row(d : @core.Dir, now : Int64, matched_by : String) -> String {
   let out : StringBuilder = StringBuilder()
   out.write_string(d.path)

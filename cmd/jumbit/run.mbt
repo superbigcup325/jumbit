@@ -1,19 +1,19 @@
 ///|
-/// 毫秒时间戳 → 秒级 Epoch（上游 Epoch 为秒；@async.now() 实测毫秒）
+/// A millisecond timestamp -> a second-level Epoch (upstream Epoch is seconds; @async.now() proved to be milliseconds)
 fn current_second() -> Int64 {
   @async.now() / 1000L
 }
 
 ///|
-/// stderr 消息收集：不直接写 fd，由 main 统一落盘。
-/// （moon test 进程里写 stderr 会 panic，收集式设计同时让错误文案可被测试断言）
+/// stderr message collection: nothing writes to the fd directly; main flushes it all at the end.
+/// (writing to stderr inside a moon test process panics, and the collecting design also lets tests assert on the wording)
 fn err_line(errs : Array[String], msg : String) -> Unit {
   errs.push(msg)
 }
 
 ///|
-/// 无换行 stdout 输出（对齐上游 print! 语义）；写失败吞掉
-/// （对齐 main 对 stderr 写失败的处理）
+/// stdout output with no newline (matching upstream print! semantics); a failed write is swallowed
+/// (matching how main handles a failed stderr write)
 async fn print_stdout(s : String) -> Unit {
   @stdio.stdout.write(s) catch {
     _ => ()
@@ -21,17 +21,17 @@ async fn print_stdout(s : String) -> Unit {
 }
 
 ///|
-/// query --interactive 的 fzf 结果 → 退出码/文案映射（纯逻辑，wbtest 直测；
-/// 进程面由 platform 伪 fzf E2E 与 dataset_check D9 对拍覆盖）。
-/// stdout 片段收集进 outs 由调用侧落盘（收集式同 errs：moon test 进程内
-/// 直写 stdout 会与 test driver 事件协议串扰）。
-/// 输出对齐上游 print!：不追加换行（fzf 自身输出带尾换行）；--score 输出
-/// 整行，否则剥掉 7 字符得分前缀（对齐上游 selection.get(7..)，len==7 →
-/// 空串原样输出）；len<7 上游走错误路（探针 2026-09-13：exit 1 +
-/// "could not read selection from fzf"）。退出码表：0 成功 / 1 无选择
-/// （上游报 "no match found"，jumbit 静默——取消语义，README 注明）/
-/// 2 与 128..=254 与信号杀死与 3..=127、255 均 exit 1 带对应文案 /
-/// 130 静默透传 130
+/// Map query --interactive\'s fzf result to an exit code and wording (pure logic, tested directly by the wbtest;
+/// the process surface is covered by platform\'s fake-fzf E2E and dataset_check\'s D9 comparison).
+/// stdout fragments are collected into outs and flushed by the caller (collected like errs: writing to stdout inside
+/// a moon test process would crosstalk with the test driver\'s event protocol).
+/// The output matches upstream print!: no newline is appended (fzf\'s own output carries one); with --score the whole
+/// line is printed, otherwise the 7-character score prefix is stripped (matching upstream selection.get(7..); len==7 ->
+/// an empty string is printed as is); len<7 takes upstream\'s error path (probed 2026-09-13: exit 1 with
+/// "could not read selection from fzf"). The exit-code table: 0 success / 1 no selection
+/// (upstream reports "no match found", jumbit is silent -- cancel semantics, noted in the README) /
+/// 2, 128..=254, a signal kill, and 3..=127/255 all exit 1 with the matching wording /
+/// 130 passes 130 through silently
 fn finish_interactive(
   selection : Result[String, @platform.FzfError],
   score : Bool,
@@ -72,10 +72,10 @@ fn finish_interactive(
 }
 
 ///|
-/// 配置解析步骤的统一出口：Err 文案写入 errs 后返回 None，调用方以
-/// `match { None => return 1 }` 提前退出。各子命令保留各自的解析顺序
-/// （对齐上游：add 先读配置再开库，query/import 先开库）
-/// 各子命令保留各自的解析顺序（对齐上游：add 先读配置再开库，query/import 先开库）
+/// The single exit for the config-parsing step: on Err the wording goes into errs and None is returned, which the caller
+/// turns into an early `match { None => return 1 }`. Each subcommand keeps its own parsing order
+/// (matching upstream: add reads the config before opening the database; query/import open it first)
+/// Each subcommand keeps its own parsing order (matching upstream: add reads the config before opening the database; query/import open it first)
 fn[T] cfg(r : Result[T, String], errs : Array[String]) -> T? {
   match r {
     Ok(v) => Some(v)
@@ -87,7 +87,7 @@ fn[T] cfg(r : Result[T, String], errs : Array[String]) -> T? {
 }
 
 ///|
-/// 打开数据库：打开失败的文案与配置错误分开（含 Repr 调试格式）
+/// Open the database: a failed open gets its own wording, separate from config errors (including the Repr debug format)
 async fn open_store(
   data_dir : String,
   errs : Array[String],
@@ -102,7 +102,7 @@ async fn open_store(
 }
 
 ///|
-/// 结束统一落盘：保存失败时退出码覆盖为 1，否则透传原退出码
+/// The unified flush at the end: a failed save overrides the exit code to 1, otherwise the original code passes through
 async fn finish(
   store : @platform.Store,
   errs : Array[String],
@@ -118,9 +118,9 @@ async fn finish(
 }
 
 ///|
-/// 全部子命令的执行入口。
-/// 返回进程退出码：0 成功 / 1 运行失败（含配置错误，对齐上游 ExitCode::FAILURE）
-/// / 2 用法错误（对齐 clap 参数解析错误）。stderr 消息写入 errs。
+/// The execution entry point for every subcommand.
+/// Returns the process exit code: 0 success / 1 runtime failure (config errors included, matching upstream ExitCode::FAILURE)
+/// / 2 a usage error (matching clap\'s argument-parsing error). stderr messages go into errs.
 pub async fn run(
   args : Array[String],
   getenv : (String) -> String?,
@@ -136,12 +136,12 @@ pub async fn run(
       0
     }
     @cli.Usage => {
-      // 帮助全文走 stderr + 退出码 2（对齐上游 clap 无子命令调用）
+      // the full help goes to stderr with exit code 2 (matching upstream clap with no subcommand)
       err_line(errs, @cli.usage())
       2
     }
     @cli.Unknown(cmd) => {
-      // clap 习语（上游 probe：error: unrecognized subcommand 'x' + try 行）
+      // the clap idiom (upstream probe: error: unrecognized subcommand 'x' plus a try line)
       err_line(errs, "error: unrecognized subcommand '\{cmd}'")
       err_line(errs, "For more information, try 'jumbit help'.")
       2
@@ -165,7 +165,7 @@ pub async fn run(
 }
 
 ///|
-/// _JB_ECHO 调试回显开关：仅值 "1" 生效（对齐上游 config::echo）
+/// The _JB_ECHO debug switch: only the value "1" takes effect (matching upstream config::echo)
 fn echo_enabled(getenv : (String) -> String?) -> Bool {
   match getenv("_JB_ECHO") {
     Some("1") => true
@@ -174,7 +174,7 @@ fn echo_enabled(getenv : (String) -> String?) -> Bool {
 }
 
 ///|
-/// _JB_EXCLUDE_DIRS glob 命中检测（add 与 import 共用；命中即静默跳过）
+/// The _JB_EXCLUDE_DIRS glob hit test (shared by add and import; a hit skips silently)
 fn glob_hit(globs : Array[String], path : String) -> Bool {
   for pattern in globs {
     if @core.glob_match(pattern, path) {
@@ -185,7 +185,7 @@ fn glob_hit(globs : Array[String], path : String) -> Bool {
 }
 
 ///|
-/// 双重尝试（对齐上游 remove.rs 的双重查找语义）：先原串，未中再按 cwd 规范化重试
+/// The dual attempt (matching the dual lookup in upstream remove.rs): the original string first, then a retry normalized against the cwd
 fn try_twice(
   db : @core.Database,
   path : String,
@@ -199,7 +199,7 @@ fn try_twice(
 }
 
 ///|
-/// 双重查找：try_twice 的查找版（describe 显示路需要下标而非布尔）
+/// The dual lookup\'s find version (describe\'s view path needs the index, not a boolean)
 fn find_twice(db : @core.Database, path : String, cwd : String) -> Int32? {
   match db.find_idx(path) {
     Some(i) => Some(i)

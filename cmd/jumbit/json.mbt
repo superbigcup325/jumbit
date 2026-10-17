@@ -1,10 +1,10 @@
 ///|
-/// query --json 的写出层（jumbit 扩展，上游无此语义）：键序固定、单行数组，
-/// 字节级可测；不引 @json 依赖（写出侧只需一个固定形状）。
+/// The writer layer for query --json (a jumbit extension with no upstream equivalent): fixed key order, a single-line array,
+/// testable at the byte level; no @json dependency (the writer needs only one fixed shape).
 
 ///|
-/// RFC 8259 字符串转义：引号/反斜杠/控制字符（< 0x20），其余 Unicode 原样透传
-/// （输出为 UTF-8，合法 JSON 不必 \u 化非 ASCII）
+/// RFC 8259 string escaping: quotes, backslashes and control characters (< 0x20); other Unicode passes through as is
+/// (the output is UTF-8, and valid JSON need not \\u-escape non-ASCII)
 fn json_escape(s : String) -> String {
   let out : StringBuilder = StringBuilder()
   for ch in s {
@@ -29,8 +29,8 @@ fn json_escape(s : String) -> String {
 }
 
 ///|
-/// JSON 数字：NaN/±Infinity 不是合法 JSON 数值（import 可带进异常 rank），出 null；
-/// 有限数走 double_short 最短表示（与 --tsv 的 score 列共用）
+/// JSON numbers: NaN/±Infinity are not legal JSON numbers (an import can bring in an aberrant rank), so they emit null;
+/// finite values use double_short\'s shortest form (shared with --tsv\'s score column)
 fn json_number(v : Double) -> String {
   if v.is_nan() || v.is_inf() {
     "null"
@@ -40,13 +40,13 @@ fn json_number(v : Double) -> String {
 }
 
 ///|
-/// 有限浮点最短表示（4.0→"4"、0.75→"0.75"）：--json 与 --tsv 共用的数字形态
+/// Shortest representation of a finite float (4.0 -> "4", 0.75 -> "0.75"): the numeric shape shared by --json and --tsv
 fn double_short(v : Double) -> String {
   v.to_string()
 }
 
 ///|
-/// 单条 JSON 对象（{path, score, last_accessed, matched_by}）
+/// One JSON object ({path, score, last_accessed, matched_by})
 fn json_row(d : @core.Dir, now : Int64, matched_by : String) -> String {
   let out : StringBuilder = StringBuilder()
   out.write_string("{\"path\":\"")
@@ -62,10 +62,10 @@ fn json_row(d : @core.Dir, now : Int64, matched_by : String) -> String {
 }
 
 ///|
-/// 单行 JSON 数组：每条 {path, score, last_accessed, matched_by}。
-/// matched_by ∈ exact/fuzzy（fuzzy 由模糊兜底路接通，提交前恒 exact）。
-/// 保持整体物化：单行契约（无内嵌换行）使流式冲刷必须用无尾换行写，
-/// 与 moon test 的 stdout 事件协议冲突（见 docs/perf-import-optimization.md）
+/// A single-line JSON array of {path, score, last_accessed, matched_by} objects.
+/// matched_by is exact or fuzzy (fuzzy is wired through the fallback path; before this it was always exact).
+/// It stays fully materialized: the single-line contract (no embedded newlines) would force a streaming flush to write
+/// without a trailing newline, which conflicts with moon test\'s stdout event protocol (see docs/perf-import-optimization.md)
 fn render_json(
   dirs : Array[@core.Dir],
   now : Int64,
