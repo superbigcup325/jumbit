@@ -1,15 +1,15 @@
 ///|
-/// MCP stdio 服务器（jumbit 扩展，上游无）。传输形态对齐 MCP 规范
-/// 2025-06-18 的 stdio transport：newline-delimited JSON-RPC 2.0，UTF-8，
-/// stdout 只承载 MCP 消息（规范硬性要求，任何日志只能走 stderr）。
-/// 零新语义薄适配：工具执行层与 CLI 同源（query_exec 的 --json 形态 /
-/// export_exec），进程退出码 0/1 直接映射 isError；协议层新增决策仅限
-/// JSON-RPC 信封、错误码与 content 包装（协议必需品）。参考实现
-/// atuinsh/atuin crates/atuin-ai/src/mcp.rs（rmcp SDK）的工具面划分。
+/// The MCP stdio server (a jumbit extension, no upstream equivalent). The transport shape matches the MCP spec\'s
+/// 2025-06-18 stdio transport: newline-delimited JSON-RPC 2.0, UTF-8, with
+/// stdout carrying MCP messages only (a spec requirement; any logging must go to stderr).
+/// A thin adapter with no new semantics: the tool execution layer is the same as the CLI\'s (query_exec\'s --json form /
+/// export_exec), and the process exit code 0/1 maps straight onto isError; the only new decisions at the protocol layer are
+/// the JSON-RPC envelope, the error codes and the content wrapper (protocol necessities). For the tool surface it follows
+/// atuinsh/atuin crates/atuin-ai/src/mcp.rs (the rmcp SDK).
 async fn run_mcp(getenv : (String) -> String?) -> Int32 {
   while true {
     match @stdio.stdin.read_until("\n") {
-      // EOF：客户端关闭 stdin 即规范 shutdown（关流→等进程退出），静默退出 0
+      // EOF: the client closing stdin is the spec\'s shutdown (close the stream, then wait for the process to exit), a silent exit 0
       None => break
       Some(raw) => {
         let line = strip_eol(raw)
@@ -27,7 +27,7 @@ async fn run_mcp(getenv : (String) -> String?) -> Int32 {
 }
 
 ///|
-/// 剥行尾换行（\n 与 \r\n 两形态；行内空白按 JSON 语义本就非法，不碰）
+/// Strip a trailing newline (\n or \r\n; whitespace inside the line is already illegal JSON, so it is left alone)
 fn strip_eol(s : String) -> String {
   let s = if s.has_suffix("\n") { s[0:s.length() - 1].to_owned() } else { s }
   if s.has_suffix("\r") {
@@ -38,7 +38,7 @@ fn strip_eol(s : String) -> String {
 }
 
 ///|
-/// 单条消息处理：返回响应行（None=不响应）。纯信封层，工具体走执行层。
+/// Handle one message: return the response line (None = no response). A pure envelope layer; tool bodies go through the execution layer.
 async fn mcp_handle_line(
   line : String,
   getenv : (String) -> String?,
@@ -48,7 +48,7 @@ async fn mcp_handle_line(
   }
   let entries : Map[String, Json] = match msg {
     Json::Object(map) => map
-    // MCP 2025-06-18 已移除 JSON-RPC batch；数组与其余非对象形态一律 Invalid Request
+    // MCP 2025-06-18 removed JSON-RPC batch, so an array or any other non-object shape is an Invalid Request
     _ => return Some(mcp_error(Json::null(), -32600, "Invalid Request"))
   }
   let id : Json? = entries.get("id")
@@ -56,8 +56,8 @@ async fn mcp_handle_line(
     Some(Json::String(m)) => Some(m)
     _ => None
   }
-  // jsonrpc 版本字段：请求缺字段/非 "2.0" → Invalid Request（JSON-RPC 2.0 语义）；
-  // 通知形态一律静默忽略（含 notifications/initialized 与无法识别的通知）
+  // the jsonrpc version field: a missing field or anything but "2.0" -> Invalid Request (JSON-RPC 2.0 semantics);
+  // a notification shape is always ignored silently (including notifications/initialized and unrecognised notifications)
   let version_ok = match entries.get("jsonrpc") {
     Some(Json::String("2.0")) => true
     _ => false
@@ -74,7 +74,7 @@ async fn mcp_handle_line(
 }
 
 ///|
-/// 已确认「请求」（有 method 有 id、jsonrpc 合法）的方法分发
+/// Method dispatch for a confirmed "request" (a method and an id present, jsonrpc legal)
 async fn mcp_handle_request(
   method_name : String,
   id : Json,
@@ -92,8 +92,8 @@ async fn mcp_handle_request(
 }
 
 ///|
-/// 版本协商（规范 lifecycle）：支持客户端请求版本则 MUST 回显同版本；
-/// 否则回自身支持的最新版本。客户端不支持时会自行断开。
+/// Version negotiation (the spec lifecycle): if the client\'s requested version is supported it MUST be echoed back;
+/// otherwise the newest version this server supports is returned. An unsupporting client disconnects on its own.
 fn mcp_latest_version() -> String {
   "2025-06-18"
 }
@@ -117,14 +117,14 @@ fn mcp_initialize(id : Json, entries : Map[String, Json]) -> String {
     Some(v) => if mcp_version_supported(v) { v } else { mcp_latest_version() }
     None => mcp_latest_version()
   }
-  // serverInfo 只带 name/version（对齐 atuin Implementation::new 两参形态）；
-  // capabilities 只声明 tools 且无 listChanged（工具集静态，不发变更通知）
+  // serverInfo carries only name and version (matching atuin\'s two-argument Implementation::new);
+  // capabilities declares tools only and no listChanged (the tool set is static and no change notification is sent)
   "{\"jsonrpc\":\"2.0\",\"id\":\{id.stringify()},\"result\":{\"protocolVersion\":\"\{negotiated}\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"jumbit\",\"version\":\"\{@root.VERSION}\"},\"instructions\":\"\{json_escape(mcp_instructions())}\"}}"
 }
 
 ///|
-/// server instructions：客户端注入模型 system prompt 的「何时用 jumbit」
-/// 叙事（atuin 同杠杆）。保持短小（atuin 以 2000 字符为上限自检）。
+/// Server instructions: the "when to reach for jumbit" narrative a client injects into the model\'s system prompt
+/// (the same lever atuin uses). Kept short (atuin self-checks against a 2000-character ceiling).
 fn mcp_instructions() -> String {
   "jumbit is the user's directory memory: a frecency-ranked history of directories they have actually worked in (a MoonBit rewrite of zoxide, own database). " +
   "Use jumbit_query when the user refers to a project by a loose or partial name ('the backend repo', 'that lab dir') instead of guessing paths or running find. " +
@@ -167,9 +167,9 @@ fn mcp_export_description() -> String {
 }
 
 ///|
-/// tools/call：工具名分发 + 参数校验。未知工具/参数形态非法走协议层
-/// -32602（对齐 atuin 的 invalid_params 划分）；工具执行失败（miss、
-/// 配置/打开库错误）走结果内 isError=true，文案与 CLI stderr 同源。
+/// tools/call: tool-name dispatch plus argument validation. An unknown tool or an illegal argument shape goes through the protocol layer
+/// as -32602 (matching atuin\'s invalid_params split); a tool execution failure (a miss, or a
+/// config/open error) becomes isError=true in the result, with the same wording as the CLI\'s stderr.
 async fn mcp_tools_call(
   id : Json,
   entries : Map[String, Json],
@@ -189,7 +189,7 @@ async fn mcp_tools_call(
   }
   let args : Map[String, Json] = match params.get("arguments") {
     Some(Json::Object(a)) => a
-    // arguments 可省略（无参工具的合法调用形态）
+    // arguments may be omitted (a legal call shape for an argument-free tool)
     None => {}
     _ =>
       return Some(
@@ -222,13 +222,13 @@ async fn mcp_tools_call(
 }
 
 ///|
-/// jumbit_query 参数 → QueryOptions（--json 形态；all/interactive/tsv 不外露）。
-/// limit 值域对齐 CLI parse_limit_value：非负整数、拒小数、拒超 Int 上限。
+/// jumbit_query arguments -> QueryOptions (the --json form; all/interactive/tsv are not exposed).
+/// The limit domain matches the CLI\'s parse_limit_value: a non-negative integer, rejecting decimals and anything past the Int cap.
 fn mcp_query_options(
   args : Map[String, Json],
 ) -> Result[@cli.QueryOptions, String] {
-  // keywords 必填（对齐 inputSchema required 与 USAGE tool 注册草案）：
-  // 缺失走协议层 -32602，不静默按「无关键词查最高分」执行
+  // keywords is required (matching the inputSchema required field and USAGE\'s tool-registration draft):
+  // a missing one goes through the protocol layer as -32602, never a silent "no keywords = highest score"
   let keywords : Array[String] = match args.get("keywords") {
     None => return Err("Invalid arguments: missing keywords")
     Some(Json::Array(items)) => {
@@ -291,9 +291,9 @@ fn join_lines(lines : Array[String]) -> String {
 }
 
 ///|
-/// 信封写出器：键序手工固定（响应字节确定性；Json::Object 的 stringify
-/// 走哈希表键序不稳定，不用于信封）。id 经 Json::stringify 原样回显
-/// （Number 保留客户端字面量 repr，字符串 id 正确转义）。
+/// The envelope writer: the key order is fixed by hand (for deterministic response bytes; Json::Object\'s stringify
+/// goes through a hash table whose order is unstable, so it is not used for the envelope). The id is echoed through Json::stringify
+/// (a Number keeps the client\'s literal repr, and a string id is escaped correctly).
 fn mcp_ok(id : Json, result : String) -> String {
   "{\"jsonrpc\":\"2.0\",\"id\":\{id.stringify()},\"result\":\{result}}"
 }

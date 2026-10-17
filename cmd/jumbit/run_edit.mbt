@@ -1,8 +1,8 @@
 ///|
-/// edit 执行层（jumbit 扩展，规格 docs/spec-plaintext-edit.md §1.4）：
-/// 三形态共享「加载 → 变换 → 校验 → save」管线，语义权威源单一。
-/// 默认形态：$VISUAL/$EDITOR 编辑 db.txt 副本，读回解析，无变化静默、
-/// 有变化整库替换；--rename 改路径（note 跟随）；--prune 清除不存在条目
+/// The edit execution layer (a jumbit extension, spec docs/spec-plaintext-edit.md §1.4):
+/// all three forms share one "load -> transform -> validate -> save" pipeline, with a single semantic authority.
+/// The default form: $VISUAL/$EDITOR edits a copy of db.txt, which is parsed on read-back; no change is silent and a change
+/// replaces the whole database; --rename changes a path (the note follows); --prune drops entries that no longer exist
 async fn run_edit(
   eopts : @cli.EditOptions,
   getenv : (String) -> String?,
@@ -20,7 +20,7 @@ async fn run_edit(
     }
   }
   let db = store.database()
-  // 结构化形态先于交互形态（互斥已在解析层裁定）
+  // the structured forms precede the interactive one (exclusivity was settled at the parse layer)
   if eopts.prune {
     return run_edit_prune(db, store, errs)
   }
@@ -28,7 +28,7 @@ async fn run_edit(
     Some(old) => {
       let new = match eopts.rename_new {
         Some(n) => n
-        None => return 1 // 解析层保证不达
+        None => return 1 // the parse layer guarantees this is unreachable
       }
       return run_edit_rename(db, store, old, new, errs)
     }
@@ -38,8 +38,8 @@ async fn run_edit(
 }
 
 ///|
-/// --rename：精确路径匹配（remove 同款双重尝试：原串 → 规范化）；
-/// note 跟随迁移；new 撞库内既有条目报错不合并
+/// --rename: exact-path matching (remove\'s dual attempt: the original string, then normalized);
+/// the note migrates with it; a new path colliding with an existing entry errors rather than merging
 async fn run_edit_rename(
   db : @core.Database,
   store : @platform.Store,
@@ -51,8 +51,8 @@ async fn run_edit_rename(
     Some(d) => d
     None => "/"
   }
-  // 撞名预检：new 已在库中（双重尝试同款）→ 报错不合并（规格 §1.4；
-  // old==new 视为撞自身，同样拒绝——重命名到自身无意义且语义含糊）
+  // the collision pre-check: new is already in the database (the same dual attempt) -> error, no merge (spec §1.4;
+  // old==new counts as colliding with itself and is rejected too -- renaming to itself is meaningless and semantically vague)
   let new_norm = @core.resolve_path(new, cwd)
   if db.find_idx(new_norm) is Some(_) {
     err_line(errs, "jumbit: path already in database: \{new}")
@@ -73,8 +73,8 @@ async fn run_edit_rename(
 }
 
 ///|
-/// --prune：全量存在性扫描（status --check 同款），移除不存在条目并逐行
-/// 输出清单（stdout）；无移除静默 exit 0
+/// --prune: a full existence scan (as in status --check) that removes entries that no longer exist and prints the list
+/// line by line (stdout); with nothing removed it exits 0 silently
 async fn run_edit_prune(
   db : @core.Database,
   store : @platform.Store,
@@ -90,7 +90,7 @@ async fn run_edit_prune(
     return 0
   }
   for p in removed {
-    // remove 的 swap_remove 语义（懒删除同款）；已确认存在才会进清单
+    // remove\'s swap_remove semantics (as in lazy deletion); only a confirmed-existence entry reaches the list
     let _ = db.remove(p)
     println(p)
   }
@@ -104,10 +104,10 @@ async fn run_edit_prune(
 }
 
 ///|
-/// 默认形态：db.txt 当前内容写临时文件 → $VISUAL/$EDITOR 继承终端编辑 →
-/// 读回解析（decode_plaintext 全套行级校验）→ 与编辑前比对：无变化静默、
-/// 有变化整库替换 + save。note 不进编辑面（notes.tsv 侧文件），编辑后按
-/// path 匹配保留原标注（path 改名 = 丢标注，规格 §1.4 注明）
+/// The default form: db.txt\'s current content goes to a temp file -> $VISUAL/$EDITOR edits it with an inherited terminal ->
+/// read back and parse (decode_plaintext\'s full line-level validation) -> compare against the pre-edit state: no change is silent,
+/// a change replaces the whole database and saves. Notes do not enter the edit surface (the notes.tsv side file); after editing they
+/// are kept by path match (renaming a path loses its annotation, noted in spec §1.4)
 async fn run_edit_interactive(
   data_dir : String,
   db : @core.Database,
@@ -115,7 +115,7 @@ async fn run_edit_interactive(
   getenv : (String) -> String?,
   errs : Array[String],
 ) -> Int32 {
-  // 编辑面内容 = 当前主库序列化（不含 note 列）
+  // the edit surface holds the current main-database serialization (without the note column)
   let before = @core.encode_plaintext(db.all())
   let tmp = data_dir + "/db.txt.edit"
   let opened = @afs.create(tmp) catch {
@@ -136,7 +136,7 @@ async fn run_edit_interactive(
     }
   }
   opened.sync()
-  // 起编辑器（继承终端；退出码非 0 = 用户取消/编辑器故障，不落库）
+  // spawn the editor (inherited terminal; a non-zero exit means the user cancelled or the editor failed, and nothing is saved)
   match @platform.run_editor(tmp, getenv) {
     Err(NotFound) => {
       err_line(errs, "jumbit: no editor: set $EDITOR or $VISUAL")
@@ -155,7 +155,7 @@ async fn run_edit_interactive(
     }
     Ok(_) => ()
   }
-  // 读回 + 行级校验（坏行 → 不落库，报「数据文件损坏」同款前缀）
+  // read back and validate line by line (a bad row -> nothing is saved, with the same "corrupted data file" prefix)
   let data = @afs.read_file(tmp) catch {
     err => {
       err_line(
@@ -175,11 +175,11 @@ async fn run_edit_interactive(
     }
   }
   let _ = @afs.remove(tmp)
-  // 无变化判定：字节级（编码确定 ⇒ 内容等价）
+  // the no-change test: byte level (a deterministic encoding means equal content)
   if @core.encode_plaintext(dirs) == before {
     return 0
   }
-  // note 保留：编辑前有标注的 path 在新集合中仍存在则继承
+  // notes are kept: a path annotated before the edit inherits its note if it still exists in the new set
   let old_notes : Array[@core.Dir] = db.all()
   for nd in dirs {
     for od in old_notes {

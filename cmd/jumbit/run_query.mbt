@@ -1,6 +1,6 @@
 ///|
-/// query：完整过滤链（core/stream）+ --exclude 精确路径过滤 + 输出模式选择。
-/// 排序与懒删除会标脏，结束统一 save 落盘（对齐上游 query 后 save）。
+/// query: the full filter chain (core/stream) plus --exclude exact-path filtering and output-mode selection.
+/// Sorting and lazy deletion mark dirty, so the final unified flush saves to disk (matching upstream\'s save after a query).
 async fn run_query(
   qopts : @cli.QueryOptions,
   getenv : (String) -> String?,
@@ -10,8 +10,8 @@ async fn run_query(
 }
 
 ///|
-/// query 执行内核：stdout 行经 emit 回调写出（CLI 直连 println；MCP 工具路
-/// 收集进 content，同字节的行串）。交互路的 fzf 直写（print_stdout）不经 emit
+/// The query execution core: stdout lines go out through an emit callback (the CLI prints directly; the MCP tool path
+/// collects byte-identical lines into content). The interactive path writes fzf straight out (print_stdout), bypassing emit
 async fn query_exec(
   qopts : @cli.QueryOptions,
   getenv : (String) -> String?,
@@ -32,11 +32,11 @@ async fn query_exec(
   }
   let resolve_symlinks = @config.resolve_symlinks(getenv)
   let now = current_second()
-  // exists 回调：kind 检查；resolve_symlinks=true 时不跟随符号链接（上游反向逻辑）
+  // the exists callback: a kind check; with resolve_symlinks=true symlinks are not followed (upstream\'s inverse logic)
   let exists = async fn(path : String) { dir_exists(path, resolve_symlinks) }
-  // --fuzzy 兜底在单趟内完成：开启 superset 收集后，关键词未命中但过滤链
-  // 通过的条目就地留存，精确路零命中时直接在其上模糊过滤——替代原「空关键词
-  // 重跑一整趟 query_all」（免二趟链路扫描 + 全库排序，exists 统计减半）
+  // --fuzzy\'s fallback finishes in one pass: with superset collection on, entries that missed the keyword but passed the
+  // filter chain are kept in place, and on an exact zero-hit result the fuzzy filter runs over them directly -- replacing the old
+  // "re-run query_all with an empty keyword" (no second chain scan, no full-database sort, and half the exists calls)
   let superset : Array[@core.Dir] = []
   let collect = qopts.fuzzy && !qopts.keywords.is_empty()
   let hits = store
@@ -56,7 +56,7 @@ async fn query_exec(
       ),
       exists,
     )
-  // --exclude 为精确路径过滤（对齐上游 query_first/list 的跳过循环）
+  // --exclude is exact-path filtering (matching the skip loop in upstream query_first/list)
   let mut matched_by = "exact"
   let mut remaining = apply_exclude(hits, qopts.exclude)
   if hits.is_empty() && collect {
@@ -66,8 +66,8 @@ async fn query_exec(
         fuzzy_hits.push(d)
       }
     }
-    // superset 为库内遍历序（无序）：命中集显式排降序，复用临时 Database 的
-    // sort_by_score（与 export 同款，含 NaN total_cmp 语义）
+    // the superset follows the database traversal order (unordered): the hit set is explicitly sorted descending, reusing a temporary
+    // Database\'s sort_by_score (as in export, including its NaN total_cmp semantics)
     @core.Database::from_dirs(fuzzy_hits).sort_by_score(now)
     remaining = apply_exclude(
       @core.Database::from_dirs(fuzzy_hits).all(),
@@ -78,7 +78,7 @@ async fn query_exec(
     }
   }
   let code = if qopts.list {
-    // --list 空结果静默、退出码 0（对齐上游 query_list：不进 no match 错误路）
+    // --list is silent on an empty result with exit code 0 (matching upstream query_list: it never takes the no-match error path)
     let shown = take_limit(remaining, qopts.limit)
     for d in shown {
       emit(render(d, now, qopts.score, " "))
@@ -86,21 +86,21 @@ async fn query_exec(
     0
   } else if remaining.is_empty() {
     if hits.length() > 0 {
-      // 有命中但全被 --exclude 排除（上游 query.rs 同文案）
+      // there were hits but --exclude removed them all (the same wording as upstream query.rs)
       err_line(errs, "jumbit: you are already in the only match")
     } else {
-      // 对齐上游 query miss/空库同文案（probe 实测均为 no match found）
+      // both a query miss and an empty database use upstream\'s wording (the probe measured no match found for both)
       err_line(errs, "jumbit: no match found")
     }
     1
   } else if qopts.json {
-    // agent 通道：单行 JSON 数组（含全部匹配与 matched_by 证据字段）。
-    // 整体物化：单行契约的无换行写与 moon test stdout 协议冲突，tsv 才流式
+    // the agent channel: a single-line JSON array (every match plus the matched_by evidence field).
+    // fully materialized: the single-line contract\'s newline-free write conflicts with moon test\'s stdout protocol, so only tsv streams
     emit(render_json(take_limit(remaining, qopts.limit), now, matched_by))
     0
   } else if qopts.tsv {
-    // agent 通道：无表头 Tab 分隔行（--limit 0 → 不输出任何行，head -0 语义）。
-    // 逐行写：字节面 = 各行 \n 连接 + 末尾换行，与原整体物化版一致
+    // the agent channel: headerless tab-separated lines (--limit 0 -> no lines at all, head -0 semantics).
+    // written line by line: the bytes equal the lines joined with \n plus a trailing newline, matching the old materialized version
     let shown = take_limit(remaining, qopts.limit)
     for d in shown {
       emit(tsv_row(d, now, matched_by))
@@ -126,8 +126,8 @@ async fn query_exec(
 }
 
 ///|
-/// --limit 截断：None=不截断；取排序后（remaining 已降序）的前 n 条，不重排。
-/// 截断收在各输出分支内——提前统一截 remaining 会让 limit 0 撞上游空检查错误路
+/// --limit truncation: None means no truncation; it takes the first n of the sorted (already descending) remaining rows without re-sorting.
+/// Truncation lives inside each output branch -- truncating remaining up front would make limit 0 hit upstream\'s empty-check error path
 fn take_limit(dirs : Array[@core.Dir], limit : Int32?) -> Array[@core.Dir] {
   match limit {
     None => dirs
@@ -143,7 +143,7 @@ fn take_limit(dirs : Array[@core.Dir], limit : Int32?) -> Array[@core.Dir] {
 }
 
 ///|
-/// StreamOptions 组装：精确路与模糊兜底路共用同一过滤链参数
+/// StreamOptions assembly: the exact and fuzzy fallback paths share one set of filter-chain parameters
 fn make_stream_opts(
   now : Int64,
   globs : Array[String],
@@ -165,8 +165,8 @@ fn make_stream_opts(
 }
 
 ///|
-/// exists 回调：kind 检查；resolve_symlinks=true 时不跟随符号链接（上游反向逻辑）。
-/// 精确路与模糊兜底路共用
+/// The exists callback: a kind check; with resolve_symlinks=true symlinks are not followed (upstream\'s inverse logic).
+/// Shared by the exact and fuzzy fallback paths
 async fn dir_exists(path : String, resolve_symlinks : Bool) -> Bool {
   let kind = @afs.kind(path, follow_symlink=!resolve_symlinks) catch {
     err => {
@@ -178,7 +178,7 @@ async fn dir_exists(path : String, resolve_symlinks : Bool) -> Bool {
 }
 
 ///|
-/// --exclude 精确路径过滤（对齐上游 query_first/list 的跳过循环）
+/// --exclude exact-path filtering (matching the skip loop in upstream query_first/list)
 fn apply_exclude(
   dirs : Array[@core.Dir],
   exclude : String?,
@@ -198,7 +198,7 @@ fn apply_exclude(
 }
 
 ///|
-/// 输出行：--score 时前缀 6.1f 得分 + 分隔符（fzf 场景后续换 \t）
+/// An output line: with --score it is prefixed by a 6.1f score plus a separator (which becomes \t for the fzf case)
 fn render(
   dir : @core.Dir,
   now : Int64,

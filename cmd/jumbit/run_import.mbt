@@ -1,10 +1,10 @@
 ///|
-/// import（对齐上游 cmd/import.rs + import/run）：
-/// 空库直灌 / --merge 合并进非空库；坏行按 `<来源>:<行号>: <原因>` 上报不中止；
+/// import (matching upstream cmd/import.rs + import/run):
+/// a direct pour into an empty database / --merge into a non-empty one; bad rows are reported as `<source>:<line>: <reason>` without aborting;
 
 ///|
-/// 坏行定位前缀（`<来源>:<行号>`；atuin 无文件来源时为 `line N`）。
-/// 只对坏行调用——成功行不构造定位串
+/// the bad-row location prefix (`<source>:<line>`; `line N` when there is no file source, as with atuin).
+/// Called only for bad rows -- a successful row never builds a location string
 fn make_location(source : String?, line_num : Int32) -> String {
   match source {
     Some(path) => "\{path}:\{line_num}"
@@ -13,7 +13,7 @@ fn make_location(source : String?, line_num : Int32) -> String {
 }
 
 ///|
-/// 结束后 dedup + age(maxage) 再落盘。atuin 走子进程，其余插件读数据文件。
+/// When it finishes, dedup + age(maxage) run before the save. atuin goes through a subprocess; the other plugins read data files.
 async fn run_import(
   iopts : @cli.ImportOptions,
   getenv : (String) -> String?,
@@ -39,17 +39,17 @@ async fn run_import(
     Some(globs) => globs
     None => return 1
   }
-  // 单趟流式处理（对齐上游 import.rs::run 的惰性迭代结构）：逐行
-  // 「Err 行/解析失败 → <定位>: <原因> 上报不中止；Ok → exclude 命中静默跳过、
-  // 直接入库」。atuin 折叠语义需要完整记录序列（六插件唯一带状态者），保持物化
+  // A single streaming pass (matching the lazy iterator structure of upstream import.rs::run): line by line,
+  // "an Err row or a parse failure -> report <location>: <reason> without aborting; Ok -> skip silently on an exclude
+  // hit, otherwise import". atuin\'s folding needs the whole record sequence (it is the only one of the six with state), so it stays materialized
   let parse : (String) -> Result[@core.Dir, String] = match iopts.plugin {
     "autojump" => @core.parse_autojump_line
     "atuin" => @core.parse_atuin_line
-    // z / zsh-z / fasd / z.lua 与 z 同格式，共用解析（对齐上游复用 z::Iter）
+    // z / zsh-z / fasd / z.lua share z\'s format and its parser (matching upstream\'s reuse of z::Iter)
     _ => @core.parse_z_line
   }
-  // 单行处理内核：空行静默跳过（上游迭代器 continue）；
-  // location 串只对坏行构造（成功行下游不读它；百万行级每行拼串是可测开销）
+  // The single-line processing core: a blank line is skipped silently (upstream\'s iterator continues);
+  // the location string is built only for bad rows (nothing downstream reads it for a success; concatenating one per line at a million lines is measurable)
   let process_line = fn(
     source : String?,
     line_num : Int32,
@@ -62,7 +62,7 @@ async fn run_import(
         if l != "" {
           match parse(l) {
             Ok(dir) =>
-              // _JB_EXCLUDE_DIRS 命中 → 静默跳过（对齐上游 exclude_dirs 过滤）
+              // a _JB_EXCLUDE_DIRS hit -> skipped silently (matching upstream\'s exclude_dirs filter)
               if !glob_hit(globs, dir.path) {
                 store
                 .database()
@@ -119,8 +119,8 @@ async fn run_import(
       }
     }
   } else {
-    // 文件源：逐行回调，行串即抛不物化记录数组；z.lua 主路径缺失回落
-    // fish 变体、双双缺失报主路径（对齐上游 z_lua.rs）
+    // a file source: a per-line callback that drops each line string without materializing a record array; z.lua falls back to the
+    // fish variant when the main path is missing, and reports the main path when both are (matching upstream z_lua.rs)
     let stream_file = async fn(
       path_res : Result[String, String],
     ) -> Result[Unit, String] {
@@ -175,8 +175,8 @@ async fn run_import(
 }
 
 ///|
-/// atuin stderr 透传（对齐上游继承 stderr 的字节原样）：err_line 会补尾换行，
-/// 原文自带的尾换行须先剥掉，否则多出一个空行（v18 真机回放实测的真分歧）
+/// atuin stderr passthrough (matching upstream\'s byte-verbatim stderr inheritance): err_line appends a newline, so the
+/// source\'s own trailing newline must be stripped first, otherwise a blank line appears (a real divergence the v18 replay measured)
 fn forward_atuin_stderr(errs : Array[String], text : String) -> Unit {
   if text == "" {
     return
