@@ -65,9 +65,8 @@ moon info        # regenerates the .mbti interfaces, which are committed
 
 ## Documentation style
 
-- Chinese prose carries no trailing period on a paragraph or list item; English
-  keeps normal punctuation
-- No em-dashes in Chinese prose — use commas, colons or parentheses
+- Prose is English throughout (comments, docs, commit messages): a Chinese
+  sentence left in the tree is a defect, not a style choice
 - README badges may only state verifiable facts (static shields; never claim a
   platform or a version that is not actually built and tested)
 
