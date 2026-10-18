@@ -1,7 +1,7 @@
 ///|
 /// Data-file path resolution for the import plugins (matching the data_path probing in upstream src/import/*.rs;
 /// jumbit follows Linux semantics and has none of upstream\'s macOS/Windows branches).
-/// Environment reads are injected through `get` (cmd/main passes @env.get_env_var, tests pass a closure).
+/// Environment reads are injected through `get` (cmd/jumbit passes @env.get_env_var, tests pass a closure).
 
 ///|
 /// z: $_Z_DATA otherwise $HOME/.z (upstream does not filter empty values, so an empty string is used as the path and reports could not read when opened)

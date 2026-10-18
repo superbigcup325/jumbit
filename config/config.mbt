@@ -1,6 +1,6 @@
 ///|
 /// The data directory: _JB_DATA_DIR first (and it must be an absolute path), otherwise $HOME/.local/share/jumbit
-/// Environment reads are injected through `get` (cmd/main passes @env.get_env_var, tests pass a closure)
+/// Environment reads are injected through `get` (cmd/jumbit passes @env.get_env_var, tests pass a closure)
 pub fn data_dir(get : (String) -> String?) -> Result[String, String] {
   match get("_JB_DATA_DIR") {
     Some(dir) =>

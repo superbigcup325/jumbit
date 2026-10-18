@@ -79,3 +79,10 @@ moon info        # regenerates the .mbti interfaces, which are committed
 ## Known pitfalls
 
 (Add a row as each one is hit: symptom → root cause → the fix to reuse)
+
+| Symptom | Root cause | Fix to reuse |
+|---|---|---|
+| A bulk text replacement silently changed test names/strings, yet `moon check` stayed green | In MoonBit source `\r` / `\t` are escapes; the file held the two-character literal `\\r`. Both compile | Never accept the compiler as the judge for escape edits — diff against the printed repr, line by line |
+| "Replaced everything" but old text still in the file | `replace(old, new, 1)` replaces one occurrence per file, not one per file-set | Close every batch with a residual scan that prints each surviving line; counts alone lie |
+| Test residue (a stray `--quiet` file) shipped in the release archive | Packaging reads the working tree, and `--quiet` was an accidental test artifact | Check `moon package --list` before publishing; the wbtest stub now guards against re-creating it |
+| Local run is green, CI fails | The toolchain is fetched as `latest`; a `latest` drift once renamed `strconv.from_str` | Re-run the full gate locally before bumping `MOONBIT_VERSION` in `ci.yml`, and bump it in the same change |
