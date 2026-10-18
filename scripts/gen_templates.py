@@ -15,7 +15,7 @@ Renames (applied uniformly to text and string values, in the order given): __zox
 _ZO_-> _JB_, zoxide->jumbit, z#->j#; the output is then normalized through `moon fmt`.
 
 Usage:
-  gen_templates.py --src ~/repos-other/zoxide/templates --shell bash --out templates/bash_gen.mbt
+  gen_templates.py --src <zoxide checkout>/templates --shell bash --out templates/bash_gen.mbt
   gen_templates.py --src ... --shell bash --stdout   # regression comparison mode
 Regression check: regenerate bash/zsh and diff byte for byte against the committed files (the post-moon-fmt shape).
 """

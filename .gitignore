@@ -7,5 +7,4 @@ target
 __pycache__/
 *.pyc
 
-# 本地件：凭据、交接文档、会话产物（不入库，不随克隆走）
-.internal/
+# Local-only material: credentials, handoff notes, session artifacts (never published)
