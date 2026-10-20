@@ -7,9 +7,14 @@ cd "$(dirname "$0")/.."
 
 data=$(mktemp -d)
 target=$(mktemp -d)
+# macOS TMPDIR always ends in a slash (…/T/), so "$TMPDIR/name" would hold a "//" that jumbit's resolve_path
+# collapses on insert: the recorded path then differs from the expected string. Strip the slash once and join onto
+# this base everywhere below (TMPDIR=/tmp/ reproduces the macOS shape on Linux)
+tmpbase="${TMPDIR:-/tmp}"
+tmpbase="${tmpbase%/}"
 # BSD/macOS mktemp requires its template to end in X and cannot take a suffixed form like test.ps1 (GNU can):
 # suffixed temporaries go into a fixed name inside a unique directory, cleaned up by the trap
-scratch=$(mktemp -d "${TMPDIR:-/tmp}/jumbit-sfx-XXXX")
+scratch=$(mktemp -d "$tmpbase/jumbit-sfx-XXXX")
 trap 'rm -rf "$data" "$target" "$scratch"' EXIT
 
 echo "== building the release binary =="
@@ -166,10 +171,10 @@ echo "== real invocation shapes: bare name on PATH + relative path + the full ho
 # always uses a full path containing /, so the bare-name branch went untested: the old argv[0] heuristic
 # ("strip only when it contains /") made every bare-name call report unknown command with exit 2 and the hook
 # fail silently. Here the binary is installed as `jumbit` in a temporary PATH prefix to cover all three argv[0] forms.
-rdata=$(mktemp -d "${TMPDIR:-/tmp}/jumbit-real-XXXX")
-rtgt=$(mktemp -d "${TMPDIR:-/tmp}/jumbit-real-tgt-XXXX")
-rfrom=$(mktemp -d "${TMPDIR:-/tmp}/jumbit-real-src-XXXX")
-rbin=$(mktemp -d "${TMPDIR:-/tmp}/jumbit-real-bin-XXXX")
+rdata=$(mktemp -d "$tmpbase/jumbit-real-XXXX")
+rtgt=$(mktemp -d "$tmpbase/jumbit-real-tgt-XXXX")
+rfrom=$(mktemp -d "$tmpbase/jumbit-real-src-XXXX")
+rbin=$(mktemp -d "$tmpbase/jumbit-real-bin-XXXX")
 cp "$bin" "$rbin/jumbit"
 
 PATH="$rbin:$PATH" _JB_DATA_DIR="$rdata" jumbit add -- "$rtgt" ||
@@ -268,7 +273,7 @@ if ! echo "$out" | grep -qE '^ *[0-9]+\.[0-9] .+'; then
 fi
 
 echo "== query --json: a single-line JSON array (the agent channel) =="
-jdata=$(mktemp -d "${TMPDIR:-/tmp}/jumbit-json-XXXX")
+jdata=$(mktemp -d "$tmpbase/jumbit-json-XXXX")
 printf '/smoke-json|1|1704067200\n' > "$jdata/z.txt"
 _JB_DATA_DIR="$jdata" _Z_DATA="$jdata/z.txt" "$bin" import z >/dev/null 2>&1
 json_out=$(_JB_DATA_DIR="$jdata" "$bin" query --json --all)
@@ -280,7 +285,7 @@ fi
 rm -rf "$jdata"
 
 echo "== query --fuzzy: the fallback when an exact pass finds nothing (matched_by=fuzzy) =="
-fdata=$(mktemp -d "${TMPDIR:-/tmp}/jumbit-fz-XXXX")
+fdata=$(mktemp -d "$tmpbase/jumbit-fz-XXXX")
 printf '/smoke-fz/blog/work|1|0\n' > "$fdata/z.txt"
 _JB_DATA_DIR="$fdata" _Z_DATA="$fdata/z.txt" "$bin" import z >/dev/null 2>&1
 if _JB_DATA_DIR="$fdata" "$bin" query --json --all blog >/dev/null 2>&1; then
@@ -296,8 +301,8 @@ fi
 rm -rf "$fdata"
 
 echo "== export --agents: the project-map Markdown (with pipe escaping) =="
-edata=$(mktemp -d "${TMPDIR:-/tmp}/jumbit-exp-XXXX")
-etgt=$(mktemp -d "${TMPDIR:-/tmp}/jumbit-exp-tgt-XXXX")
+edata=$(mktemp -d "$tmpbase/jumbit-exp-XXXX")
+etgt=$(mktemp -d "$tmpbase/jumbit-exp-tgt-XXXX")
 _JB_DATA_DIR="$edata" "$bin" add -- "$etgt" >/dev/null
 _JB_DATA_DIR="$edata" "$bin" describe "$etgt" --note "后端服务 | 含API" >/dev/null
 _JB_DATA_DIR="$edata" "$bin" export --agents | tr -d '\r' > "$edata/map.md"
@@ -319,7 +324,7 @@ if _JB_DATA_DIR="$data" "$bin" frobnicate 2>/dev/null; then
 fi
 
 echo "== keyword query (anchored on the final component) =="
-t2=$(mktemp -d "${TMPDIR:-/tmp}/foo-demo-XXXX")
+t2=$(mktemp -d "$tmpbase/foo-demo-XXXX")
 trap 'rm -rf "$data" "$target" "$t2"' EXIT
 _JB_DATA_DIR="$data" "$bin" add -- "$t2"
 out=$(_JB_DATA_DIR="$data" "$bin" query foo)
