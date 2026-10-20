@@ -77,7 +77,7 @@ pub(all) struct QueryOptions {
   mut exclude : String?
   mut json : Bool
   mut fuzzy : Bool
-  mut limit : Int?
+  mut limit : Int32?
   mut tsv : Bool
 } derive(Eq, @debug.Debug)
 

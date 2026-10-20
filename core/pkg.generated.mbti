@@ -10,7 +10,7 @@ pub const DAY : Int64 = 86400
 
 pub const HOUR : Int64 = 3600
 
-pub const MAX_SIZE : Int = 33554432
+pub const MAX_SIZE : Int32 = 33554432
 
 pub const MINUTE : Int64 = 60
 
@@ -68,7 +68,7 @@ pub(all) enum AtuinTsError {
 
 pub enum CodecError {
   CorruptedData
-  UnsupportedVersion(Int)
+  UnsupportedVersion(Int32)
   TooLarge
 } derive(@debug.Debug)
 
@@ -82,7 +82,7 @@ pub fn Database::add_update(Self, String, Double, Int64) -> Unit
 pub fn Database::age(Self, Double) -> Unit
 pub fn Database::all(Self) -> Array[Dir]
 pub fn Database::dedup(Self) -> Unit
-pub fn Database::find_idx(Self, String) -> Int?
+pub fn Database::find_idx(Self, String) -> Int32?
 pub fn Database::from_dirs(Array[Dir]) -> Self
 pub fn Database::is_dirty(Self) -> Bool
 pub fn Database::is_empty(Self) -> Bool
@@ -96,7 +96,7 @@ pub fn Database::replace_all(Self, Array[Dir]) -> Unit
 pub fn Database::set_note(Self, String, String?) -> Bool
 pub fn Database::sort_by_path(Self) -> Unit
 pub fn Database::sort_by_score(Self, Int64) -> Unit
-pub fn Database::swap_remove(Self, Int) -> Unit
+pub fn Database::swap_remove(Self, Int32) -> Unit
 
 pub(all) struct Dir {
   mut path : String

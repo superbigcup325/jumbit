@@ -6,7 +6,7 @@ import {
 }
 
 // Values
-pub async fn run(Array[String], (String) -> String?, Array[String]) -> Int
+pub async fn run(Array[String], (String) -> String?, Array[String]) -> Int32
 
 // Errors
 

@@ -14,7 +14,7 @@ main-line release build after the plaintext-database decode fast path landed.
 | Measured | 2026-10-05 |
 | Hardware | Intel i5-12500H (12th gen, 16 threads) / 15 GiB / x86_64 |
 | System | CachyOS, kernel 7.2.x |
-| jumbit | release build (main line 2026-10-05, after two rounds of query hot-path work), toolchain moon 0.1.20260920 (the version ci.yml anchored at the time; after the 2026-10-15 bump to 0.1.20261012, perf_check re-checked and found the same order of magnitude) |
+| jumbit | release build (main line 2026-10-05, after two rounds of query hot-path work), toolchain moon 0.1.20260920 (the version ci.yml anchored at the time; after the 2026-10-15 bump to 0.1.20261012 and the 2026-10-20 bump to 0.1.20261016, perf_check re-checked both times and found the same order of magnitude) |
 | Judge | zoxide 0.10.0 (the real binary from PATH, not a mock) |
 | Dataset | z format, 1,000,000 lines / 300,000 unique paths / 43,822,540 bytes (`scripts/gen_dataset.py`, seed=20260908, Zipf visit distribution + time decay + boundary rows + deterministic bad rows) |
 | Environment pin | `_JB_MAXAGE`/`_ZO_MAXAGE` = u32::MAX (suppresses aging-driven pruning; 1M rows accumulate far past the default threshold, and without this both sides would prune identically) |

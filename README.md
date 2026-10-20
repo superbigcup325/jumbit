@@ -48,7 +48,7 @@ moon install superbigcup325/jumbit/cmd/jumbit   # install the binary globally
 
 Note: the binary lands at `~/.moon/bin/jumbit`, matching the executable name, ready to use right away (`~/.moon/bin` is already on your PATH, otherwise the `moon` command itself would not run)
 
-**Option 3: build from source** (anchored at `moon 0.1.20261012`; CI pins this version for reproducible builds):
+**Option 3: build from source** (anchored at `moon 0.1.20261016`; CI pins this version for reproducible builds):
 
 ```bash
 git clone https://github.com/superbigcup325/jumbit && cd jumbit
