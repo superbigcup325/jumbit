@@ -57,10 +57,13 @@ jobs:
           moon version --all
           moon version | grep -F "${{ env.MOONBIT_VERSION }}"
 
-      - name: Fetch dependencies
-        run: |
-          moon update
-          moon install
+      # moon update only refreshes the registry index: since 0.1.20261016 plain
+      # `moon install` is the global binary installer and requires a SOURCE
+      # argument (it used to install the module's dependencies), so dependency
+      # resolution now happens implicitly during check/build (cold ~/.moon
+      # cache: "Downloading moonbitlang/..." during the Lint step)
+      - name: Refresh the registry index
+        run: moon update
 
       - name: Lint (check --deny-warn)
         run: moon check --deny-warn

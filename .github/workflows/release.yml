@@ -56,10 +56,8 @@ jobs:
         run: |
           moon version --all
           moon version | grep -F "$MOONBIT_VERSION"
-      - name: Fetch dependencies
-        run: |
-          moon update
-          moon install
+      - name: Refresh the registry index
+        run: moon update
       - name: Build (release)
         run: moon build --release
       - name: Smoke (built binary end-to-end)

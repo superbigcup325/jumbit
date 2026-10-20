@@ -3,7 +3,7 @@
 # to be red. It gathers the full signal set in one shot to answer "what would
 # Windows really cost to take on":
 #   1. toolchain: does moonbit-windows-x86_64.zip install and run (install/powershell.ps1)
-#   2. dependencies and build: moon update/install, check, test, release artefacts
+#   2. dependencies and build: moon update (dependencies resolve during check/build), check, test, release artefacts
 #   3. script gates: how far the smoke/golden POSIX assumptions go under Git Bash
 # Only an all-green run is worth folding into the matrix; each red step goes into
 # the ledger as evidence for or against taking Windows on.
@@ -41,12 +41,11 @@ jobs:
           moon version --all
           moon version | Select-String -SimpleMatch $env:MOONBIT_VERSION
 
-      - name: Fetch dependencies
+      - name: Refresh the registry index
         id: deps
         continue-on-error: true
         run: |
           moon update
-          moon install
 
       - name: Lint (check --deny-warn)
         id: check
