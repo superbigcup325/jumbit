@@ -1,6 +1,7 @@
 ///|
 /// query\'s options and keywords (--exclude is an exact path, matching upstream; glob exclusion goes through _JB_EXCLUDE_DIRS;
 /// --json/--fuzzy/--limit/--tsv are jumbit extensions upstream has no equivalent for)
+#derive(Debug, Eq)
 pub(all) struct QueryOptions {
   keywords : Array[String]
   mut all : Bool
@@ -14,51 +15,57 @@ pub(all) struct QueryOptions {
   mut limit : Int32?
   /// --tsv: the headerless tab-separated data channel (a jumbit extension)
   mut tsv : Bool
-} derive(Debug, Eq)
+}
 
 ///|
 /// Subcommands (add / query / remove / init / import / describe / export / help)
+#derive(Debug, Eq)
 pub(all) struct AddOptions {
   paths : Array[String]
   mut score : Double
-} derive(Debug, Eq)
+}
 
 ///|
+#derive(Debug, Eq)
 pub(all) struct InitOptions {
   shell : String
   mut cmd : String?
   mut hook : @tpl.Hook
   mut no_cmd : Bool
-} derive(Debug, Eq)
+}
 
 ///|
 /// import\'s options: plugin in {atuin, autojump, fasd, z, z.lua, zsh-z};
 /// --merge matches upstream\'s global flag and may appear anywhere before or after the plugin name
+#derive(Debug, Eq)
 pub(all) struct ImportOptions {
   plugin : String
   mut merge : Bool
-} derive(Debug, Eq)
+}
 
 ///|
 /// describe\'s options (a jumbit extension): note None means view mode, Some("") means clear
+#derive(Debug, Eq)
 pub(all) struct DescribeOptions {
   path : String
   mut note : String?
-} derive(Debug, Eq)
+}
 
 ///|
 /// export\'s options (a jumbit extension): --agents prints the project-map Markdown
+#derive(Debug, Eq)
 pub(all) struct ExportOptions {
   mut agents : Bool
-} derive(Debug, Eq)
+}
 
 ///|
 /// status\'s options (a jumbit extension): --json is a single-line JSON object; --check explicitly runs
 /// the O(N) existence scan (the default quick check walks no filesystem)
+#derive(Debug, Eq)
 pub(all) struct StatusOptions {
   mut json : Bool
   mut check : Bool
-} derive(Debug, Eq)
+}
 
 ///|
 
@@ -66,14 +73,16 @@ pub(all) struct StatusOptions {
 /// edit\'s argument parsing (a jumbit extension, spec docs/spec-plaintext-edit.md §1.4):
 /// no flag = interactive editing with $EDITOR; --rename <old> <new> changes a path (the note follows);
 /// --prune drops entries that no longer exist. The three forms are mutually exclusive
+#derive(Debug, Eq)
 pub(all) struct EditOptions {
   mut rename_old : String?
   mut rename_new : String?
   mut prune : Bool
-} derive(Debug, Eq)
+}
 
 ///|
 /// Subcommands (add / query / remove / init / import / describe / export / help)
+#derive(Debug, Eq)
 pub(all) enum Command {
   Add(AddOptions)
   Query(QueryOptions)
@@ -96,7 +105,7 @@ pub(all) enum Command {
   Unknown(String)
   /// A semantic argument error (conflicting flags / invalid value): the wording is reported as is, with no unknown-command prefix
   Invalid(String)
-} derive(Debug, Eq)
+}
 
 ///|
 /// Subcommand parsing (args excludes the program name; verified for @env.args())

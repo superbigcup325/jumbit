@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 env:
-  MOONBIT_VERSION: 0.1.20261016
+  MOONBIT_VERSION: 0.1.20261104
 
 jobs:
   build:

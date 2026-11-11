@@ -18,11 +18,13 @@ pub fn version() -> String
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) struct AddOptions {
   paths : Array[String]
   mut score : Double
-} derive(Eq, @debug.Debug)
+}
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Command {
   Add(AddOptions)
   Query(QueryOptions)
@@ -39,35 +41,41 @@ pub(all) enum Command {
   Usage
   Unknown(String)
   Invalid(String)
-} derive(Eq, @debug.Debug)
+}
 
+#derive(Eq, @debug.Debug)
 pub(all) struct DescribeOptions {
   path : String
   mut note : String?
-} derive(Eq, @debug.Debug)
+}
 
+#derive(Eq, @debug.Debug)
 pub(all) struct EditOptions {
   mut rename_old : String?
   mut rename_new : String?
   mut prune : Bool
-} derive(Eq, @debug.Debug)
+}
 
+#derive(Eq, @debug.Debug)
 pub(all) struct ExportOptions {
   mut agents : Bool
-} derive(Eq, @debug.Debug)
+}
 
+#derive(Eq, @debug.Debug)
 pub(all) struct ImportOptions {
   plugin : String
   mut merge : Bool
-} derive(Eq, @debug.Debug)
+}
 
+#derive(Eq, @debug.Debug)
 pub(all) struct InitOptions {
   shell : String
   mut cmd : String?
   mut hook : @templates.Hook
   mut no_cmd : Bool
-} derive(Eq, @debug.Debug)
+}
 
+#derive(Eq, @debug.Debug)
 pub(all) struct QueryOptions {
   keywords : Array[String]
   mut all : Bool
@@ -79,12 +87,13 @@ pub(all) struct QueryOptions {
   mut fuzzy : Bool
   mut limit : Int32?
   mut tsv : Bool
-} derive(Eq, @debug.Debug)
+}
 
+#derive(Eq, @debug.Debug)
 pub(all) struct StatusOptions {
   mut json : Bool
   mut check : Bool
-} derive(Eq, @debug.Debug)
+}
 
 // Type aliases
 

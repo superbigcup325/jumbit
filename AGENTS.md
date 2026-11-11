@@ -49,7 +49,7 @@ moon info        # regenerates the .mbti interfaces, which are committed
 ## Coding conventions
 
 - Block style, blocks separated by `///|`
-- Public `derive(Debug, Eq)` method-lift suppression lives in each package's
+- Public `#derive(Debug, Eq)` method-lift suppression lives in each package's
   `extends.mbt` (`#deprecated` + `#doc(hidden)` `pub extend`)
 - Blackbox tests refer to the package under test as `@pkg.fn`
 - Prefer fixing the root cause over layering a workaround. If the cause is
@@ -87,3 +87,6 @@ moon info        # regenerates the .mbti interfaces, which are committed
 | Local run is green, CI fails | The toolchain is fetched as `latest`; a `latest` drift once renamed `strconv.from_str` | Re-run the full gate locally before bumping `MOONBIT_VERSION` in `ci.yml`, and bump it in the same change |
 | Local gate all green, CI red at the dependency step | The local gate runs `scripts/*.sh`, which never call `moon install`; the workflow did, and 0.1.20261016 turned plain `moon install` into the global binary installer (it now requires a SOURCE argument) | On a toolchain bump, run the workflow's own command list too (grep the workflows for `moon ` invocations), not just the local scripts — dependencies now resolve implicitly during check/build |
 | A macOS-only integration check fails while Linux is green ("printed /T/x != /T//x") | macOS `$TMPDIR` ends in a slash, so `"$TMPDIR/name"` carries a `//` that `resolve_path` collapses on insert — the test's expected string was the wrong one, not the binary | Strip the trailing slash once (`tmpbase="${TMPDIR:-/tmp}"; tmpbase="${tmpbase%/}"`) and join onto that; `TMPDIR=/tmp/ scripts/smoke.sh` reproduces the macOS shape on Linux |
+| The 0.1.20261104 bump turned every `} derive(...)` into a `--deny-warn` error (deprecated_syntax) | moonc v0.10.20 deprecated the trailing `derive(...)` clause in favour of a `#derive(...)` attribute placed before the declaration | `moon fmt` rewrites it mechanically (no hand edits); expect `moon info` to re-render every affected `.mbti` in the same shape — the public surface is unchanged |
+| A `--deny-warn` error on `errdefer`/`defer` whose body is async code (`cancellable_defer`) | A cancelled task cancels the cleanup too, so a failed or interrupted write could leave its tmp file behind | Wrap the cleanup: `errdefer @async.protect_from_cancel() <| () => { cleanup() }` — the braces are required after `<|` |
+| After a toolchain upgrade `moon build` fails with "version `x.y.z` was not found in the registry" | Only the binaries were replaced; `~/.moon/registry` still holds the old index | Run `moon update` first (CI does it before check/build); dependency resolution then works implicitly |

@@ -19,12 +19,13 @@ pub const MONTH : Int64 = 30L * DAY
 ///|
 /// One directory record: the three fields path/rank/last_accessed match upstream src/db/dir.rs;
 /// note is a jumbit extension (the describe annotation, persisted from the v2 format on, encoded as empty for None)
+#derive(Debug)
 pub(all) struct Dir {
   mut path : String
   mut rank : Double
   mut last_accessed : Int64
   mut note : String?
-} derive(Debug)
+}
 
 ///|
 /// Frecency score = rank x the time-decay factor (epoch units: seconds)

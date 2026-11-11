@@ -1,10 +1,11 @@
 ///|
+#derive(Debug, Eq)
 pub(all) enum GlobError {
   UnclosedBracket
   EmptyClass
   InvalidRange
   TrailingEscape
-} derive(Debug, Eq)
+}
 
 ///|
 /// Validate a glob (matching the Rust glob crate\'s construction-time errors):

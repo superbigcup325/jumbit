@@ -1,10 +1,11 @@
 ///|
 /// One record from an import source: its line number (1-based; blank lines and empty records count too, matching upstream\'s line-by-line reads)
 /// result holds the UTF-8 decode; a failed line carries the reason, and the caller reports `<source>:<line>`
+#derive(Debug)
 pub(all) struct ImportRecord {
   line_num : Int32
   result : Result[String, String]
-} derive(Debug)
+}
 
 ///|
 /// Read a plugin\'s data file record by record through a callback (\n separated, trailing \r stripped).

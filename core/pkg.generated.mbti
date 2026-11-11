@@ -59,23 +59,26 @@ pub fn validate_glob(String) -> GlobError?
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) enum AtuinTsError {
   Component(String)
   CharLiteral
   Trailing
   DayRange
-} derive(Eq, @debug.Debug)
+}
 
+#derive(@debug.Debug)
 pub enum CodecError {
   CorruptedData
   UnsupportedVersion(Int32)
   TooLarge
-} derive(@debug.Debug)
+}
 
+#derive(@debug.Debug)
 pub struct Database {
   mut dirs : Array[Dir]
   mut dirty : Bool
-} derive(@debug.Debug)
+}
 pub fn Database::add(Self, String, Double, Int64) -> Unit
 pub fn Database::add_unchecked(Self, String, Double, Int64) -> Unit
 pub fn Database::add_update(Self, String, Double, Int64) -> Unit
@@ -98,30 +101,34 @@ pub fn Database::sort_by_path(Self) -> Unit
 pub fn Database::sort_by_score(Self, Int64) -> Unit
 pub fn Database::swap_remove(Self, Int32) -> Unit
 
+#derive(@debug.Debug)
 pub(all) struct Dir {
   mut path : String
   mut rank : Double
   mut last_accessed : Int64
   mut note : String?
-} derive(@debug.Debug)
+}
 pub fn Dir::format_score(Self, Int64) -> String
 pub fn Dir::score(Self, Int64) -> Double
 
+#derive(Eq, @debug.Debug)
 pub(all) enum GlobError {
   UnclosedBracket
   EmptyClass
   InvalidRange
   TrailingEscape
-} derive(Eq, @debug.Debug)
+}
 
+#derive(@debug.Debug)
 pub(all) struct LocatedDir {
   location : String
   result : Result[Dir, String]
-} derive(@debug.Debug)
+}
 
+#derive(@debug.Debug)
 pub(all) struct PlaintextError {
   lines : Array[String]
-} derive(@debug.Debug)
+}
 pub fn PlaintextError::message(Self) -> String
 
 pub(all) struct StreamOptions {

@@ -1,4 +1,5 @@
 ///|
+#derive(Debug, Eq)
 pub(all) enum FzfError {
   /// fzf unavailable (every spawn failure lands here; upstream also distinguishes "could not launch fzf",
   /// but the @process binding exposes no spawn error class, so it cannot be split out -- noted in the README)
@@ -15,7 +16,7 @@ pub(all) enum FzfError {
   Terminated
   /// every other exit code: 3..=127 and 255 (upstream\'s wording "fzf returned an unknown error")
   UnknownExit(Int32)
-} derive(Debug, Eq)
+}
 
 ///|
 /// The fzf exit-code mapping (matching upstream FzfChild::wait, measured with a fake-fzf probe matrix against

@@ -17,6 +17,7 @@ async fn resolve_editor(get : (String) -> String?) -> String? {
 
 ///|
 /// Editor errors (jumbit\'s own semantic surface, worded in the style of the existing stderr phrases)
+#derive(Debug)
 pub enum EditorError {
   /// $VISUAL/$EDITOR unset and no vi on PATH
   NotFound
@@ -24,7 +25,7 @@ pub enum EditorError {
   Failed(Int32)
   /// a spawn failure (resolution succeeded but exec failed, and so on; the @process binding exposes no error class)
   Spawn
-} derive(Debug)
+}
 
 ///|
 /// Interactive editing: spawn the editor on the given file with inherited terminal stdio (wait for exit, collecting no
