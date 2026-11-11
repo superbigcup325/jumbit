@@ -15,7 +15,10 @@ pub async fn write_atomic(path : String, contents : Bytes) -> Unit {
     break (opened, tmp)
   }
   let (file, tmp) = pair
-  errdefer remove_quiet(tmp)
+  // The cleanup is cancellable async code, so it is wrapped in
+  // protect_from_cancel: a cancelled write must still remove its tmp file
+  // instead of leaving it behind (the cancellable_defer lint, moonc v0.10.20)
+  errdefer @async.protect_from_cancel() <| () => { remove_quiet(tmp) }
   file.write(contents)
   file.sync()
   file.close()

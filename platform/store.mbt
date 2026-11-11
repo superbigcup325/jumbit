@@ -1,10 +1,11 @@
 ///|
 /// Database access errors: IO failure, binary codec failure, plaintext line-level failure
+#derive(Debug)
 pub enum StoreError {
   Io(String)
   Codec(@core.CodecError)
   Plaintext(@core.PlaintextError)
-} derive(Debug)
+}
 
 ///|
 /// CodecError -> a user-readable reason (the single exit shared by status\'s header diagnosis and StoreError, so the
@@ -55,10 +56,11 @@ pub fn os_error_message(err : Error) -> String {
 
 ///|
 /// The access context: the database plus the data-directory location
+#derive(Debug)
 pub(all) struct Store {
   db : @core.Database
   data_dir : String
-} derive(Debug)
+}
 
 ///|
 pub fn Store::database(self : Store) -> @core.Database {

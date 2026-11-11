@@ -13,11 +13,12 @@ const CODEC_VERSION : Int32 = 2
 const MIN_DECODE_VERSION : Int32 = 1
 
 ///|
+#derive(Debug)
 pub enum CodecError {
   CorruptedData
   UnsupportedVersion(Int32)
   TooLarge
-} derive(Debug)
+}
 
 ///|
 /// The UTF-8 encoded length (counted per scalar value, matching @utf8.encode\'s output); used for pre-sizing, avoiding a second encode

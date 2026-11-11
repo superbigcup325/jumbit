@@ -97,10 +97,11 @@ pub fn parse_atuin_line(line : String) -> Result[Dir, String] {
 ///|
 /// A parsed entry carrying its location: the caller builds `<source>:<line>` for error reporting (with no file source for atuin it
 /// passes `line <N>`); bound to the entry, it can go through the folder as a whole (isomorphic to upstream ImportError)
+#derive(Debug)
 pub(all) struct LocatedDir {
   location : String
   result : Result[Dir, String]
-} derive(Debug)
+}
 
 ///|
 /// Consecutive same-path folding for an atuin import (matching prev_cwd in upstream src/import/atuin.rs Iter):
@@ -142,12 +143,13 @@ fn sigmoid(x : Double) -> Double {
 /// - a day within 1..=31 but past that month\'s length (a leap day) -> "day was not in range" (three links)
 /// - a wrong separator in the fixed layout -> "a character literal was not valid" (two links)
 /// - the first 19 characters valid but with trailing characters -> "unexpected trailing characters; ..." (two links)
+#derive(Debug, Eq)
 pub(all) enum AtuinTsError {
   Component(String)
   CharLiteral
   Trailing
   DayRange
-} derive(Debug, Eq)
+}
 
 ///|
 fn atuin_ts_message(ts : String, reason : AtuinTsError) -> String {

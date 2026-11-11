@@ -18,9 +18,10 @@ const PLAINTEXT_MAX_ERRORS : Int32 = 8
 ///|
 /// A plaintext decode line-level error (aggregated at the end of the decode, rejecting the whole database; matching upstream\'s errors collection).
 /// lines is the display surface: decode_plaintext has already truncated to PLAINTEXT_MAX_ERRORS
+#derive(Debug)
 pub(all) struct PlaintextError {
   lines : Array[String]
-} derive(Debug)
+}
 
 ///|
 /// The aggregate wording joins the lines with newlines (matching the multi-line stderr shape of upstream errors.join("\n"))

@@ -28,12 +28,14 @@ pub async fn write_atomic(String, Bytes) -> Unit
 // Errors
 
 // Types and methods
+#derive(@debug.Debug)
 pub enum EditorError {
   NotFound
   Failed(Int32)
   Spawn
-} derive(@debug.Debug)
+}
 
+#derive(Eq, @debug.Debug)
 pub(all) enum FzfError {
   NotFound
   NoMatch
@@ -41,25 +43,28 @@ pub(all) enum FzfError {
   Interrupted
   Terminated
   UnknownExit(Int32)
-} derive(Eq, @debug.Debug)
+}
 
+#derive(@debug.Debug)
 pub(all) struct ImportRecord {
   line_num : Int32
   result : Result[String, String]
-} derive(@debug.Debug)
+}
 
+#derive(@debug.Debug)
 pub(all) struct Store {
   db : @core.Database
   data_dir : String
-} derive(@debug.Debug)
+}
 pub fn Store::database(Self) -> @core.Database
 pub async fn Store::save(Self) -> Result[Unit, StoreError]
 
+#derive(@debug.Debug)
 pub enum StoreError {
   Io(String)
   Codec(@core.CodecError)
   Plaintext(@core.PlaintextError)
-} derive(@debug.Debug)
+}
 pub fn StoreError::message(Self) -> String
 
 // Type aliases

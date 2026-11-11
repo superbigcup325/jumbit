@@ -48,7 +48,7 @@ moon install superbigcup325/jumbit/cmd/jumbit   # install the binary globally
 
 Note: the binary lands at `~/.moon/bin/jumbit`, matching the executable name, ready to use right away (`~/.moon/bin` is already on your PATH, otherwise the `moon` command itself would not run)
 
-**Option 3: build from source** (anchored at `moon 0.1.20261016`; CI pins this version for reproducible builds):
+**Option 3: build from source** (anchored at `moon 0.1.20261104`; CI pins this version for reproducible builds):
 
 ```bash
 git clone https://github.com/superbigcup325/jumbit && cd jumbit
@@ -59,6 +59,8 @@ cp _build/native/release/build/cmd/jumbit/jumbit.exe ~/.local/bin/   # or any di
 ```
 
 Toolchain anchor: CI pins reproducible builds via the `MOONBIT_VERSION` constant in `.github/workflows/ci.yml`; when upgrading the toolchain, bump that constant in the same change and rerun the full verification suite (regression/golden/dataset/chaos/realdata) — the constant is the single source of truth for the version
+
+Minimum toolchain: `0.1.20261104` (moonc `v0.10.20`), the version the source is written against — the tree uses the `#derive(...)` attribute form and wraps cancellable `errdefer` cleanup in `@async.protect_from_cancel` (the `cancellable_defer` lint), so an older toolchain is untested and unsupported. Targets: the build is verified on Linux x86_64 (CI plus the full local gate) and macOS Apple Silicon (CI); Windows is probe-only, not a promise
 
 ## Quick start
 

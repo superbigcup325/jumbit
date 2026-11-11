@@ -5,6 +5,7 @@
 /// format = the identity of the format actually loaded (spec docs/spec-plaintext-edit.md §3.4):
 /// "plaintext" (db.txt, the main format) / "binary" (legacy db.zo, read-only with no migration) / None (no database) --
 /// the binary\'s internal version number never leaks (the diagnostic value lives on the "corrupted data file" path)
+#derive(Debug)
 struct DbStatus {
   data_file : String
   file_size : Int32
@@ -14,7 +15,7 @@ struct DbStatus {
   /// the current _JB_MAXAGE (config parses it into a Double)
   maxage : Double
   existing : Int32?
-} derive(Debug)
+}
 
 ///|
 fn render_status_human(r : DbStatus) -> Array[String] {

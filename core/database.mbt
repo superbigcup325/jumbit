@@ -1,10 +1,11 @@
 ///|
 /// The database: an entry array plus a dirty flag (matching upstream src/db/mod.rs; MoonBit has no borrow constraints, so it holds the array directly)
 /// A pub struct: the fields are readable from outside but cannot be constructed or mutated in place, and every change goes through a method (keeping dirty consistent)
+#derive(Debug)
 pub struct Database {
   mut dirs : Array[Dir]
   mut dirty : Bool
-} derive(Debug)
+}
 
 ///|
 pub fn Database::new() -> Database {

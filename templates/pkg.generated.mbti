@@ -27,11 +27,12 @@ pub fn render_zsh(String?, Hook, Bool, Bool) -> String
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) enum Hook {
   HookNone
   HookPrompt
   HookPwd
-} derive(Eq, @debug.Debug)
+}
 
 // Type aliases
 
